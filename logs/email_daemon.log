@@ -1,0 +1,92 @@
+2026-01-09 00:53:26,155 - INFO - Email daemon starting
+2026-01-09 01:04:19,536 - INFO - Email daemon starting
+2026-01-09 01:04:19,664 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:04:34,752 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:05:16,453 - INFO - Email daemon starting
+2026-01-09 01:05:16,551 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:05:31,634 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:05:46,731 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:06:01,829 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:06:16,909 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:06:31,997 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:06:47,077 - WARNING - GET failed for https://scrapiq.leadtechx.com/api/campaigns/active: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>
+2026-01-09 01:07:14,679 - INFO - Email daemon starting
+2026-01-09 01:07:14,928 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaigns/active; retried with insecure context.
+2026-01-09 01:07:15,135 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaign/8/nomail?batch=1; retried with insecure context.
+2026-01-09 01:07:15,136 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:07:15,136 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:07:15,137 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:07:35,425 - INFO - Email job completed: queue/processed/campaign_8.json
+2026-01-09 01:07:35,639 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaigns/active; retried with insecure context.
+2026-01-09 01:07:35,840 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaign/8/nomail?batch=1; retried with insecure context.
+2026-01-09 01:07:51,072 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaigns/active; retried with insecure context.
+2026-01-09 01:07:51,290 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaign/8/nomail?batch=1; retried with insecure context.
+2026-01-09 01:08:06,522 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaigns/active; retried with insecure context.
+2026-01-09 01:08:06,729 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaign/8/nomail?batch=1; retried with insecure context.
+2026-01-09 01:08:21,962 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaigns/active; retried with insecure context.
+2026-01-09 01:08:22,182 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaign/8/nomail?batch=1; retried with insecure context.
+2026-01-09 01:08:37,407 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaigns/active; retried with insecure context.
+2026-01-09 01:08:37,612 - WARNING - SSL verification failed for https://scrapiq.leadtechx.com/api/campaign/8/nomail?batch=1; retried with insecure context.
+2026-01-09 01:11:14,222 - INFO - Email daemon starting
+2026-01-09 01:11:14,472 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 01:12:01,977 - INFO - Email daemon starting
+2026-01-09 01:12:02,225 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 01:13:27,866 - INFO - Email daemon starting
+2026-01-09 01:13:28,103 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 01:13:28,233 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:13:28,233 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:13:28,233 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:13:40,489 - INFO - Email job completed: queue/processed/campaign_8.json.1767942820
+2026-01-09 01:13:55,758 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:13:55,758 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:13:55,759 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:14:07,661 - INFO - Email job completed: queue/processed/campaign_8.json.1767942847
+2026-01-09 01:14:22,932 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:14:22,933 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:14:22,933 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:14:38,683 - INFO - Email job completed: queue/processed/campaign_8.json.1767942878
+2026-01-09 01:14:38,979 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:14:38,980 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:14:38,980 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:14:47,111 - INFO - Email job completed: queue/processed/campaign_8.json.1767942887
+2026-01-09 01:15:02,397 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:15:02,398 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:15:02,398 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:15:14,203 - INFO - Email job completed: queue/processed/campaign_8.json.1767942914
+2026-01-09 01:15:29,475 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:15:29,476 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:15:29,476 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:15:44,947 - INFO - Email job completed: queue/processed/campaign_8.json.1767942944
+2026-01-09 01:15:45,216 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:15:45,216 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:15:45,216 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:15:54,077 - INFO - Email job completed: queue/processed/campaign_8.json.1767942954
+2026-01-09 01:16:09,358 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:16:09,358 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:16:09,359 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:16:23,158 - INFO - Email job completed: queue/processed/campaign_8.json.1767942983
+2026-01-09 01:16:38,451 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:16:38,451 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:16:38,451 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:16:49,670 - INFO - Email job completed: queue/processed/campaign_8.json.1767943009
+2026-01-09 01:17:04,931 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:17:04,931 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:17:04,932 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:17:18,983 - INFO - Email job completed: queue/processed/campaign_8.json.1767943038
+2026-01-09 01:17:34,263 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:17:34,263 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:17:34,263 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:17:43,715 - INFO - Email job completed: queue/processed/campaign_8.json.1767943063
+2026-01-09 01:17:59,016 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:17:59,016 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:17:59,016 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:18:10,761 - INFO - Email job completed: queue/processed/campaign_8.json.1767943090
+2026-01-09 01:18:26,050 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:18:26,050 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:18:26,050 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:18:38,899 - INFO - Email job completed: queue/processed/campaign_8.json.1767943118
+2026-01-09 01:18:54,171 - INFO - Queued email job: queue/campaign_8.json
+2026-01-09 01:18:54,171 - INFO - Discovered active campaign 8 with missing emails.
+2026-01-09 01:18:54,171 - INFO - Starting email scraper for campaign 8
+2026-01-09 01:18:57,179 - ERROR - Email job failed (code=-15): queue/failed/campaign_8.json
+2026-01-09 01:18:57,180 - INFO - Email daemon stopping

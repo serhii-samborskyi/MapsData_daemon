@@ -1,0 +1,24 @@
+{
+  "email": {
+    "batch": 10,
+    "concurrency": 3,
+    "domain_timeout_s": 60.0,
+    "facebook": false,
+    "links": 5,
+    "timeout_s": 8.0
+  },
+  "email_base_url": "https://scrapiq.leadtechx.com",
+  "email_poll_interval_s": 15,
+  "logging": {
+    "email_log": "logs/email_daemon.log",
+    "maps_log": "logs/maps_daemon.log"
+  },
+  "maps": {
+    "batch_size": 20,
+    "csv_dir": "",
+    "max_concurrent": 3
+  },
+  "maps_base_url": "https://scrapiq.leadtechx.com/api",
+  "maps_poll_interval_s": 30,
+  "queue_dir": "queue"
+}
