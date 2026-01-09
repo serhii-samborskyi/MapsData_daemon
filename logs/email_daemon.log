@@ -90,3 +90,24 @@
 2026-01-09 01:18:54,171 - INFO - Starting email scraper for campaign 8
 2026-01-09 01:18:57,179 - ERROR - Email job failed (code=-15): queue/failed/campaign_8.json
 2026-01-09 01:18:57,180 - INFO - Email daemon stopping
+2026-01-09 08:12:02,987 - INFO - Email daemon starting
+2026-01-09 08:12:03,206 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 08:12:03,207 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:12:28,773 - INFO - Email job completed: queue/processed/campaign_11.json
+2026-01-09 08:15:02,918 - INFO - Email daemon starting
+2026-01-09 08:15:03,142 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 08:21:04,410 - INFO - Email daemon starting
+2026-01-09 08:21:04,631 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 08:21:35,081 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 08:21:35,082 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 08:21:35,082 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:22:03,908 - INFO - Email job completed: queue/processed/campaign_11.json.1767968523
+2026-01-09 08:22:04,181 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 08:22:04,181 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 08:22:04,181 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:22:27,376 - INFO - Email job completed: queue/processed/campaign_11.json.1767968547
+2026-01-09 08:22:27,664 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 08:22:27,665 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 08:22:27,665 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:22:44,592 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json
+2026-01-09 08:22:44,592 - INFO - Email daemon stopping

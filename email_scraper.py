@@ -214,6 +214,33 @@ PUBLIC_PROVIDERS = {
 
 PREFERRED_MAILBOX_ORDER = ["info@", "contact@", "hello@", "support@", "sales@", "admin@"]
 
+# Only accept emails from common business TLDs or known public providers.
+ALLOWED_DOMAIN_SUFFIXES = {
+    ".com", ".net", ".org", ".edu", ".gov", ".mil",
+    ".us", ".uk", ".ca", ".au", ".nz",
+    ".de", ".fr", ".it", ".es", ".nl", ".be", ".ch", ".at",
+    ".se", ".no", ".dk", ".fi", ".ie", ".pt", ".pl", ".cz", ".sk", ".hu", ".ro", ".bg", ".gr",
+    ".lt", ".lv", ".ee",
+    ".il", ".tr", ".ua",
+    ".br", ".mx", ".ar", ".cl", ".co", ".pe",
+    ".za", ".ng", ".ke",
+    ".cn", ".jp", ".kr", ".sg", ".my", ".id", ".th", ".vn", ".ph", ".hk", ".tw",
+    ".ae", ".sa",
+    ".io",
+}
+
+
+def is_allowed_domain(domain_part: str) -> bool:
+    if not domain_part or "." not in domain_part:
+        return False
+    host = domain_part.lower().strip(".")
+    if host in PUBLIC_PROVIDERS:
+        return True
+    for suffix in ALLOWED_DOMAIN_SUFFIXES:
+        if host.endswith(suffix):
+            return True
+    return False
+
 
 def priority_score(url_or_text: str) -> int:
     """Smart prioritization based on contact relevance"""
@@ -234,6 +261,15 @@ def deobfuscate_text_for_emails(text: str) -> str:
     t = re.sub(r"\s+@\s+", "@", t)
     t = re.sub(r"\s*\.\s*", ".", t)
     return t.strip()
+
+
+def strip_url_prefix(value: str) -> str:
+    v = (value or "").strip()
+    if v.startswith("http://"):
+        v = v[7:]
+    elif v.startswith("https://"):
+        v = v[8:]
+    return v.lstrip("/")
 
 
 def collect_emails_from_jsonld(soup: BeautifulSoup) -> Set[str]:
@@ -429,9 +465,8 @@ async def extract_emails_from_facebook(
             if any(fake in domain_words for fake in fake_patterns):
                 return False
 
-            # Allow any properly formatted email from Facebook (no domain restriction)
-            domain_parts = host.split(".")
-            if len(domain_parts) >= 2 and 2 <= len(domain_parts[-1]) <= 10:
+            # Allow only common business TLDs or known public providers
+            if is_allowed_domain(host):
                 return True
 
         except Exception:
@@ -638,6 +673,10 @@ async def extract_emails(
             if len(domain_part) < 4 or len(domain_part) > 60:
                 continue
 
+            # Only allow common TLDs or known public providers
+            if not is_allowed_domain(domain_part):
+                continue
+
         except ValueError:
             # Email doesn't contain exactly one @
             continue
@@ -689,6 +728,9 @@ def pick_best_facebook_email(candidates: Set[str]) -> Optional[str]:
             if digit_count > 4:  # Normal domains rarely have more than 4 digits
                 continue
 
+            if not is_allowed_domain(domain_part):
+                continue
+
         except ValueError:
             # Email doesn't contain exactly one @
             continue
@@ -728,7 +770,7 @@ def pick_best_email(domain: str, candidates: Set[str], allow_public: bool = True
         return None
 
     domain = (domain or "").lower()
-    domain = domain.lstrip("http://").lstrip("https://")
+    domain = strip_url_prefix(domain)
     if domain.startswith("www."):
         domain = domain[4:]
 
@@ -916,7 +958,7 @@ async def scrape_and_update_immediate(
                         logger.warning("Browser restarted after timeout.")
 
                 async def try_extract(domain: str, https: bool, js_enabled: bool, check_facebook: bool = False) -> Set[str]:
-                    target = domain if https else "http://" + domain.lstrip("http://").lstrip("https://")
+                    target = domain if https else "http://" + strip_url_prefix(domain)
                     scheme = "https" if https else "http"
                     js_flag = "JSon" if js_enabled else "JSoff"
                     print(f"[START] {target} [{scheme},{js_flag}], links≤{links}", flush=True)
@@ -953,7 +995,7 @@ async def scrape_and_update_immediate(
                                 main_page_result = await asyncio.wait_for(try_extract(domain, True, js_enabled=False, check_facebook=False), timeout=domain_timeout)
 
                                 # Then check Facebook pages separately
-                                target = domain if True else "http://" + domain.lstrip("http://").lstrip("https://")
+                                target = domain if True else "http://" + strip_url_prefix(domain)
                                 context = await browser.new_context(
                                     java_script_enabled=False,
                                     user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
