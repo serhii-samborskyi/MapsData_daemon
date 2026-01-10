@@ -111,3 +111,875 @@
 2026-01-09 08:22:27,665 - INFO - Starting email scraper for campaign 11
 2026-01-09 08:22:44,592 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json
 2026-01-09 08:22:44,592 - INFO - Email daemon stopping
+2026-01-09 08:26:31,553 - INFO - Email daemon starting
+2026-01-09 08:26:31,795 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 08:26:31,931 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 08:26:31,932 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 08:26:31,932 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:27:08,636 - INFO - Email job completed: queue/processed/campaign_11.json.1767968828
+2026-01-09 08:27:08,909 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 08:27:08,909 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 08:27:08,910 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:27:28,954 - INFO - Email job completed: queue/processed/campaign_11.json.1767968848
+2026-01-09 08:27:29,230 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 08:27:29,230 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 08:27:29,231 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:27:58,651 - INFO - Email job completed: queue/processed/campaign_11.json.1767968878
+2026-01-09 08:27:58,923 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 08:27:58,924 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 08:27:58,924 - INFO - Starting email scraper for campaign 11
+2026-01-09 08:28:41,807 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json.1767968921
+2026-01-09 08:28:41,807 - INFO - Email daemon stopping
+2026-01-09 18:35:14,382 - INFO - Email daemon starting
+2026-01-09 18:35:15,225 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 18:35:15,648 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:35:15,648 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:35:15,649 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:35:55,275 - INFO - Email job completed: queue/processed/campaign_11.json.1768005355
+2026-01-09 18:35:55,555 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:35:55,556 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:35:55,556 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:36:17,679 - INFO - Email job completed: queue/processed/campaign_11.json.1768005377
+2026-01-09 18:36:17,952 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:36:17,953 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:36:17,953 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:36:49,567 - INFO - Email job completed: queue/processed/campaign_11.json.1768005409
+2026-01-09 18:36:49,855 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:36:49,856 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:36:49,856 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:37:31,611 - INFO - Email job completed: queue/processed/campaign_11.json.1768005451
+2026-01-09 18:37:31,887 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:37:31,887 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:37:31,889 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:38:13,018 - INFO - Email job completed: queue/processed/campaign_11.json.1768005493
+2026-01-09 18:38:13,329 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:38:13,330 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:38:13,330 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:38:47,513 - INFO - Email job completed: queue/processed/campaign_11.json.1768005527
+2026-01-09 18:38:47,806 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:38:47,806 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:38:47,807 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:39:12,693 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json.1768005552
+2026-01-09 18:39:12,694 - INFO - Email daemon stopping
+2026-01-09 18:44:12,717 - INFO - Email daemon starting
+2026-01-09 18:44:12,943 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 18:44:13,072 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:44:13,072 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:44:13,073 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:45:03,970 - INFO - Email job completed: queue/processed/campaign_11.json.1768005903
+2026-01-09 18:45:04,245 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:45:04,245 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:45:04,245 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:45:31,234 - INFO - Email job completed: queue/processed/campaign_11.json.1768005931
+2026-01-09 18:45:31,518 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:45:31,519 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:45:31,519 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:45:57,089 - INFO - Email job completed: queue/processed/campaign_11.json.1768005957
+2026-01-09 18:45:57,361 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:45:57,361 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:45:57,361 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:46:15,989 - INFO - Email job completed: queue/processed/campaign_11.json.1768005975
+2026-01-09 18:46:16,270 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 18:46:16,270 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 18:46:16,271 - INFO - Starting email scraper for campaign 11
+2026-01-09 18:46:22,830 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json.1768005982
+2026-01-09 18:46:22,833 - INFO - Email daemon stopping
+2026-01-09 19:36:00,528 - INFO - Email daemon starting
+2026-01-09 19:36:00,914 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 19:36:01,065 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:36:01,066 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:36:01,066 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:36:41,914 - INFO - Email job completed: queue/processed/campaign_11.json.1768009001
+2026-01-09 19:36:42,188 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:36:42,189 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:36:42,189 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:37:35,500 - INFO - Email job completed: queue/processed/campaign_11.json.1768009055
+2026-01-09 19:37:35,808 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:37:35,808 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:37:35,808 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:38:20,813 - INFO - Email job completed: queue/processed/campaign_11.json.1768009100
+2026-01-09 19:38:21,147 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:38:21,147 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:38:21,148 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:39:04,074 - INFO - Email job completed: queue/processed/campaign_11.json.1768009144
+2026-01-09 19:39:04,386 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:39:04,386 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:39:04,386 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:39:50,628 - INFO - Email job completed: queue/processed/campaign_11.json.1768009190
+2026-01-09 19:39:50,910 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:39:50,910 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:39:50,911 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:40:18,706 - INFO - Email job completed: queue/processed/campaign_11.json.1768009218
+2026-01-09 19:40:18,987 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:40:18,987 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:40:18,987 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:41:06,820 - INFO - Email job completed: queue/processed/campaign_11.json.1768009266
+2026-01-09 19:41:07,093 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:41:07,093 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:41:07,093 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:42:16,958 - INFO - Email job completed: queue/processed/campaign_11.json.1768009336
+2026-01-09 19:42:17,235 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:42:17,236 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:42:17,236 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:42:42,566 - INFO - Email job completed: queue/processed/campaign_11.json.1768009362
+2026-01-09 19:42:42,855 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:42:42,855 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:42:42,855 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:43:12,755 - INFO - Email job completed: queue/processed/campaign_11.json.1768009392
+2026-01-09 19:43:13,035 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:43:13,035 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:43:13,036 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:43:37,175 - INFO - Email job completed: queue/processed/campaign_11.json.1768009417
+2026-01-09 19:43:37,671 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:43:37,671 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:43:37,672 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:44:10,367 - INFO - Email job completed: queue/processed/campaign_11.json.1768009450
+2026-01-09 19:44:10,650 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:44:10,650 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:44:10,650 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:44:42,993 - INFO - Email job completed: queue/processed/campaign_11.json.1768009482
+2026-01-09 19:44:43,285 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:44:43,285 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:44:43,286 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:45:49,318 - INFO - Email job completed: queue/processed/campaign_11.json.1768009549
+2026-01-09 19:45:49,586 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:45:49,586 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:45:49,587 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:46:25,868 - INFO - Email job completed: queue/processed/campaign_11.json.1768009585
+2026-01-09 19:46:26,153 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:46:26,153 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:46:26,154 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:46:40,875 - INFO - Email job completed: queue/processed/campaign_11.json.1768009600
+2026-01-09 19:46:41,150 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:46:41,151 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:46:41,151 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:47:22,043 - INFO - Email job completed: queue/processed/campaign_11.json.1768009642
+2026-01-09 19:47:22,326 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:47:22,326 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:47:22,326 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:47:58,786 - INFO - Email job completed: queue/processed/campaign_11.json.1768009678
+2026-01-09 19:47:59,078 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:47:59,078 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:47:59,078 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:48:15,818 - INFO - Email job completed: queue/processed/campaign_11.json.1768009695
+2026-01-09 19:48:16,082 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:48:16,082 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:48:16,082 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:48:39,431 - INFO - Email job completed: queue/processed/campaign_11.json.1768009719
+2026-01-09 19:48:39,705 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:48:39,705 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:48:39,705 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:49:32,705 - INFO - Email job completed: queue/processed/campaign_11.json.1768009772
+2026-01-09 19:49:33,000 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:49:33,001 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:49:33,001 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:50:16,849 - INFO - Email job completed: queue/processed/campaign_11.json.1768009816
+2026-01-09 19:50:17,114 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:50:17,114 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:50:17,114 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:50:38,880 - INFO - Email job completed: queue/processed/campaign_11.json.1768009838
+2026-01-09 19:50:39,158 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:50:39,159 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:50:39,159 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:51:12,035 - INFO - Email job completed: queue/processed/campaign_11.json.1768009872
+2026-01-09 19:51:12,308 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:51:12,309 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:51:12,309 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:51:44,063 - INFO - Email job completed: queue/processed/campaign_11.json.1768009904
+2026-01-09 19:51:44,356 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:51:44,356 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:51:44,357 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:52:20,703 - INFO - Email job completed: queue/processed/campaign_11.json.1768009940
+2026-01-09 19:52:20,970 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:52:20,970 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:52:20,971 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:52:49,374 - INFO - Email job completed: queue/processed/campaign_11.json.1768009969
+2026-01-09 19:52:49,635 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:52:49,635 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:52:49,635 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:53:14,718 - INFO - Email job completed: queue/processed/campaign_11.json.1768009994
+2026-01-09 19:53:14,989 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:53:14,989 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:53:14,989 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:53:43,719 - INFO - Email job completed: queue/processed/campaign_11.json.1768010023
+2026-01-09 19:53:43,998 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:53:43,999 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:53:43,999 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:53:57,274 - INFO - Email job completed: queue/processed/campaign_11.json.1768010037
+2026-01-09 19:54:12,562 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:54:12,562 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:54:12,562 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:54:47,850 - INFO - Email job completed: queue/processed/campaign_11.json.1768010087
+2026-01-09 19:54:48,175 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:54:48,175 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:54:48,176 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:55:46,138 - INFO - Email job completed: queue/processed/campaign_11.json.1768010146
+2026-01-09 19:55:46,433 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:55:46,433 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:55:46,433 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:56:26,014 - INFO - Email job completed: queue/processed/campaign_11.json.1768010186
+2026-01-09 19:56:26,315 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:56:26,315 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:56:26,315 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:56:43,651 - INFO - Email job completed: queue/processed/campaign_11.json.1768010203
+2026-01-09 19:56:43,934 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:56:43,934 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:56:43,934 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:57:04,539 - INFO - Email job completed: queue/processed/campaign_11.json.1768010224
+2026-01-09 19:57:04,820 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:57:04,820 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:57:04,820 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:57:50,632 - INFO - Email job completed: queue/processed/campaign_11.json.1768010270
+2026-01-09 19:57:50,924 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:57:50,924 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:57:50,924 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:58:13,688 - INFO - Email job completed: queue/processed/campaign_11.json.1768010293
+2026-01-09 19:58:13,982 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:58:13,982 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:58:13,982 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:58:56,822 - INFO - Email job completed: queue/processed/campaign_11.json.1768010336
+2026-01-09 19:58:57,107 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:58:57,107 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:58:57,108 - INFO - Starting email scraper for campaign 11
+2026-01-09 19:59:34,865 - INFO - Email job completed: queue/processed/campaign_11.json.1768010374
+2026-01-09 19:59:35,148 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 19:59:35,148 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 19:59:35,149 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:00:17,184 - INFO - Email job completed: queue/processed/campaign_11.json.1768010417
+2026-01-09 20:00:17,481 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:00:17,481 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:00:17,481 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:00:58,049 - INFO - Email job completed: queue/processed/campaign_11.json.1768010458
+2026-01-09 20:00:58,367 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:00:58,367 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:00:58,368 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:01:42,395 - INFO - Email job completed: queue/processed/campaign_11.json.1768010502
+2026-01-09 20:01:42,686 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:01:42,686 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:01:42,686 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:02:08,023 - INFO - Email job completed: queue/processed/campaign_11.json.1768010528
+2026-01-09 20:02:08,308 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:02:08,308 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:02:08,308 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:02:41,358 - INFO - Email job completed: queue/processed/campaign_11.json.1768010561
+2026-01-09 20:02:41,636 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:02:41,636 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:02:41,636 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:03:27,668 - INFO - Email job completed: queue/processed/campaign_11.json.1768010607
+2026-01-09 20:03:27,957 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:03:27,957 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:03:27,957 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:03:47,051 - INFO - Email job completed: queue/processed/campaign_11.json.1768010627
+2026-01-09 20:03:47,329 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:03:47,329 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:03:47,329 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:04:17,392 - INFO - Email job completed: queue/processed/campaign_11.json.1768010657
+2026-01-09 20:04:17,705 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:04:17,705 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:04:17,705 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:04:29,265 - INFO - Email job completed: queue/processed/campaign_11.json.1768010669
+2026-01-09 20:04:44,575 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:04:44,576 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:04:44,576 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:05:54,386 - INFO - Email job completed: queue/processed/campaign_11.json.1768010754
+2026-01-09 20:05:54,655 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:05:54,655 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:05:54,655 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:06:29,539 - INFO - Email job completed: queue/processed/campaign_11.json.1768010789
+2026-01-09 20:06:29,808 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:06:29,808 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:06:29,809 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:07:25,387 - INFO - Email job completed: queue/processed/campaign_11.json.1768010845
+2026-01-09 20:07:25,665 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:07:25,665 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:07:25,665 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:08:18,992 - INFO - Email job completed: queue/processed/campaign_11.json.1768010898
+2026-01-09 20:08:19,291 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:08:19,291 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:08:19,291 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:09:06,908 - INFO - Email job completed: queue/processed/campaign_11.json.1768010946
+2026-01-09 20:09:07,190 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:09:07,190 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:09:07,190 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:09:37,104 - INFO - Email job completed: queue/processed/campaign_11.json.1768010977
+2026-01-09 20:09:37,415 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:09:37,415 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:09:37,415 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:10:24,393 - INFO - Email job completed: queue/processed/campaign_11.json.1768011024
+2026-01-09 20:10:24,680 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:10:24,680 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:10:24,681 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:10:45,816 - INFO - Email job completed: queue/processed/campaign_11.json.1768011045
+2026-01-09 20:10:46,108 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:10:46,108 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:10:46,109 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:11:33,557 - INFO - Email job completed: queue/processed/campaign_11.json.1768011093
+2026-01-09 20:11:33,864 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:11:33,864 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:11:33,865 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:11:56,956 - INFO - Email job completed: queue/processed/campaign_11.json.1768011116
+2026-01-09 20:11:57,275 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:11:57,275 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:11:57,275 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:12:17,146 - INFO - Email job completed: queue/processed/campaign_11.json.1768011137
+2026-01-09 20:12:17,421 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:12:17,421 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:12:17,422 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:12:57,715 - INFO - Email job completed: queue/processed/campaign_11.json.1768011177
+2026-01-09 20:12:58,001 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:12:58,001 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:12:58,001 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:13:34,318 - INFO - Email job completed: queue/processed/campaign_11.json.1768011214
+2026-01-09 20:13:34,605 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:13:34,606 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:13:34,606 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:14:43,605 - INFO - Email job completed: queue/processed/campaign_11.json.1768011283
+2026-01-09 20:14:43,892 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:14:43,892 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:14:43,893 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:15:09,108 - INFO - Email job completed: queue/processed/campaign_11.json.1768011309
+2026-01-09 20:15:09,392 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:15:09,392 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:15:09,393 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:15:48,055 - INFO - Email job completed: queue/processed/campaign_11.json.1768011348
+2026-01-09 20:15:48,356 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:15:48,356 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:15:48,356 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:16:24,729 - INFO - Email job completed: queue/processed/campaign_11.json.1768011384
+2026-01-09 20:16:25,015 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:16:25,015 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:16:25,015 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:16:47,050 - INFO - Email job completed: queue/processed/campaign_11.json.1768011407
+2026-01-09 20:16:47,354 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:16:47,354 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:16:47,354 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:17:20,884 - INFO - Email job completed: queue/processed/campaign_11.json.1768011440
+2026-01-09 20:17:21,204 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:17:21,204 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:17:21,204 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:17:48,033 - INFO - Email job completed: queue/processed/campaign_11.json.1768011468
+2026-01-09 20:17:48,323 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:17:48,323 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:17:48,323 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:18:26,249 - INFO - Email job completed: queue/processed/campaign_11.json.1768011506
+2026-01-09 20:18:26,524 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:18:26,524 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:18:26,524 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:18:46,223 - INFO - Email job completed: queue/processed/campaign_11.json.1768011526
+2026-01-09 20:18:46,511 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:18:46,512 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:18:46,512 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:19:25,269 - INFO - Email job completed: queue/processed/campaign_11.json.1768011565
+2026-01-09 20:19:25,556 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:19:25,556 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:19:25,556 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:20:06,613 - INFO - Email job completed: queue/processed/campaign_11.json.1768011606
+2026-01-09 20:20:06,938 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:20:06,939 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:20:06,939 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:20:45,628 - INFO - Email job completed: queue/processed/campaign_11.json.1768011645
+2026-01-09 20:20:45,912 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:20:45,912 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:20:45,913 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:21:27,674 - INFO - Email job completed: queue/processed/campaign_11.json.1768011687
+2026-01-09 20:21:27,957 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:21:27,957 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:21:27,957 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:22:04,370 - INFO - Email job completed: queue/processed/campaign_11.json.1768011724
+2026-01-09 20:22:04,649 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:22:04,649 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:22:04,649 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:22:49,349 - INFO - Email job completed: queue/processed/campaign_11.json.1768011769
+2026-01-09 20:22:49,666 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:22:49,666 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:22:49,667 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:23:50,586 - INFO - Email job completed: queue/processed/campaign_11.json.1768011830
+2026-01-09 20:23:50,882 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:23:50,882 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:23:50,883 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:24:19,027 - INFO - Email job completed: queue/processed/campaign_11.json.1768011859
+2026-01-09 20:24:19,301 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:24:19,301 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:24:19,302 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:25:00,199 - INFO - Email job completed: queue/processed/campaign_11.json.1768011900
+2026-01-09 20:25:00,482 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:25:00,482 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:25:00,482 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:25:27,035 - INFO - Email job completed: queue/processed/campaign_11.json.1768011927
+2026-01-09 20:25:27,337 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:25:27,337 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:25:27,338 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:25:50,597 - INFO - Email job completed: queue/processed/campaign_11.json.1768011950
+2026-01-09 20:25:50,880 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:25:50,880 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:25:50,880 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:26:23,737 - INFO - Email job completed: queue/processed/campaign_11.json.1768011983
+2026-01-09 20:26:24,020 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:26:24,020 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:26:24,020 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:27:10,938 - INFO - Email job completed: queue/processed/campaign_11.json.1768012030
+2026-01-09 20:27:11,222 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:27:11,222 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:27:11,222 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:27:47,137 - INFO - Email job completed: queue/processed/campaign_11.json.1768012067
+2026-01-09 20:27:47,445 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:27:47,445 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:27:47,446 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:28:12,243 - INFO - Email job completed: queue/processed/campaign_11.json.1768012092
+2026-01-09 20:28:12,512 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:28:12,513 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:28:12,513 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:28:52,342 - INFO - Email job completed: queue/processed/campaign_11.json.1768012132
+2026-01-09 20:28:52,632 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:28:52,632 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:28:52,632 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:29:56,943 - INFO - Email job completed: queue/processed/campaign_11.json.1768012196
+2026-01-09 20:29:57,245 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:29:57,245 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:29:57,245 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:30:25,449 - INFO - Email job completed: queue/processed/campaign_11.json.1768012225
+2026-01-09 20:30:25,732 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:30:25,733 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:30:25,733 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:30:58,237 - INFO - Email job completed: queue/processed/campaign_11.json.1768012258
+2026-01-09 20:30:58,539 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:30:58,539 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:30:58,540 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:31:47,479 - INFO - Email job completed: queue/processed/campaign_11.json.1768012307
+2026-01-09 20:31:47,772 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:31:47,772 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:31:47,773 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:33:03,170 - INFO - Email job completed: queue/processed/campaign_11.json.1768012383
+2026-01-09 20:33:03,453 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:33:03,453 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:33:03,453 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:33:43,521 - INFO - Email job completed: queue/processed/campaign_11.json.1768012423
+2026-01-09 20:33:43,802 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:33:43,802 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:33:43,802 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:34:04,447 - INFO - Email job completed: queue/processed/campaign_11.json.1768012444
+2026-01-09 20:34:04,715 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:34:04,715 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:34:04,715 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:34:53,271 - INFO - Email job completed: queue/processed/campaign_11.json.1768012493
+2026-01-09 20:34:53,574 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:34:53,574 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:34:53,575 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:35:29,734 - INFO - Email job completed: queue/processed/campaign_11.json.1768012529
+2026-01-09 20:35:30,043 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:35:30,043 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:35:30,044 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:36:20,715 - INFO - Email job completed: queue/processed/campaign_11.json.1768012580
+2026-01-09 20:36:20,998 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:36:20,998 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:36:20,999 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:37:05,992 - INFO - Email job completed: queue/processed/campaign_11.json.1768012625
+2026-01-09 20:37:06,280 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:37:06,280 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:37:06,281 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:37:17,657 - INFO - Email job completed: queue/processed/campaign_11.json.1768012637
+2026-01-09 20:37:32,963 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:37:32,963 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:37:32,963 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:38:37,153 - INFO - Email job completed: queue/processed/campaign_11.json.1768012717
+2026-01-09 20:38:37,430 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:38:37,431 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:38:37,431 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:39:11,572 - INFO - Email job completed: queue/processed/campaign_11.json.1768012751
+2026-01-09 20:39:11,840 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:39:11,841 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:39:11,841 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:40:08,887 - INFO - Email job completed: queue/processed/campaign_11.json.1768012808
+2026-01-09 20:40:09,177 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:40:09,177 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:40:09,177 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:41:01,387 - INFO - Email job completed: queue/processed/campaign_11.json.1768012861
+2026-01-09 20:41:01,696 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:41:01,696 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:41:01,696 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:41:53,727 - INFO - Email job completed: queue/processed/campaign_11.json.1768012913
+2026-01-09 20:41:53,999 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:41:54,000 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:41:54,000 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:42:50,335 - INFO - Email job completed: queue/processed/campaign_11.json.1768012970
+2026-01-09 20:42:50,630 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:42:50,630 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:42:50,631 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:43:45,073 - INFO - Email job completed: queue/processed/campaign_11.json.1768013025
+2026-01-09 20:43:45,386 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:43:45,386 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:43:45,387 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:44:14,993 - INFO - Email job completed: queue/processed/campaign_11.json.1768013054
+2026-01-09 20:44:15,280 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:44:15,280 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:44:15,281 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:45:02,627 - INFO - Email job completed: queue/processed/campaign_11.json.1768013102
+2026-01-09 20:45:02,932 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:45:02,932 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:45:02,933 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:45:38,134 - INFO - Email job completed: queue/processed/campaign_11.json.1768013138
+2026-01-09 20:45:38,431 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:45:38,431 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:45:38,432 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:46:02,356 - INFO - Email job completed: queue/processed/campaign_11.json.1768013162
+2026-01-09 20:46:02,677 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:46:02,677 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:46:02,677 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:46:48,485 - INFO - Email job completed: queue/processed/campaign_11.json.1768013208
+2026-01-09 20:46:48,762 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:46:48,762 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:46:48,762 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:47:24,109 - INFO - Email job completed: queue/processed/campaign_11.json.1768013244
+2026-01-09 20:47:24,377 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:47:24,377 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:47:24,377 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:47:57,138 - INFO - Email job completed: queue/processed/campaign_11.json.1768013277
+2026-01-09 20:47:57,444 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:47:57,445 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:47:57,445 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:48:53,792 - INFO - Email job completed: queue/processed/campaign_11.json.1768013333
+2026-01-09 20:48:54,076 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:48:54,076 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:48:54,076 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:49:31,876 - INFO - Email job completed: queue/processed/campaign_11.json.1768013371
+2026-01-09 20:49:32,177 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:49:32,177 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:49:32,177 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:50:07,041 - INFO - Email job completed: queue/processed/campaign_11.json.1768013407
+2026-01-09 20:50:07,328 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:50:07,328 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:50:07,328 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:50:43,821 - INFO - Email job completed: queue/processed/campaign_11.json.1768013443
+2026-01-09 20:50:44,104 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:50:44,104 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:50:44,104 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:51:12,102 - INFO - Email job completed: queue/processed/campaign_11.json.1768013472
+2026-01-09 20:51:12,390 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:51:12,390 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:51:12,390 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:51:38,273 - INFO - Email job completed: queue/processed/campaign_11.json.1768013498
+2026-01-09 20:51:38,542 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:51:38,542 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:51:38,542 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:52:11,359 - INFO - Email job completed: queue/processed/campaign_11.json.1768013531
+2026-01-09 20:52:11,626 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:52:11,626 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:52:11,627 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:52:39,715 - INFO - Email job completed: queue/processed/campaign_11.json.1768013559
+2026-01-09 20:52:40,000 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:52:40,000 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:52:40,001 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:53:21,771 - INFO - Email job completed: queue/processed/campaign_11.json.1768013601
+2026-01-09 20:53:22,085 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:53:22,086 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:53:22,086 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:53:52,986 - INFO - Email job completed: queue/processed/campaign_11.json.1768013632
+2026-01-09 20:53:53,253 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:53:53,253 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:53:53,253 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:54:31,786 - INFO - Email job completed: queue/processed/campaign_11.json.1768013671
+2026-01-09 20:54:32,081 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:54:32,081 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:54:32,081 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:55:17,403 - INFO - Email job completed: queue/processed/campaign_11.json.1768013717
+2026-01-09 20:55:17,704 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:55:17,704 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:55:17,704 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:56:41,818 - INFO - Email job completed: queue/processed/campaign_11.json.1768013801
+2026-01-09 20:56:42,096 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:56:42,096 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:56:42,096 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:57:19,913 - INFO - Email job completed: queue/processed/campaign_11.json.1768013839
+2026-01-09 20:57:20,210 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:57:20,210 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:57:20,210 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:58:12,168 - INFO - Email job completed: queue/processed/campaign_11.json.1768013892
+2026-01-09 20:58:12,481 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:58:12,481 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:58:12,482 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:58:45,993 - INFO - Email job completed: queue/processed/campaign_11.json.1768013925
+2026-01-09 20:58:46,458 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:58:46,458 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:58:46,458 - INFO - Starting email scraper for campaign 11
+2026-01-09 20:59:33,218 - INFO - Email job completed: queue/processed/campaign_11.json.1768013973
+2026-01-09 20:59:33,509 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 20:59:33,509 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 20:59:33,509 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:00:04,423 - INFO - Email job completed: queue/processed/campaign_11.json.1768014004
+2026-01-09 21:00:04,701 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:00:04,701 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:00:04,701 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:00:31,603 - INFO - Email job completed: queue/processed/campaign_11.json.1768014031
+2026-01-09 21:00:31,890 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:00:31,890 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:00:31,891 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:01:32,049 - INFO - Email job completed: queue/processed/campaign_11.json.1768014092
+2026-01-09 21:01:32,345 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:01:32,346 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:01:32,346 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:02:16,830 - INFO - Email job completed: queue/processed/campaign_11.json.1768014136
+2026-01-09 21:02:17,131 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:02:17,131 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:02:17,132 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:02:38,549 - INFO - Email job completed: queue/processed/campaign_11.json.1768014158
+2026-01-09 21:02:38,860 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:02:38,860 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:02:38,860 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:03:01,251 - INFO - Email job completed: queue/processed/campaign_11.json.1768014181
+2026-01-09 21:03:01,541 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:03:01,542 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:03:01,542 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:03:46,269 - INFO - Email job completed: queue/processed/campaign_11.json.1768014226
+2026-01-09 21:03:46,568 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:03:46,568 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:03:46,568 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:04:42,903 - INFO - Email job completed: queue/processed/campaign_11.json.1768014282
+2026-01-09 21:04:43,192 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:04:43,192 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:04:43,193 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:05:11,785 - INFO - Email job completed: queue/processed/campaign_11.json.1768014311
+2026-01-09 21:05:12,064 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:05:12,064 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:05:12,064 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:06:17,021 - INFO - Email job completed: queue/processed/campaign_11.json.1768014377
+2026-01-09 21:06:17,315 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:06:17,315 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:06:17,315 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:07:38,864 - INFO - Email job completed: queue/processed/campaign_11.json.1768014458
+2026-01-09 21:07:39,175 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:07:39,175 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:07:39,176 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:08:24,134 - INFO - Email job completed: queue/processed/campaign_11.json.1768014504
+2026-01-09 21:08:24,442 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:08:24,442 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:08:24,442 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:09:16,242 - INFO - Email job completed: queue/processed/campaign_11.json.1768014556
+2026-01-09 21:09:16,548 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:09:16,548 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:09:16,549 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:10:11,230 - INFO - Email job completed: queue/processed/campaign_11.json.1768014611
+2026-01-09 21:10:11,513 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:10:11,514 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:10:11,514 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:10:53,212 - INFO - Email job completed: queue/processed/campaign_11.json.1768014653
+2026-01-09 21:10:53,508 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:10:53,508 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:10:53,509 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:12:08,246 - INFO - Email job completed: queue/processed/campaign_11.json.1768014728
+2026-01-09 21:12:08,523 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:12:08,523 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:12:08,523 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:12:40,447 - INFO - Email job completed: queue/processed/campaign_11.json.1768014760
+2026-01-09 21:12:40,727 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:12:40,727 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:12:40,727 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:13:44,841 - INFO - Email job completed: queue/processed/campaign_11.json.1768014824
+2026-01-09 21:13:45,130 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:13:45,130 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:13:45,130 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:14:50,713 - INFO - Email job completed: queue/processed/campaign_11.json.1768014890
+2026-01-09 21:14:51,024 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:14:51,024 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:14:51,024 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:15:47,872 - INFO - Email job completed: queue/processed/campaign_11.json.1768014947
+2026-01-09 21:15:48,149 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:15:48,149 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:15:48,149 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:16:36,264 - INFO - Email job completed: queue/processed/campaign_11.json.1768014996
+2026-01-09 21:16:36,567 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:16:36,567 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:16:36,567 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:17:40,163 - INFO - Email job completed: queue/processed/campaign_11.json.1768015060
+2026-01-09 21:17:40,455 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:17:40,455 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:17:40,456 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:18:11,489 - INFO - Email job completed: queue/processed/campaign_11.json.1768015091
+2026-01-09 21:18:11,787 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:18:11,787 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:18:11,787 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:18:32,274 - INFO - Email job completed: queue/processed/campaign_11.json.1768015112
+2026-01-09 21:18:32,549 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:18:32,549 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:18:32,549 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:19:12,502 - INFO - Email job completed: queue/processed/campaign_11.json.1768015152
+2026-01-09 21:19:12,796 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:19:12,796 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:19:12,797 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:19:37,372 - INFO - Email job completed: queue/processed/campaign_11.json.1768015177
+2026-01-09 21:19:37,643 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:19:37,643 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:19:37,643 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:20:03,539 - INFO - Email job completed: queue/processed/campaign_11.json.1768015203
+2026-01-09 21:20:03,847 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:20:03,847 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:20:03,847 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:20:39,768 - INFO - Email job completed: queue/processed/campaign_11.json.1768015239
+2026-01-09 21:20:40,045 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:20:40,045 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:20:40,045 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:21:32,653 - INFO - Email job completed: queue/processed/campaign_11.json.1768015292
+2026-01-09 21:21:32,928 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:21:32,928 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:21:32,929 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:22:38,325 - INFO - Email job completed: queue/processed/campaign_11.json.1768015358
+2026-01-09 21:22:38,598 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:22:38,598 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:22:38,598 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:23:32,729 - INFO - Email job completed: queue/processed/campaign_11.json.1768015412
+2026-01-09 21:23:33,032 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:23:33,032 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:23:33,032 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:23:49,648 - INFO - Email job completed: queue/processed/campaign_11.json.1768015429
+2026-01-09 21:23:49,948 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:23:49,948 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:23:49,948 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:24:08,817 - INFO - Email job completed: queue/processed/campaign_11.json.1768015448
+2026-01-09 21:24:09,109 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:24:09,109 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:24:09,109 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:24:34,291 - INFO - Email job completed: queue/processed/campaign_11.json.1768015474
+2026-01-09 21:24:34,599 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:24:34,599 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:24:34,599 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:25:25,138 - INFO - Email job completed: queue/processed/campaign_11.json.1768015525
+2026-01-09 21:25:25,422 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:25:25,422 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:25:25,422 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:26:05,258 - INFO - Email job completed: queue/processed/campaign_11.json.1768015565
+2026-01-09 21:26:05,533 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:26:05,533 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:26:05,534 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:26:49,642 - INFO - Email job completed: queue/processed/campaign_11.json.1768015609
+2026-01-09 21:26:49,904 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:26:49,904 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:26:49,904 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:27:24,428 - INFO - Email job completed: queue/processed/campaign_11.json.1768015644
+2026-01-09 21:27:24,746 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:27:24,746 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:27:24,746 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:27:46,190 - INFO - Email job completed: queue/processed/campaign_11.json.1768015666
+2026-01-09 21:27:46,473 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:27:46,473 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:27:46,473 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:28:03,411 - INFO - Email job completed: queue/processed/campaign_11.json.1768015683
+2026-01-09 21:28:03,706 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:28:03,706 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:28:03,707 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:28:22,309 - INFO - Email job completed: queue/processed/campaign_11.json.1768015702
+2026-01-09 21:28:22,606 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:28:22,606 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:28:22,606 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:28:51,137 - INFO - Email job completed: queue/processed/campaign_11.json.1768015731
+2026-01-09 21:28:51,399 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:28:51,399 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:28:51,400 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:29:29,478 - INFO - Email job completed: queue/processed/campaign_11.json.1768015769
+2026-01-09 21:29:29,787 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:29:29,787 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:29:29,787 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:30:15,142 - INFO - Email job completed: queue/processed/campaign_11.json.1768015815
+2026-01-09 21:30:15,433 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:30:15,433 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:30:15,433 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:32:18,403 - INFO - Email job completed: queue/processed/campaign_11.json.1768015938
+2026-01-09 21:32:18,704 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:32:18,704 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:32:18,704 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:32:35,424 - INFO - Email job completed: queue/processed/campaign_11.json.1768015955
+2026-01-09 21:32:35,744 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:32:35,744 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:32:35,744 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:33:36,233 - INFO - Email job completed: queue/processed/campaign_11.json.1768016016
+2026-01-09 21:33:36,552 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:33:36,553 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:33:36,553 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:34:45,529 - INFO - Email job completed: queue/processed/campaign_11.json.1768016085
+2026-01-09 21:34:45,806 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:34:45,806 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:34:45,807 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:35:10,903 - INFO - Email job completed: queue/processed/campaign_11.json.1768016110
+2026-01-09 21:35:11,193 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:35:11,193 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:35:11,194 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:35:29,802 - INFO - Email job completed: queue/processed/campaign_11.json.1768016129
+2026-01-09 21:35:30,103 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:35:30,103 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:35:30,103 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:36:11,249 - INFO - Email job completed: queue/processed/campaign_11.json.1768016171
+2026-01-09 21:36:11,560 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:36:11,560 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:36:11,560 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:36:30,831 - INFO - Email job completed: queue/processed/campaign_11.json.1768016190
+2026-01-09 21:36:31,147 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:36:31,167 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:36:31,168 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:37:39,176 - INFO - Email job completed: queue/processed/campaign_11.json.1768016259
+2026-01-09 21:37:39,502 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:37:39,502 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:37:39,503 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:38:38,376 - INFO - Email job completed: queue/processed/campaign_11.json.1768016318
+2026-01-09 21:38:38,661 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:38:38,661 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:38:38,661 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:39:20,489 - INFO - Email job completed: queue/processed/campaign_11.json.1768016360
+2026-01-09 21:39:20,754 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:39:20,754 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:39:20,755 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:39:55,724 - INFO - Email job completed: queue/processed/campaign_11.json.1768016395
+2026-01-09 21:39:56,002 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:39:56,002 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:39:56,002 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:40:33,836 - INFO - Email job completed: queue/processed/campaign_11.json.1768016433
+2026-01-09 21:40:34,119 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:40:34,119 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:40:34,120 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:41:08,002 - INFO - Email job completed: queue/processed/campaign_11.json.1768016468
+2026-01-09 21:41:08,294 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:41:08,295 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:41:08,295 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:42:10,760 - INFO - Email job completed: queue/processed/campaign_11.json.1768016530
+2026-01-09 21:42:11,044 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:42:11,044 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:42:11,044 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:42:41,615 - INFO - Email job completed: queue/processed/campaign_11.json.1768016561
+2026-01-09 21:42:41,898 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:42:41,898 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:42:41,899 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:43:46,877 - INFO - Email job completed: queue/processed/campaign_11.json.1768016626
+2026-01-09 21:43:47,137 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:43:47,137 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:43:47,137 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:44:05,878 - INFO - Email job completed: queue/processed/campaign_11.json.1768016645
+2026-01-09 21:44:06,178 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:44:06,178 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:44:06,178 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:44:45,601 - INFO - Email job completed: queue/processed/campaign_11.json.1768016685
+2026-01-09 21:44:45,895 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:44:45,895 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:44:45,895 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:45:37,556 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json.1768016737
+2026-01-09 21:45:37,556 - INFO - Email daemon stopping
+2026-01-09 21:46:14,190 - INFO - Email daemon starting
+2026-01-09 21:46:14,436 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 21:46:14,580 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:46:14,580 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:46:14,581 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:46:44,474 - INFO - Email job completed: queue/processed/campaign_11.json.1768016804
+2026-01-09 21:46:44,740 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:46:44,740 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:46:44,741 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:46:48,726 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json.1768016808
+2026-01-09 21:46:48,727 - INFO - Email daemon stopping
+2026-01-09 21:47:01,354 - INFO - Email daemon starting
+2026-01-09 21:47:01,611 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-01-09 21:47:01,766 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:47:01,766 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:47:01,767 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:48:22,293 - INFO - Email job completed: queue/processed/campaign_11.json.1768016902
+2026-01-09 21:48:22,566 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:48:22,566 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:48:22,566 - INFO - Starting email scraper for campaign 11
+2026-01-09 21:52:22,136 - INFO - Email job completed: queue/processed/campaign_11.json.1768017142
+2026-01-09 21:52:22,455 - INFO - Queued email job: queue/campaign_11.json
+2026-01-09 21:52:22,455 - INFO - Discovered active campaign 11 with missing emails.
+2026-01-09 21:52:22,455 - INFO - Starting email scraper for campaign 11

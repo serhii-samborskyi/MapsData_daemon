@@ -1,9 +1,9 @@
 {
   "email": {
     "batch": 10,
-    "concurrency": 3,
+    "concurrency": 1,
     "domain_timeout_s": 10.0,
-    "facebook": false,
+    "facebook": true,
     "links": 5,
     "timeout_s": 8.0
   },

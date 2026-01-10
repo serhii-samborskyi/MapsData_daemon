@@ -272,6 +272,20 @@ def strip_url_prefix(value: str) -> str:
     return v.lstrip("/")
 
 
+def normalize_email_candidate(raw: str) -> str:
+    if not raw:
+        return ""
+    s = raw.strip().strip("<>\"'")
+    if s.lower().startswith("mailto:"):
+        s = s.split(":", 1)[1]
+    s = s.split("?", 1)[0]
+    s = s.split("#", 1)[0]
+    s = s.split("&", 1)[0]
+    s = s.split(",", 1)[0]
+    s = s.split(";", 1)[0]
+    return s.strip().lower()
+
+
 def collect_emails_from_jsonld(soup: BeautifulSoup) -> Set[str]:
     found: Set[str] = set()
     for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
@@ -301,7 +315,9 @@ async def _extract_emails_from_html(html: str) -> Set[str]:
     # Regex over raw HTML (catches mailto in scripts, onclick, etc.)
     for rx in EMAIL_RE_LIST:
         for m in rx.findall(html):
-            found.add(m.lower())
+            email = normalize_email_candidate(m)
+            if email:
+                found.add(email)
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -309,9 +325,18 @@ async def _extract_emails_from_html(html: str) -> Set[str]:
     for a in soup.find_all("a"):
         href = a.get("href") or ""
         if href.lower().startswith("mailto:"):
-            email = href.split(":", 1)[1].strip().lower()
+            email = normalize_email_candidate(href)
             if email:
                 found.add(email)
+
+    # Email attributes used by some builders (e.g., email="user@host.com")
+    for tag in soup.find_all(True):
+        for attr in ("email", "data-email"):
+            val = tag.get(attr)
+            if val and "@" in val:
+                email = normalize_email_candidate(val)
+                if email:
+                    found.add(email)
 
     # Cloudflare protected links
     for a in soup.find_all("a"):
@@ -329,7 +354,10 @@ async def _extract_emails_from_html(html: str) -> Set[str]:
             found.add(dec.lower())
 
     # JSON-LD email fields
-    found.update(collect_emails_from_jsonld(soup))
+    for e in collect_emails_from_jsonld(soup):
+        email = normalize_email_candidate(e)
+        if email:
+            found.add(email)
 
     # Body text (entities decoded), then deobfuscate and regex
     body_text = soup.get_text(" ", strip=True)
@@ -337,7 +365,9 @@ async def _extract_emails_from_html(html: str) -> Set[str]:
         body_text = deobfuscate_text_for_emails(body_text)
         for rx in EMAIL_RE_LIST:
             for m in rx.findall(body_text):
-                found.add(m.lower())
+                email = normalize_email_candidate(m)
+                if email:
+                    found.add(email)
 
     return found
 
@@ -504,6 +534,11 @@ async def extract_emails(
     if not url:
         return set()
 
+    allowed_hosts = set()
+    base_host = get_host(url)
+    if base_host:
+        allowed_hosts.add(base_host)
+
     context = await browser.new_context(
         java_script_enabled=js_enabled,
         user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -513,6 +548,15 @@ async def extract_emails(
     async def route_handler(route):
         if not block_assets and allow_third_party:
             return await route.continue_()
+        try:
+            req_url = route.request.url
+            if route.request.is_navigation_request():
+                req_host = get_host(req_url)
+                if req_host:
+                    allowed_hosts.add(req_host)
+                return await route.continue_()
+        except Exception:
+            pass
         rtype = route.request.resource_type
         # Always drop heavy assets
         if rtype in {"image", "media", "font", "stylesheet"}:
@@ -520,7 +564,8 @@ async def extract_emails(
         if not allow_third_party:
             try:
                 req_url = route.request.url
-                if not same_site(url, req_url):
+                req_host = get_host(req_url)
+                if req_host and req_host not in allowed_hosts:
                     return await route.abort()
             except Exception:
                 pass
@@ -532,10 +577,36 @@ async def extract_emails(
 
     page = await context.new_page()
     html = ""
+    runtime_candidates: Set[str] = set()
+    effective_url = url
     try:
         resp = await page.goto(url, wait_until="domcontentloaded", timeout=int(timeout * 1000))
         if resp and resp.status == 200:
+            effective_url = page.url or url
+            if js_enabled:
+                try:
+                    await page.wait_for_timeout(1200)
+                except Exception:
+                    pass
             html = await page.content()
+            try:
+                mailtos = await page.eval_on_selector_all(
+                    "a[href^='mailto:']",
+                    "els => els.map(el => el.getAttribute('href')).filter(Boolean)"
+                )
+                for m in mailtos:
+                    runtime_candidates.add(m)
+            except Exception:
+                pass
+            try:
+                attrs = await page.eval_on_selector_all(
+                    "[email], [data-email]",
+                    "els => els.map(el => (el.getAttribute('email') || el.getAttribute('data-email') || '')).filter(Boolean)"
+                )
+                for a in attrs:
+                    runtime_candidates.add(a)
+            except Exception:
+                pass
     except Exception:
         pass
     finally:
@@ -551,10 +622,14 @@ async def extract_emails(
             pass
 
     emails = await _extract_emails_from_html(html)
+    for cand in runtime_candidates:
+        email = normalize_email_candidate(cand)
+        if email:
+            emails.add(email)
 
     if recurse and html:
         soup = BeautifulSoup(html, "html.parser")
-        base = url
+        base = effective_url
 
         # Smart link discovery with prioritization
         priority_links: List[Tuple[int, str]] = []
@@ -565,7 +640,7 @@ async def extract_emails(
                 continue
 
             full = urljoin(base, href)
-            if same_site(url, full):
+            if same_site(effective_url, full):
                 path = urlparse(full).path.lower()
                 link_text = (a.get_text() or "").lower()
 
@@ -582,6 +657,20 @@ async def extract_emails(
 
         # Sort by priority (lower score = higher priority) and take top links
         priority_links.sort(key=lambda x: (x[0], x[1]))
+
+        if len(priority_links) < max_children:
+            existing = {link for _, link in priority_links}
+            for target in TARGET_PATHS:
+                path = target if target.startswith("/") else f"/{target}"
+                full = urljoin(base, path)
+                if full in existing:
+                    continue
+                if same_site(effective_url, full):
+                    priority_links.append((priority_score(path), full))
+                    existing.add(full)
+
+            priority_links.sort(key=lambda x: (x[0], x[1]))
+
         children = [link for _, link in priority_links[:max_children]]
 
         logger.debug(f"{url} → scanning {len(children)} prioritized child page(s)")
@@ -605,7 +694,7 @@ async def extract_emails(
 
         # Check Facebook pages if enabled (only on main page, not recursively)
         if check_facebook:
-            facebook_links = find_facebook_page_links(soup, url)
+            facebook_links = find_facebook_page_links(soup, effective_url)
             if facebook_links:
                 logger.info(f"🔍 FACEBOOK DETECTION: Found {len(facebook_links)} Facebook page(s): {facebook_links[:3]}...") if len(facebook_links) > 3 else logger.info(f"🔍 FACEBOOK DETECTION: Found Facebook page(s): {facebook_links}")
                 for fb_url in facebook_links[:2]:  # Only check first 2 Facebook links
@@ -627,7 +716,7 @@ async def extract_emails(
     domain_emails = set()
 
     # Get domain for this URL using extension's logic
-    domain = get_domain_from_url(url)
+    domain = get_domain_from_url(effective_url)
 
     for email in emails:
         # Clean email same as extension
