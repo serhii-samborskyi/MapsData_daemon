@@ -51,13 +51,12 @@ if ! $PIP --version >/dev/null 2>&1; then
 fi
 
 echo "==> Installing Python packages"
-$PIP install --upgrade pip
 TARGET_DIR="$SCRIPT_DIR/.deps"
 mkdir -p "$TARGET_DIR"
 if [ "$NO_UI" -eq 1 ]; then
-  $PIP install --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml
+  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml
 else
-  $PIP install --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml PySide6
+  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml PySide6
 fi
 
 echo "==> Installing Playwright browsers"
