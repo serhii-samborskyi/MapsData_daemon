@@ -3,15 +3,22 @@ from __future__ import annotations
 # === BEGIN: user's scraper (Playwright + DOM/XPath), emails disabled ===
 
 import asyncio
-import re
-import unicodedata
-from playwright.async_api import async_playwright
 import logging
+import os
 import random
+import re
+import sys
+import unicodedata
 from datetime import datetime
-from lxml import html
 from urllib.parse import urlparse
+
+LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
+if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
+    sys.path.insert(0, LOCAL_DEPS)
+
+from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
+from lxml import html
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

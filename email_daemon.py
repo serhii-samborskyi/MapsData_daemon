@@ -13,6 +13,10 @@ import time
 import urllib.request
 from typing import Optional
 
+LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
+if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
+    sys.path.insert(0, LOCAL_DEPS)
+
 from daemon_config import load_config
 
 

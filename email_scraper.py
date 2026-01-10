@@ -18,6 +18,7 @@ import asyncio
 import argparse
 import json
 import logging
+import os
 import random
 import re
 import sys
@@ -25,6 +26,10 @@ import time
 import unicodedata
 from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse, urljoin
+
+LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
+if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
+    sys.path.insert(0, LOCAL_DEPS)
 
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup

@@ -50,28 +50,22 @@ if ! $PIP --version >/dev/null 2>&1; then
   fi
 fi
 
-if [ ! -d ".venv" ]; then
-  echo "==> Creating virtualenv"
-  python3 -m venv .venv
-fi
-
-echo "==> Activating virtualenv"
-source .venv/bin/activate
-
 echo "==> Installing Python packages"
 $PIP install --upgrade pip
+TARGET_DIR="$SCRIPT_DIR/.deps"
+mkdir -p "$TARGET_DIR"
 if [ "$NO_UI" -eq 1 ]; then
-  $PIP install playwright requests beautifulsoup4 lxml
+  $PIP install --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml
 else
-  $PIP install playwright requests beautifulsoup4 lxml PySide6
+  $PIP install --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml PySide6
 fi
 
 echo "==> Installing Playwright browsers"
-python3 -m playwright install
+PYTHONPATH="$TARGET_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m playwright install
 
 if [ "$WITH_DEPS" -eq 1 ] && command_exists apt-get; then
   echo "==> Installing Playwright system deps (Linux)"
-  python3 -m playwright install-deps
+  PYTHONPATH="$TARGET_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m playwright install-deps
 fi
 
 echo "==> Done"
