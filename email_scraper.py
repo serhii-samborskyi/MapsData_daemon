@@ -997,6 +997,7 @@ class HttpClient:
 async def scrape_and_update_immediate(
     campaign: str,
     batch: int,
+    max_batches: int,
     base_url: str,
     concurrency: int,
     timeout: float,
@@ -1024,32 +1025,50 @@ async def scrape_and_update_immediate(
                     raise RuntimeError(f"Campaign '{campaign}' not found. Available: {names}")
                 logger.info(f"Matched campaign '{campaign}' -> id={campaign_id}")
 
-            # Pull batch
-            data = http.get_json(f"{base_url}/api/campaign/{campaign_id}/nomail?batch={batch}")
-            contacts = data.get("contacts", []) if isinstance(data, dict) else []
-            if not contacts:
-                if attempt_insecure:
-                    logger.info("No contacts returned for this batch (even with insecure).")
+            batch_count = 0
+            while True:
+                if max_batches and batch_count >= max_batches:
+                    logger.info(f"Reached max batches ({max_batches}); stopping.")
                     return
-                else:
+
+                # Pull batch
+                data = http.get_json(f"{base_url}/api/campaign/{campaign_id}/nomail?batch={batch}")
+                contacts = data.get("contacts", []) if isinstance(data, dict) else []
+                if not contacts:
+                    if attempt_insecure:
+                        logger.info("No contacts returned for this batch (even with insecure).")
+                        return
                     logger.warning("No contacts returned; retrying with --insecure mode due to possible TLS issue...")
-                    continue
-            logger.info(f"Pulled {len(contacts)} contact(s) with domains but no emails).")
+                    break
 
-            async with async_playwright() as pw:
-                browser = await pw.chromium.launch(headless=True)
-                browser_lock = asyncio.Lock()
-                sem = asyncio.Semaphore(concurrency)
+                batch_count += 1
+                logger.info(f"Pulled {len(contacts)} contact(s) with domains but no emails) [batch {batch_count}].")
 
-                async def restart_browser():
-                    nonlocal browser
-                    async with browser_lock:
-                        try:
-                            await browser.close()
-                        except Exception:
-                            pass
-                        browser = await pw.chromium.launch(headless=True)
-                        logger.warning("Browser restarted after timeout.")
+                async with async_playwright() as pw:
+                    browser = await pw.chromium.launch(headless=True)
+                    browser_lock = asyncio.Lock()
+                    sem = asyncio.Semaphore(concurrency)
+                    allow_restart = kill_browser_on_timeout and concurrency <= 1
+                    restart_warned = False
+
+                    async def restart_browser():
+                        nonlocal browser
+                        async with browser_lock:
+                            try:
+                                await browser.close()
+                            except Exception:
+                                pass
+                            browser = await pw.chromium.launch(headless=True)
+                            logger.warning("Browser restarted after timeout.")
+
+                    async def maybe_restart_browser():
+                        nonlocal restart_warned
+                        if not allow_restart:
+                            if not restart_warned:
+                                logger.warning("Skipping browser restart with concurrency>1 to avoid aborting active tasks.")
+                                restart_warned = True
+                            return
+                        await restart_browser()
 
                 async def try_extract(domain: str, https: bool, js_enabled: bool, check_facebook: bool = False) -> Set[str]:
                     target = domain if https else "http://" + strip_url_prefix(domain)
@@ -1165,7 +1184,7 @@ async def scrape_and_update_immediate(
                             except asyncio.TimeoutError:
                                 print(f"[TIMEOUT] ({seq}/{len(contacts)}): {domain} (JSoff)", flush=True)
                                 if kill_browser_on_timeout:
-                                    await restart_browser()
+                                    await maybe_restart_browser()
                                 return None
                             except Exception as e:
                                 logger.debug(f"FAST PASS error for {domain}: {e}")
@@ -1181,9 +1200,9 @@ async def scrape_and_update_immediate(
                                         candidates.update(found2)
                                 except asyncio.TimeoutError:
                                     print(f"[TIMEOUT] ({seq}/{len(contacts)}): {domain} (JSon)", flush=True)
-                                    if kill_browser_on_timeout:
-                                        await restart_browser()
-                                    return None
+                                if kill_browser_on_timeout:
+                                    await maybe_restart_browser()
+                                return None
                                 except Exception as e:
                                     logger.debug(f"FULL PASS error for {domain}: {e}")
 
@@ -1205,22 +1224,22 @@ async def scrape_and_update_immediate(
                             logger.warning(f"SAVE DEFERRED ({seq}/{len(contacts)}): {domain} -> {best}; {resp}")
                             return {"id": cid, "email": best}
 
-                results = await asyncio.gather(
-                    *[scrape_one(i, c) for i, c in enumerate(contacts, 1)],
-                    return_exceptions=True,
-                )
+                    results = await asyncio.gather(
+                        *[scrape_one(i, c) for i, c in enumerate(contacts, 1)],
+                        return_exceptions=True,
+                    )
 
-                try:
-                    await browser.close()
-                except Exception:
-                    pass
+                    try:
+                        await browser.close()
+                    except Exception:
+                        pass
 
-            # Any unsaved ones? Batch once.
-            unsaved = [r for r in results if isinstance(r, dict) and r.get("email")]
-            if unsaved:
-                batch_payload = {"contacts": [{"id": u["id"], "email": u["email"]} for u in unsaved]}
-                resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", batch_payload)
-                logger.info(f"BATCH SAVE: {len(unsaved)} email(s) → {resp}")
+                # Any unsaved ones? Batch once.
+                unsaved = [r for r in results if isinstance(r, dict) and r.get("email")]
+                if unsaved:
+                    batch_payload = {"contacts": [{"id": u["id"], "email": u["email"]} for u in unsaved]}
+                    resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", batch_payload)
+                    logger.info(f"BATCH SAVE: {len(unsaved)} email(s) → {resp}")
 
             break  # success with this insecure level
         except Exception as e:
@@ -1240,6 +1259,7 @@ def main():
     p.add_argument("--timeout", type=float, default=8.0, help="Per-page timeout (seconds)")
     p.add_argument("--links", type=int, default=5, help="Max child pages to visit per domain")
     p.add_argument("--domain-timeout", type=float, default=60.0, help="Total timeout per domain")
+    p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
     p.add_argument("--no-kill-on-timeout", action="store_true", help="Don't restart browser on timeout")
     p.add_argument("--facebook", action="store_true", help="Check Facebook pages linked from website for additional emails")
     args = p.parse_args()
@@ -1258,6 +1278,7 @@ def main():
         timeout=args.timeout,
         links=args.links,
         domain_timeout=args.domain_timeout,
+        max_batches=args.max_batches,
         kill_browser_on_timeout=not args.no_kill_on_timeout,
         facebook=args.facebook,
     ))

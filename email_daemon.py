@@ -217,6 +217,7 @@ def _run_email_scraper(
     campaign_id: str,
     base_url: str,
     batch: int,
+    max_batches: int,
     concurrency: int,
     timeout_s: float,
     domain_timeout_s: float,
@@ -242,6 +243,8 @@ def _run_email_scraper(
         "--domain-timeout",
         str(domain_timeout_s),
     ]
+    if max_batches is not None:
+        args.extend(["--max-batches", str(max_batches)])
     if facebook:
         args.append("--facebook")
 
@@ -258,6 +261,7 @@ def run_daemon(
     poll_interval_s: float,
     base_url: str,
     batch: int,
+    max_batches: int,
     concurrency: int,
     timeout_s: float,
     domain_timeout_s: float,
@@ -310,6 +314,7 @@ def run_daemon(
                 campaign_id=campaign_id,
                 base_url=base_url,
                 batch=batch,
+                max_batches=max_batches,
                 concurrency=concurrency,
                 timeout_s=timeout_s,
                 domain_timeout_s=domain_timeout_s,
@@ -344,6 +349,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=None, help="Per-page timeout in seconds")
     parser.add_argument("--domain-timeout", type=float, default=None, help="Total timeout per domain")
     parser.add_argument("--links", type=int, default=None, help="Max child pages per domain")
+    parser.add_argument("--max-batches", type=int, default=None, help="Max batches per campaign run (0 = unlimited)")
     parser.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
     parser.add_argument("--max-runs", type=int, default=None, help="Max runs per campaign before skipping")
     parser.add_argument("--log-path", default=None, help="Log file path")
@@ -359,6 +365,7 @@ def main() -> None:
     timeout_s = args.timeout if args.timeout is not None else email_cfg.get("timeout_s", 8.0)
     domain_timeout_s = args.domain_timeout if args.domain_timeout is not None else email_cfg.get("domain_timeout_s", 60.0)
     links = args.links if args.links is not None else email_cfg.get("links", 5)
+    max_batches = args.max_batches if args.max_batches is not None else email_cfg.get("max_batches", 0)
     facebook = args.facebook or bool(email_cfg.get("facebook", False))
     log_path = args.log_path or cfg.get("logging", {}).get("email_log", "")
     max_runs = args.max_runs if args.max_runs is not None else email_cfg.get("max_campaign_runs", 2)
@@ -371,6 +378,7 @@ def main() -> None:
         poll_interval_s=poll_interval_s,
         base_url=base_url,
         batch=batch,
+        max_batches=max_batches,
         concurrency=concurrency,
         timeout_s=timeout_s,
         domain_timeout_s=domain_timeout_s,
