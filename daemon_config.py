@@ -24,6 +24,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "domain_timeout_s": 60.0,
         "links": 5,
         "facebook": False,
+        "max_campaign_runs": 2,
     },
     "logging": {
         "maps_log": "logs/maps_daemon.log",
