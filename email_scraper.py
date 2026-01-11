@@ -1042,7 +1042,33 @@ async def scrape_and_update_immediate(
                     break
 
                 batch_count += 1
-                logger.info(f"Pulled {len(contacts)} contact(s) with domains but no emails) [batch {batch_count}].")
+                logger.info(f"Pulled {len(contacts)} contact(s) needing emails [batch {batch_count}].")
+
+                def _resolve_domain(contact: Dict) -> str:
+                    raw = (
+                        contact.get("domain")
+                        or contact.get("website")
+                        or contact.get("url")
+                        or ""
+                    )
+                    raw = str(raw).strip()
+                    if not raw:
+                        return ""
+                    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+                    return parsed.netloc or strip_url_prefix(raw)
+
+                usable_contacts: List[Dict] = []
+                for c in contacts:
+                    d = _resolve_domain(c)
+                    if d:
+                        c["_resolved_domain"] = d
+                        usable_contacts.append(c)
+
+                if not usable_contacts:
+                    logger.info("No usable domains found in this batch; skipping.")
+                    continue
+                contacts = usable_contacts
+                logger.info(f"Usable domains in batch: {len(contacts)}")
 
                 results: List[Any] = []
                 async with async_playwright() as pw:
@@ -1090,18 +1116,18 @@ async def scrape_and_update_immediate(
                 async def scrape_one(seq: int, contact: Dict) -> Optional[Dict]:
                     async with sem:
                         cid = contact.get("id")
-                        raw_domain = (
-                            contact.get("domain")
-                            or contact.get("website")
-                            or contact.get("url")
-                            or ""
-                        )
-                        raw_domain = str(raw_domain).strip()
-                        if raw_domain:
-                            parsed = urlparse(raw_domain if "://" in raw_domain else f"https://{raw_domain}")
-                            domain = parsed.netloc or strip_url_prefix(raw_domain)
-                        else:
-                            domain = ""
+                        domain = (contact.get("_resolved_domain") or "").strip()
+                        if not domain:
+                            raw_domain = (
+                                contact.get("domain")
+                                or contact.get("website")
+                                or contact.get("url")
+                                or ""
+                            )
+                            raw_domain = str(raw_domain).strip()
+                            if raw_domain:
+                                parsed = urlparse(raw_domain if "://" in raw_domain else f"https://{raw_domain}")
+                                domain = parsed.netloc or strip_url_prefix(raw_domain)
                         if not domain:
                             logger.debug(f"Skipping contact {cid}: no domain/website/url.")
                             return None
