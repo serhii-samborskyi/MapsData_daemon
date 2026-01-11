@@ -24,7 +24,7 @@ import re
 import sys
 import time
 import unicodedata
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse, urljoin
 
 LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
@@ -1044,6 +1044,7 @@ async def scrape_and_update_immediate(
                 batch_count += 1
                 logger.info(f"Pulled {len(contacts)} contact(s) with domains but no emails) [batch {batch_count}].")
 
+                results: List[Any] = []
                 async with async_playwright() as pw:
                     browser = await pw.chromium.launch(headless=True)
                     browser_lock = asyncio.Lock()
