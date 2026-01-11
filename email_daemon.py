@@ -189,26 +189,32 @@ def _discover_jobs(
     logger: logging.Logger,
     run_state: dict,
     max_runs: int,
-) -> None:
+) -> dict:
+    stats = {"active": 0, "queued": 0, "skipped_limit": 0, "no_nomail": 0}
     if not base_url:
-        return
+        return stats
     base = _normalize_base_url(base_url)
     data = _get_json(f"{base}/api/campaigns/active", logger)
     campaigns = data.get("campaigns", []) if isinstance(data, dict) else []
+    stats["active"] = len(campaigns)
     for camp in campaigns:
         campaign_id = str(camp.get("id", "")).strip()
         campaign_name = str(camp.get("name", "")).strip()
         if not campaign_id:
             continue
         if max_runs > 0 and _get_run_count(run_state, campaign_id) >= max_runs:
+            stats["skipped_limit"] += 1
             continue
         probe = _get_json(f"{base}/api/campaign/{campaign_id}/nomail?batch=1", logger)
         contacts = probe.get("contacts", []) if isinstance(probe, dict) else []
         if not contacts:
+            stats["no_nomail"] += 1
             continue
         queued = _enqueue_job(queue_dir, campaign_id, campaign_name, logger)
         if queued:
             logger.info(f"Discovered active campaign {campaign_id} with missing emails.")
+            stats["queued"] += 1
+    return stats
 
 
 def _run_email_scraper(
@@ -285,9 +291,16 @@ def run_daemon(
     while not STOP:
         now = time.monotonic()
         if now - last_discovery >= poll_interval_s:
-            _discover_jobs(base_url, queue_dir, logger, run_state, max_runs)
+            stats = _discover_jobs(base_url, queue_dir, logger, run_state, max_runs)
             _save_run_state(state_path, run_state)
             last_discovery = now
+            if stats.get("queued", 0) == 0:
+                logger.info(
+                    "Discovery: active=%s queued=0 no_nomail=%s skipped_limit=%s",
+                    stats.get("active", 0),
+                    stats.get("no_nomail", 0),
+                    stats.get("skipped_limit", 0),
+                )
 
         jobs = _list_jobs(queue_dir)
         if not jobs:
