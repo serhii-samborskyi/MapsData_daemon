@@ -1200,9 +1200,9 @@ async def scrape_and_update_immediate(
                                         candidates.update(found2)
                                 except asyncio.TimeoutError:
                                     print(f"[TIMEOUT] ({seq}/{len(contacts)}): {domain} (JSon)", flush=True)
-                                if kill_browser_on_timeout:
-                                    await maybe_restart_browser()
-                                return None
+                                    if kill_browser_on_timeout:
+                                        await maybe_restart_browser()
+                                    return None
                                 except Exception as e:
                                     logger.debug(f"FULL PASS error for {domain}: {e}")
 
