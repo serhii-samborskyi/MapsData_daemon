@@ -1090,8 +1090,20 @@ async def scrape_and_update_immediate(
                 async def scrape_one(seq: int, contact: Dict) -> Optional[Dict]:
                     async with sem:
                         cid = contact.get("id")
-                        domain = (contact.get("domain") or "").strip()
+                        raw_domain = (
+                            contact.get("domain")
+                            or contact.get("website")
+                            or contact.get("url")
+                            or ""
+                        )
+                        raw_domain = str(raw_domain).strip()
+                        if raw_domain:
+                            parsed = urlparse(raw_domain if "://" in raw_domain else f"https://{raw_domain}")
+                            domain = parsed.netloc or strip_url_prefix(raw_domain)
+                        else:
+                            domain = ""
                         if not domain:
+                            logger.debug(f"Skipping contact {cid}: no domain/website/url.")
                             return None
 
                         print(f"[WILL SEARCH] ({seq}/{len(contacts)}): {domain}", flush=True)
