@@ -103,8 +103,6 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_domain_timeout.setDecimals(1)
         self.email_links = QtWidgets.QSpinBox()
         self.email_links.setRange(0, 20)
-        self.email_max_runs = QtWidgets.QSpinBox()
-        self.email_max_runs.setRange(1, 20)
         self.email_max_batches = QtWidgets.QSpinBox()
         self.email_max_batches.setRange(0, 200)
         self.email_facebook = QtWidgets.QCheckBox("Enable Facebook scraping")
@@ -113,7 +111,6 @@ class DaemonUI(QtWidgets.QMainWindow):
         email_form.addRow("Timeout (s)", self.email_timeout)
         email_form.addRow("Domain timeout (s)", self.email_domain_timeout)
         email_form.addRow("Links per domain", self.email_links)
-        email_form.addRow("Max runs per campaign", self.email_max_runs)
         email_form.addRow("Max batches per run (0 = unlimited)", self.email_max_batches)
         email_form.addRow("", self.email_facebook)
 
@@ -277,7 +274,6 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_timeout.setValue(float(email_cfg.get("timeout_s", 8.0)))
         self.email_domain_timeout.setValue(float(email_cfg.get("domain_timeout_s", 60.0)))
         self.email_links.setValue(int(email_cfg.get("links", 5)))
-        self.email_max_runs.setValue(int(email_cfg.get("max_campaign_runs", 2)))
         self.email_max_batches.setValue(int(email_cfg.get("max_batches", 0)))
         self.email_facebook.setChecked(bool(email_cfg.get("facebook", False)))
 
@@ -301,7 +297,6 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["email"]["timeout_s"] = float(self.email_timeout.value())
         cfg["email"]["domain_timeout_s"] = float(self.email_domain_timeout.value())
         cfg["email"]["links"] = int(self.email_links.value())
-        cfg["email"]["max_campaign_runs"] = int(self.email_max_runs.value())
         cfg["email"]["max_batches"] = int(self.email_max_batches.value())
         cfg["email"]["facebook"] = bool(self.email_facebook.isChecked())
         return cfg

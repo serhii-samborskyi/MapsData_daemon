@@ -120,42 +120,6 @@ def _normalize_base_url(base_url: str) -> str:
     return base.rstrip("/")
 
 
-def _load_run_state(path: str) -> dict:
-    if not path:
-        return {"runs": {}}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, dict) and isinstance(data.get("runs"), dict):
-            return data
-    except Exception:
-        pass
-    return {"runs": {}}
-
-
-def _save_run_state(path: str, state: dict) -> None:
-    if not path:
-        return
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp_path = f"{path}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2, sort_keys=True)
-    os.replace(tmp_path, path)
-
-
-def _get_run_count(state: dict, campaign_id: str) -> int:
-    try:
-        return int(state.get("runs", {}).get(str(campaign_id), 0))
-    except Exception:
-        return 0
-
-
-def _increment_run_count(state: dict, campaign_id: str) -> None:
-    runs = state.setdefault("runs", {})
-    cid = str(campaign_id)
-    runs[cid] = int(runs.get(cid, 0)) + 1
-
-
 def _get_json(url: str, logger: logging.Logger, timeout_s: float = 20.0) -> dict:
     global INSECURE_MODE, INSECURE_LOGGED
     try:
@@ -187,10 +151,8 @@ def _discover_jobs(
     base_url: str,
     queue_dir: str,
     logger: logging.Logger,
-    run_state: dict,
-    max_runs: int,
 ) -> dict:
-    stats = {"active": 0, "queued": 0, "skipped_limit": 0, "no_nomail": 0}
+    stats = {"active": 0, "queued": 0, "no_nomail": 0}
     if not base_url:
         return stats
     base = _normalize_base_url(base_url)
@@ -201,9 +163,6 @@ def _discover_jobs(
         campaign_id = str(camp.get("id", "")).strip()
         campaign_name = str(camp.get("name", "")).strip()
         if not campaign_id:
-            continue
-        if max_runs > 0 and _get_run_count(run_state, campaign_id) >= max_runs:
-            stats["skipped_limit"] += 1
             continue
         probe = _get_json(f"{base}/api/campaign/{campaign_id}/nomail?batch=1", logger)
         contacts = probe.get("contacts", []) if isinstance(probe, dict) else []
@@ -274,7 +233,6 @@ def run_daemon(
     links: int,
     facebook: bool,
     log_path: str,
-    max_runs: int,
 ) -> None:
     logger = _setup_logging(log_path)
     logger.info("Email daemon starting")
@@ -285,21 +243,17 @@ def run_daemon(
     script_path = os.path.join(os.path.dirname(__file__), "email_scraper.py")
     python_exe = sys.executable
     last_discovery = 0.0
-    state_path = os.path.join(os.path.dirname(__file__), "state", "email_campaign_runs.json")
-    run_state = _load_run_state(state_path)
 
     while not STOP:
         now = time.monotonic()
         if now - last_discovery >= poll_interval_s:
-            stats = _discover_jobs(base_url, queue_dir, logger, run_state, max_runs)
-            _save_run_state(state_path, run_state)
+            stats = _discover_jobs(base_url, queue_dir, logger)
             last_discovery = now
             if stats.get("queued", 0) == 0:
                 logger.info(
-                    "Discovery: active=%s queued=0 no_nomail=%s skipped_limit=%s",
+                    "Discovery: active=%s queued=0 no_nomail=%s",
                     stats.get("active", 0),
                     stats.get("no_nomail", 0),
-                    stats.get("skipped_limit", 0),
                 )
 
         jobs = _list_jobs(queue_dir)
@@ -345,8 +299,6 @@ def run_daemon(
         else:
             dest = _move_job(job_path, os.path.join(queue_dir, "failed"))
             logger.error(f"Email job failed (code={code}): {dest}")
-        _increment_run_count(run_state, campaign_id)
-        _save_run_state(state_path, run_state)
 
     logger.info("Email daemon stopping")
 
@@ -364,7 +316,6 @@ def main() -> None:
     parser.add_argument("--links", type=int, default=None, help="Max child pages per domain")
     parser.add_argument("--max-batches", type=int, default=None, help="Max batches per campaign run (0 = unlimited)")
     parser.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
-    parser.add_argument("--max-runs", type=int, default=None, help="Max runs per campaign before skipping")
     parser.add_argument("--log-path", default=None, help="Log file path")
     args = parser.parse_args()
 
@@ -381,7 +332,6 @@ def main() -> None:
     max_batches = args.max_batches if args.max_batches is not None else email_cfg.get("max_batches", 0)
     facebook = args.facebook or bool(email_cfg.get("facebook", False))
     log_path = args.log_path or cfg.get("logging", {}).get("email_log", "")
-    max_runs = args.max_runs if args.max_runs is not None else email_cfg.get("max_campaign_runs", 2)
 
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
@@ -398,7 +348,6 @@ def main() -> None:
         links=links,
         facebook=facebook,
         log_path=log_path,
-        max_runs=max_runs,
     )
 
 
