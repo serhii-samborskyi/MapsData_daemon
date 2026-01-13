@@ -998,6 +998,7 @@ async def scrape_and_update_immediate(
     campaign: str,
     batch: int,
     max_batches: int,
+    max_batches_facebook: int,
     base_url: str,
     concurrency: int,
     timeout: float,
@@ -1025,260 +1026,290 @@ async def scrape_and_update_immediate(
                     raise RuntimeError(f"Campaign '{campaign}' not found. Available: {names}")
                 logger.info(f"Matched campaign '{campaign}' -> id={campaign_id}")
 
-            batch_count = 0
-            while True:
-                if max_batches and batch_count >= max_batches:
-                    logger.info(f"Reached max batches ({max_batches}); stopping.")
-                    return
+            async def run_batches(
+                use_facebook: bool,
+                facebook_only: bool,
+                max_batches_limit: int,
+                phase_concurrency: int,
+                phase_label: str,
+            ) -> str:
+                batch_count = 0
+                while True:
+                    if max_batches_limit and batch_count >= max_batches_limit:
+                        logger.info(f"Reached max {phase_label} batches ({max_batches_limit}); stopping {phase_label} phase.")
+                        return "done"
 
-                # Pull batch
-                data = http.get_json(f"{base_url}/api/campaign/{campaign_id}/nomail?batch={batch}")
-                contacts = data.get("contacts", []) if isinstance(data, dict) else []
-                if not contacts:
-                    if attempt_insecure:
-                        logger.info("No contacts returned for this batch (even with insecure).")
-                        return
-                    logger.warning("No contacts returned; retrying with --insecure mode due to possible TLS issue...")
-                    break
+                    data = http.get_json(f"{base_url}/api/campaign/{campaign_id}/nomail?batch={batch}")
+                    contacts = data.get("contacts", []) if isinstance(data, dict) else []
+                    if not contacts:
+                        if batch_count == 0 and not attempt_insecure:
+                            logger.warning("No contacts returned; retrying with --insecure mode due to possible TLS issue...")
+                            return "retry_insecure"
+                        logger.info(f"No contacts returned for {phase_label} phase.")
+                        return "done"
 
-                batch_count += 1
-                logger.info(f"Pulled {len(contacts)} contact(s) needing emails [batch {batch_count}].")
+                    batch_count += 1
+                    logger.info(f"Pulled {len(contacts)} contact(s) needing emails [batch {batch_count} / {phase_label}].")
 
-                def _resolve_domain(contact: Dict) -> str:
-                    raw = (
-                        contact.get("domain")
-                        or contact.get("website")
-                        or contact.get("url")
-                        or ""
-                    )
-                    raw = str(raw).strip()
-                    if not raw:
-                        return ""
-                    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
-                    return parsed.netloc or strip_url_prefix(raw)
-
-                usable_contacts: List[Dict] = []
-                for c in contacts:
-                    d = _resolve_domain(c)
-                    if d:
-                        c["_resolved_domain"] = d
-                        usable_contacts.append(c)
-
-                if not usable_contacts:
-                    logger.info("No usable domains found in this batch; skipping.")
-                    continue
-                contacts = usable_contacts
-                logger.info(f"Usable domains in batch: {len(contacts)}")
-
-                results: List[Any] = []
-                async with async_playwright() as pw:
-                    browser = await pw.chromium.launch(headless=True)
-                    browser_lock = asyncio.Lock()
-                    sem = asyncio.Semaphore(concurrency)
-                    allow_restart = kill_browser_on_timeout and concurrency <= 1
-                    restart_warned = False
-
-                    async def restart_browser():
-                        nonlocal browser
-                        async with browser_lock:
-                            try:
-                                await browser.close()
-                            except Exception:
-                                pass
-                            browser = await pw.chromium.launch(headless=True)
-                            logger.warning("Browser restarted after timeout.")
-
-                    async def maybe_restart_browser():
-                        nonlocal restart_warned
-                        if not allow_restart:
-                            if not restart_warned:
-                                logger.warning("Skipping browser restart with concurrency>1 to avoid aborting active tasks.")
-                                restart_warned = True
-                            return
-                        await restart_browser()
-
-                    async def try_extract(domain: str, https: bool, js_enabled: bool, check_facebook: bool = False) -> Set[str]:
-                        target = domain if https else "http://" + strip_url_prefix(domain)
-                        scheme = "https" if https else "http"
-                        js_flag = "JSon" if js_enabled else "JSoff"
-                        print(f"[START] {target} [{scheme},{js_flag}], links≤{links}", flush=True)
-                        # Use longer per-page timeout on JS-on pass
-                        per_page_timeout = max(timeout, 12.0) if js_enabled else timeout
-                        return await extract_emails(
-                            browser, target,
-                            timeout=per_page_timeout, recurse=True, max_children=links,
-                            js_enabled=js_enabled,
-                            block_assets=True,
-                            allow_third_party=js_enabled,  # allow 3P when JS is on
-                            check_facebook=check_facebook,
+                    def _resolve_domain(contact: Dict) -> str:
+                        raw = (
+                            contact.get("domain")
+                            or contact.get("website")
+                            or contact.get("url")
+                            or ""
                         )
-    
-                    async def scrape_one(seq: int, contact: Dict) -> Optional[Dict]:
-                        async with sem:
-                            cid = contact.get("id")
-                            domain = (contact.get("_resolved_domain") or "").strip()
-                            if not domain:
-                                raw_domain = (
-                                    contact.get("domain")
-                                    or contact.get("website")
-                                    or contact.get("url")
-                                    or ""
-                                )
-                                raw_domain = str(raw_domain).strip()
-                                if raw_domain:
-                                    parsed = urlparse(raw_domain if "://" in raw_domain else f"https://{raw_domain}")
-                                    domain = parsed.netloc or strip_url_prefix(raw_domain)
-                            if not domain:
-                                logger.debug(f"Skipping contact {cid}: no domain/website/url.")
-                                return None
-    
-                            print(f"[WILL SEARCH] ({seq}/{len(contacts)}): {domain}", flush=True)
-                            start_ts = time.monotonic()
-                            best = None
-    
-                            # PRIORITY 1: Check Facebook pages first (if enabled)
-                            if facebook:
+                        raw = str(raw).strip()
+                        if not raw:
+                            return ""
+                        parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+                        return parsed.netloc or strip_url_prefix(raw)
+
+                    usable_contacts: List[Dict] = []
+                    for c in contacts:
+                        d = _resolve_domain(c)
+                        if d:
+                            c["_resolved_domain"] = d
+                            usable_contacts.append(c)
+
+                    if not usable_contacts:
+                        logger.info("No usable domains found in this batch; skipping.")
+                        continue
+                    contacts = usable_contacts
+                    logger.info(f"Usable domains in batch: {len(contacts)}")
+
+                    results: List[Any] = []
+                    async with async_playwright() as pw:
+                        browser = await pw.chromium.launch(headless=True)
+                        browser_lock = asyncio.Lock()
+                        sem = asyncio.Semaphore(phase_concurrency)
+                        allow_restart = kill_browser_on_timeout and phase_concurrency <= 1
+                        restart_warned = False
+
+                        async def restart_browser():
+                            nonlocal browser
+                            async with browser_lock:
                                 try:
-                                    print(f"[FACEBOOK] ({seq}/{len(contacts)}): {domain} - checking Facebook pages first", flush=True)
-                                    # Extract ONLY Facebook emails by checking Facebook directly
-                                    facebook_only_candidates = set()
-    
-                                    # Get main page content to find Facebook links
-                                    main_page_result = await asyncio.wait_for(try_extract(domain, True, js_enabled=False, check_facebook=False), timeout=domain_timeout)
-    
-                                    # Then check Facebook pages separately
-                                    target = domain if True else "http://" + strip_url_prefix(domain)
-                                    context = await browser.new_context(
-                                        java_script_enabled=False,
-                                        user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                                                    "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"),
+                                    await browser.close()
+                                except Exception:
+                                    pass
+                                browser = await pw.chromium.launch(headless=True)
+                                logger.warning("Browser restarted after timeout.")
+
+                        async def maybe_restart_browser():
+                            nonlocal restart_warned
+                            if not allow_restart:
+                                if not restart_warned:
+                                    logger.warning("Skipping browser restart with concurrency>1 to avoid aborting active tasks.")
+                                    restart_warned = True
+                                return
+                            await restart_browser()
+
+                        async def try_extract(domain: str, https: bool, js_enabled: bool, check_facebook: bool = False) -> Set[str]:
+                            target = domain if https else "http://" + strip_url_prefix(domain)
+                            scheme = "https" if https else "http"
+                            js_flag = "JSon" if js_enabled else "JSoff"
+                            print(f"[START] {target} [{scheme},{js_flag}], links≤{links}", flush=True)
+                            per_page_timeout = max(timeout, 12.0) if js_enabled else timeout
+                            return await extract_emails(
+                                browser, target,
+                                timeout=per_page_timeout, recurse=True, max_children=links,
+                                js_enabled=js_enabled,
+                                block_assets=True,
+                                allow_third_party=js_enabled,
+                                check_facebook=check_facebook,
+                            )
+
+                        async def scrape_one(seq: int, contact: Dict) -> Optional[Dict]:
+                            async with sem:
+                                cid = contact.get("id")
+                                domain = (contact.get("_resolved_domain") or "").strip()
+                                if not domain:
+                                    raw_domain = (
+                                        contact.get("domain")
+                                        or contact.get("website")
+                                        or contact.get("url")
+                                        or ""
                                     )
-                                    context.set_default_timeout(int(timeout * 1000))
-                                    context.set_default_navigation_timeout(int(timeout * 1000))
-                                    page = await context.new_page()
-    
+                                    raw_domain = str(raw_domain).strip()
+                                    if raw_domain:
+                                        parsed = urlparse(raw_domain if "://" in raw_domain else f"https://{raw_domain}")
+                                        domain = parsed.netloc or strip_url_prefix(raw_domain)
+                                if not domain:
+                                    logger.debug(f"Skipping contact {cid}: no domain/website/url.")
+                                    return None
+
+                                print(f"[WILL SEARCH] ({seq}/{len(contacts)}): {domain}", flush=True)
+                                start_ts = time.monotonic()
+                                best = None
+
+                                if use_facebook:
                                     try:
-                                        resp = await page.goto(f"https://{target}", wait_until="domcontentloaded", timeout=int(timeout * 1000))
-                                        if resp and resp.status == 200:
-                                            html = await page.content()
-                                            soup = BeautifulSoup(html, "html.parser")
-                                            facebook_links = find_facebook_page_links(soup, f"https://{target}")
-    
-                                            if facebook_links:
-                                                logger.info(f"🔍 FACEBOOK DETECTION: Found Facebook page(s): {facebook_links}")
-                                                for fb_url in facebook_links[:2]:  # Only check first 2 Facebook links
-                                                    try:
-                                                        logger.info(f"📘 FACEBOOK SCRAPING: Attempting to scrape {fb_url}...")
-                                                        fb_emails = await extract_emails_from_facebook(browser, fb_url, timeout=timeout)
-                                                        if fb_emails:
-                                                            logger.info(f"✅ FACEBOOK SUCCESS: Found {len(fb_emails)} email(s) on Facebook page {fb_url}: {list(fb_emails)}")
-                                                            facebook_only_candidates.update(fb_emails)
-                                                        else:
-                                                            logger.warning(f"❌ FACEBOOK EMPTY: No emails found on Facebook page: {fb_url}")
-                                                    except Exception as e:
-                                                        logger.warning(f"💥 FACEBOOK ERROR: Facebook scraping failed for {fb_url}: {e}")
-                                            else:
-                                                logger.info(f"🚫 FACEBOOK DETECTION: No Facebook page links found on {target}")
-                                    finally:
+                                        print(f"[FACEBOOK] ({seq}/{len(contacts)}): {domain} - checking Facebook pages first", flush=True)
+                                        facebook_only_candidates = set()
+                                        _ = await asyncio.wait_for(
+                                            try_extract(domain, True, js_enabled=False, check_facebook=False),
+                                            timeout=domain_timeout,
+                                        )
+
+                                        target = domain if True else "http://" + strip_url_prefix(domain)
+                                        context = await browser.new_context(
+                                            java_script_enabled=False,
+                                            user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                                        "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"),
+                                        )
+                                        context.set_default_timeout(int(timeout * 1000))
+                                        context.set_default_navigation_timeout(int(timeout * 1000))
+                                        page = await context.new_page()
+
                                         try:
-                                            await context.close()
-                                        except Exception:
-                                            pass
-    
-                                    if facebook_only_candidates:
-                                        # Use Facebook-specific email selection (prioritizes real emails over domain matching)
-                                        best = pick_best_facebook_email(facebook_only_candidates)
-                                        if best:
-                                            elapsed = time.monotonic() - start_ts
-                                            print(f"[FACEBOOK SUCCESS] ({seq}/{len(contacts)}): {domain} -> {best} (from Facebook)", flush=True)
-                                            # Save immediately and return
-                                            payload = {"id": str(cid), "email": best}
-                                            resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", payload)
-                                            if isinstance(resp, dict) and not resp.get("error"):
-                                                logger.info(f"✓ DONE ({seq}/{len(contacts)}): {domain} -> {best} [FB priority] [{elapsed:.1f}s]")
-                                                return None
-                                            else:
+                                            resp = await page.goto(f"https://{target}", wait_until="domcontentloaded", timeout=int(timeout * 1000))
+                                            if resp and resp.status == 200:
+                                                html = await page.content()
+                                                soup = BeautifulSoup(html, "html.parser")
+                                                facebook_links = find_facebook_page_links(soup, f"https://{target}")
+
+                                                if facebook_links:
+                                                    logger.info(f"🔍 FACEBOOK DETECTION: Found Facebook page(s): {facebook_links}")
+                                                    for fb_url in facebook_links[:2]:
+                                                        try:
+                                                            logger.info(f"📘 FACEBOOK SCRAPING: Attempting to scrape {fb_url}...")
+                                                            fb_emails = await extract_emails_from_facebook(browser, fb_url, timeout=timeout)
+                                                            if fb_emails:
+                                                                logger.info(f"✅ FACEBOOK SUCCESS: Found {len(fb_emails)} email(s) on Facebook page {fb_url}: {list(fb_emails)}")
+                                                                facebook_only_candidates.update(fb_emails)
+                                                            else:
+                                                                logger.warning(f"❌ FACEBOOK EMPTY: No emails found on Facebook page: {fb_url}")
+                                                        except Exception as e:
+                                                            logger.warning(f"💥 FACEBOOK ERROR: Facebook scraping failed for {fb_url}: {e}")
+                                                else:
+                                                    logger.info(f"🚫 FACEBOOK DETECTION: No Facebook page links found on {target}")
+                                        finally:
+                                            try:
+                                                await context.close()
+                                            except Exception:
+                                                pass
+
+                                        if facebook_only_candidates:
+                                            best = pick_best_facebook_email(facebook_only_candidates)
+                                            if best:
+                                                elapsed = time.monotonic() - start_ts
+                                                print(f"[FACEBOOK SUCCESS] ({seq}/{len(contacts)}): {domain} -> {best} (from Facebook)", flush=True)
+                                                payload = {"id": str(cid), "email": best}
+                                                resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", payload)
+                                                if isinstance(resp, dict) and not resp.get("error"):
+                                                    logger.info(f"✓ DONE ({seq}/{len(contacts)}): {domain} -> {best} [FB priority] [{elapsed:.1f}s]")
+                                                    return None
                                                 logger.warning(f"SAVE DEFERRED ({seq}/{len(contacts)}): {domain} -> {best} [FB]; {resp}")
                                                 return {"id": cid, "email": best}
-                                except asyncio.TimeoutError:
-                                    print(f"[FB TIMEOUT] ({seq}/{len(contacts)}): {domain}", flush=True)
-                                    if kill_browser_on_timeout:
-                                        await restart_browser()
-                                except Exception as e:
-                                    logger.debug(f"Facebook priority check failed for {domain}: {e}")
-    
-                            # PRIORITY 2: Website fallback (only if Facebook didn't find anything)
-                            if not best:
-                                print(f"[WEBSITE FALLBACK] ({seq}/{len(contacts)}): {domain} - checking website", flush=True)
-                                candidates: Set[str] = set()
-    
-                                # FAST PASS: JS off (low CPU), HTTPS then HTTP
-                                try:
-                                    found = await asyncio.wait_for(try_extract(domain, True, js_enabled=False, check_facebook=False), timeout=domain_timeout)
-                                    candidates.update(found)
-                                    if not candidates:
-                                        print(f"[RETRY] ({seq}/{len(contacts)}): http://{domain} [http,JSoff]", flush=True)
-                                        found2 = await asyncio.wait_for(try_extract(domain, False, js_enabled=False, check_facebook=False), timeout=domain_timeout)
-                                        candidates.update(found2)
-                                except asyncio.TimeoutError:
-                                    print(f"[TIMEOUT] ({seq}/{len(contacts)}): {domain} (JSoff)", flush=True)
-                                    if kill_browser_on_timeout:
-                                        await maybe_restart_browser()
+                                    except asyncio.TimeoutError:
+                                        print(f"[FB TIMEOUT] ({seq}/{len(contacts)}): {domain}", flush=True)
+                                        if kill_browser_on_timeout:
+                                            await restart_browser()
+                                    except Exception as e:
+                                        logger.debug(f"Facebook priority check failed for {domain}: {e}")
+
+                                if not best and facebook_only:
+                                    elapsed = time.monotonic() - start_ts
+                                    logger.info(f"∅ DONE ({seq}/{len(contacts)}): {domain} (no email) [{elapsed:.1f}s]")
                                     return None
-                                except Exception as e:
-                                    logger.debug(f"FAST PASS error for {domain}: {e}")
-    
-                                # FULL PASS: JS on, allow third-party scripts
-                                if not candidates:
+
+                                if not best and not facebook_only:
+                                    print(f"[WEBSITE FALLBACK] ({seq}/{len(contacts)}): {domain} - checking website", flush=True)
+                                    candidates: Set[str] = set()
+
                                     try:
-                                        found = await asyncio.wait_for(try_extract(domain, True, js_enabled=True, check_facebook=False), timeout=domain_timeout)
+                                        found = await asyncio.wait_for(
+                                            try_extract(domain, True, js_enabled=False, check_facebook=False),
+                                            timeout=domain_timeout,
+                                        )
                                         candidates.update(found)
                                         if not candidates:
-                                            print(f"[RETRY] ({seq}/{len(contacts)}): http://{domain} [http,JSon]", flush=True)
-                                            found2 = await asyncio.wait_for(try_extract(domain, False, js_enabled=True, check_facebook=False), timeout=domain_timeout)
+                                            print(f"[RETRY] ({seq}/{len(contacts)}): http://{domain} [http,JSoff]", flush=True)
+                                            found2 = await asyncio.wait_for(
+                                                try_extract(domain, False, js_enabled=False, check_facebook=False),
+                                                timeout=domain_timeout,
+                                            )
                                             candidates.update(found2)
                                     except asyncio.TimeoutError:
-                                        print(f"[TIMEOUT] ({seq}/{len(contacts)}): {domain} (JSon)", flush=True)
+                                        print(f"[TIMEOUT] ({seq}/{len(contacts)}): {domain} (JSoff)", flush=True)
                                         if kill_browser_on_timeout:
                                             await maybe_restart_browser()
                                         return None
                                     except Exception as e:
-                                        logger.debug(f"FULL PASS error for {domain}: {e}")
-    
-                                # Use website-specific email selection (stricter filtering)
-                                best = pick_best_email(domain, candidates, allow_public=True)
-    
-                            elapsed = time.monotonic() - start_ts
-                            if not best:
-                                logger.info(f"∅ DONE ({seq}/{len(contacts)}): {domain} (no email) [{elapsed:.1f}s]")
-                                return None
-    
-                            # IMMEDIATE SAVE
-                            payload = {"id": str(cid), "email": best}
-                            resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", payload)
-                            if isinstance(resp, dict) and not resp.get("error"):
-                                logger.info(f"✓ DONE ({seq}/{len(contacts)}): {domain} -> {best} [{elapsed:.1f}s]")
-                                return None
-                            else:
+                                        logger.debug(f"FAST PASS error for {domain}: {e}")
+
+                                    if not candidates:
+                                        try:
+                                            found = await asyncio.wait_for(
+                                                try_extract(domain, True, js_enabled=True, check_facebook=False),
+                                                timeout=domain_timeout,
+                                            )
+                                            candidates.update(found)
+                                            if not candidates:
+                                                print(f"[RETRY] ({seq}/{len(contacts)}): http://{domain} [http,JSon]", flush=True)
+                                                found2 = await asyncio.wait_for(
+                                                    try_extract(domain, False, js_enabled=True, check_facebook=False),
+                                                    timeout=domain_timeout,
+                                                )
+                                                candidates.update(found2)
+                                        except asyncio.TimeoutError:
+                                            print(f"[TIMEOUT] ({seq}/{len(contacts)}): {domain} (JSon)", flush=True)
+                                            if kill_browser_on_timeout:
+                                                await maybe_restart_browser()
+                                            return None
+                                        except Exception as e:
+                                            logger.debug(f"FULL PASS error for {domain}: {e}")
+
+                                    best = pick_best_email(domain, candidates, allow_public=True)
+
+                                elapsed = time.monotonic() - start_ts
+                                if not best:
+                                    logger.info(f"∅ DONE ({seq}/{len(contacts)}): {domain} (no email) [{elapsed:.1f}s]")
+                                    return None
+
+                                payload = {"id": str(cid), "email": best}
+                                resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", payload)
+                                if isinstance(resp, dict) and not resp.get("error"):
+                                    logger.info(f"✓ DONE ({seq}/{len(contacts)}): {domain} -> {best} [{elapsed:.1f}s]")
+                                    return None
                                 logger.warning(f"SAVE DEFERRED ({seq}/{len(contacts)}): {domain} -> {best}; {resp}")
                                 return {"id": cid, "email": best}
-    
-                    results = await asyncio.gather(
-                        *[scrape_one(i, c) for i, c in enumerate(contacts, 1)],
-                        return_exceptions=True,
-                    )
 
-                    try:
-                        await browser.close()
-                    except Exception:
-                        pass
+                        results = await asyncio.gather(
+                            *[scrape_one(i, c) for i, c in enumerate(contacts, 1)],
+                            return_exceptions=True,
+                        )
 
-                # Any unsaved ones? Batch once.
-                unsaved = [r for r in results if isinstance(r, dict) and r.get("email")]
-                if unsaved:
-                    batch_payload = {"contacts": [{"id": u["id"], "email": u["email"]} for u in unsaved]}
-                    resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", batch_payload)
-                    logger.info(f"BATCH SAVE: {len(unsaved)} email(s) → {resp}")
+                        try:
+                            await browser.close()
+                        except Exception:
+                            pass
+
+                    unsaved = [r for r in results if isinstance(r, dict) and r.get("email")]
+                    if unsaved:
+                        batch_payload = {"contacts": [{"id": u["id"], "email": u["email"]} for u in unsaved]}
+                        resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", batch_payload)
+                        logger.info(f"BATCH SAVE: {len(unsaved)} email(s) → {resp}")
+
+            status = await run_batches(
+                use_facebook=False,
+                facebook_only=False,
+                max_batches_limit=max_batches,
+                phase_concurrency=concurrency,
+                phase_label="regular",
+            )
+            if status == "retry_insecure":
+                continue
+
+            if facebook and max_batches_facebook and max_batches_facebook > 0:
+                logger.info("Starting Facebook-only phase with concurrency=1.")
+                await run_batches(
+                    use_facebook=True,
+                    facebook_only=True,
+                    max_batches_limit=max_batches_facebook,
+                    phase_concurrency=1,
+                    phase_label="facebook",
+                )
 
             break  # success with this insecure level
         except Exception as e:
@@ -1299,6 +1330,7 @@ def main():
     p.add_argument("--links", type=int, default=5, help="Max child pages to visit per domain")
     p.add_argument("--domain-timeout", type=float, default=60.0, help="Total timeout per domain")
     p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
+    p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--no-kill-on-timeout", action="store_true", help="Don't restart browser on timeout")
     p.add_argument("--facebook", action="store_true", help="Check Facebook pages linked from website for additional emails")
     args = p.parse_args()
@@ -1318,6 +1350,7 @@ def main():
         links=args.links,
         domain_timeout=args.domain_timeout,
         max_batches=args.max_batches,
+        max_batches_facebook=args.max_batches_facebook,
         kill_browser_on_timeout=not args.no_kill_on_timeout,
         facebook=args.facebook,
     ))

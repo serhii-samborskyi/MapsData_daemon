@@ -25,6 +25,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "links": 5,
         "facebook": False,
         "max_batches": 0,
+        "max_batches_facebook": 0,
     },
     "logging": {
         "maps_log": "logs/maps_daemon.log",
