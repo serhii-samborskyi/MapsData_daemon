@@ -91,6 +91,9 @@ class DaemonUI(QtWidgets.QMainWindow):
 
         email_group = QtWidgets.QGroupBox("Email Daemon")
         email_form = QtWidgets.QFormLayout(email_group)
+        self.email_scraper_engine = QtWidgets.QComboBox()
+        self.email_scraper_engine.addItem("Playwright (more emails)", "playwright")
+        self.email_scraper_engine.addItem("Scrapy (faster)", "scrapy")
         self.email_batch = QtWidgets.QSpinBox()
         self.email_batch.setRange(1, 200)
         self.email_concurrency = QtWidgets.QSpinBox()
@@ -108,6 +111,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_max_batches_facebook = QtWidgets.QSpinBox()
         self.email_max_batches_facebook.setRange(0, 200)
         self.email_facebook = QtWidgets.QCheckBox("Enable Facebook scraping")
+        email_form.addRow("Scraper engine", self.email_scraper_engine)
         email_form.addRow("Batch", self.email_batch)
         email_form.addRow("Concurrency", self.email_concurrency)
         email_form.addRow("Timeout (s)", self.email_timeout)
@@ -190,6 +194,12 @@ class DaemonUI(QtWidgets.QMainWindow):
                 font-weight: 600;
             }
             QLineEdit, QSpinBox, QDoubleSpinBox {
+                background: #fbfaf7;
+                border: 1px solid #d6d1c4;
+                border-radius: 6px;
+                padding: 4px 6px;
+            }
+            QComboBox {
                 background: #fbfaf7;
                 border: 1px solid #d6d1c4;
                 border-radius: 6px;
@@ -280,6 +290,11 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_max_batches.setValue(int(email_cfg.get("max_batches", 0)))
         self.email_max_batches_facebook.setValue(int(email_cfg.get("max_batches_facebook", 0)))
         self.email_facebook.setChecked(bool(email_cfg.get("facebook", False)))
+        engine = str(email_cfg.get("scraper", "playwright")).lower().strip()
+        engine_index = self.email_scraper_engine.findData(engine)
+        if engine_index == -1:
+            engine_index = 0
+        self.email_scraper_engine.setCurrentIndex(engine_index)
 
         self._update_status("maps")
         self._update_status("email")
@@ -304,6 +319,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["email"]["max_batches"] = int(self.email_max_batches.value())
         cfg["email"]["max_batches_facebook"] = int(self.email_max_batches_facebook.value())
         cfg["email"]["facebook"] = bool(self.email_facebook.isChecked())
+        cfg["email"]["scraper"] = str(self.email_scraper_engine.currentData() or "playwright")
         return cfg
 
     def _save_config(self) -> None:

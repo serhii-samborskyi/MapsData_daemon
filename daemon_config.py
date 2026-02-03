@@ -26,6 +26,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "facebook": False,
         "max_batches": 0,
         "max_batches_facebook": 0,
+        "scraper": "playwright",
     },
     "logging": {
         "maps_log": "logs/maps_daemon.log",

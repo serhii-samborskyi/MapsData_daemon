@@ -54,9 +54,9 @@ echo "==> Installing Python packages"
 TARGET_DIR="$SCRIPT_DIR/.deps"
 mkdir -p "$TARGET_DIR"
 if [ "$NO_UI" -eq 1 ]; then
-  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml
+  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml scrapy
 else
-  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml PySide6
+  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml scrapy PySide6
 fi
 
 echo "==> Installing Playwright browsers"

@@ -236,6 +236,7 @@ def run_daemon(
     domain_timeout_s: float,
     links: int,
     facebook: bool,
+    scraper: str,
     log_path: str,
 ) -> None:
     logger = _setup_logging(log_path)
@@ -244,7 +245,16 @@ def run_daemon(
     base_url = _normalize_base_url(base_url)
 
     _ensure_queue_dirs(queue_dir)
-    script_path = os.path.join(os.path.dirname(__file__), "email_scraper.py")
+    scraper_key = str(scraper or "playwright").strip().lower()
+    script_name = "email_scraper.py"
+    if scraper_key == "scrapy":
+        script_name = "email_scraper_scrapy.py"
+    script_path = os.path.join(os.path.dirname(__file__), script_name)
+    if not os.path.exists(script_path):
+        logger.warning("Email scraper '%s' not found at %s; falling back to Playwright.", scraper_key, script_path)
+        script_path = os.path.join(os.path.dirname(__file__), "email_scraper.py")
+        scraper_key = "playwright"
+    logger.info("Email scraper engine: %s", scraper_key)
     python_exe = sys.executable
     last_discovery = 0.0
 
@@ -322,6 +332,7 @@ def main() -> None:
     parser.add_argument("--max-batches", type=int, default=None, help="Max batches per campaign run (0 = unlimited)")
     parser.add_argument("--max-batches-facebook", type=int, default=None, help="Max Facebook batches per run (0 = disabled)")
     parser.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
+    parser.add_argument("--scraper", default=None, help="Email scraper engine (playwright or scrapy)")
     parser.add_argument("--log-path", default=None, help="Log file path")
     args = parser.parse_args()
 
@@ -342,6 +353,7 @@ def main() -> None:
         else email_cfg.get("max_batches_facebook", 0)
     )
     facebook = args.facebook or bool(email_cfg.get("facebook", False))
+    scraper = (args.scraper or email_cfg.get("scraper", "playwright")).strip().lower()
     log_path = args.log_path or cfg.get("logging", {}).get("email_log", "")
 
     signal.signal(signal.SIGINT, _handle_signal)
@@ -359,6 +371,7 @@ def main() -> None:
         domain_timeout_s=domain_timeout_s,
         links=links,
         facebook=facebook,
+        scraper=scraper,
         log_path=log_path,
     )
 
