@@ -71,6 +71,10 @@ BLOCKED_EMAIL_DOMAINS = {
     "email.com",
     "localhost",
     "invalid",
+    "h.com",
+    "ic.com",
+    "wp.com",
+    "linkedin.com",
 }
 
 GENERIC_LOCAL_PARTS = {
