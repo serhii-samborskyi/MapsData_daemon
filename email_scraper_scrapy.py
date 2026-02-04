@@ -7,7 +7,7 @@ import logging
 import os
 import sys
 import time
-from typing import Dict, Iterable, List, Set
+from typing import Dict, Iterable, List, Optional, Set
 from urllib.parse import urlparse
 
 LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
@@ -65,28 +65,44 @@ class HttpClient:
     def _sleep(self, attempt: int) -> None:
         time.sleep(0.5 * (attempt + 1))
 
-    def get_json(self, url: str) -> Dict:
+    def get_text(self, url: str, headers: Optional[Dict[str, str]] = None) -> str:
+        req_headers = headers or {"Accept": "text/html,application/json"}
         for attempt in range(self.max_retries):
             try:
                 if requests is not None:
-                    resp = requests.get(url, timeout=self.timeout, allow_redirects=True, verify=(not self.insecure))
+                    resp = requests.get(
+                        url,
+                        headers=req_headers,
+                        timeout=self.timeout,
+                        allow_redirects=True,
+                        verify=(not self.insecure),
+                    )
                     resp.raise_for_status()
-                    return resp.json() if resp.text else {}
-                req = Request(url, headers={"Accept": "application/json"})
+                    return resp.text or ""
+                req = Request(url, headers=req_headers)
                 ctx = ssl._create_unverified_context() if self.insecure else None
                 with urlopen(req, timeout=self.timeout, context=ctx) as resp:
-                    text = resp.read().decode("utf-8", "ignore")
-                return json.loads(text) if text else {}
+                    return resp.read().decode("utf-8", "ignore")
             except Exception as exc:
                 if "CERTIFICATE_VERIFY_FAILED" in str(exc) and not self.insecure:
                     self.insecure = True
-                    logger.warning("SSL verification failed; retrying discovery with insecure HTTPS.")
+                    logger.warning("SSL verification failed; retrying GET with insecure HTTPS.")
                     continue
                 if attempt == self.max_retries - 1:
                     logger.warning("GET failed for %s: %s", url, exc)
-                    return {}
+                    return ""
                 self._sleep(attempt)
-        return {}
+        return ""
+
+    def get_json(self, url: str) -> Dict:
+        text = self.get_text(url, headers={"Accept": "application/json"})
+        if not text:
+            return {}
+        try:
+            return json.loads(text)
+        except Exception as exc:
+            logger.warning("JSON parse failed for %s: %s", url, exc)
+            return {}
 
     def post_json(self, url: str, payload: Dict) -> Dict:
         for attempt in range(self.max_retries):
@@ -187,6 +203,8 @@ class EmailSpider(scrapy.Spider):
         domain_timeout: float,
         http_timeout: float,
         http_max_retries: int,
+        facebook: bool,
+        max_batches_facebook: int,
     ) -> None:
         super().__init__()
         self.base_url = normalize_base_url(base_url)
@@ -196,6 +214,8 @@ class EmailSpider(scrapy.Spider):
         self.links = int(links)
         self.domain_timeout = float(domain_timeout)
         self.http = HttpClient(timeout=http_timeout, max_retries=http_max_retries)
+        self.facebook = bool(facebook)
+        self.max_batches_facebook = int(max_batches_facebook or 0)
         self.batch_count = 0
         self._no_more_batches = False
         self.contact_states: Dict[int, Dict] = {}
@@ -232,7 +252,14 @@ class EmailSpider(scrapy.Spider):
             logger.info("No contacts returned; stopping.")
             return []
         self.batch_count += 1
+        facebook_for_batch = (
+            self.facebook
+            and self.max_batches_facebook > 0
+            and self.batch_count <= self.max_batches_facebook
+        )
         logger.info("Pulled %s contact(s) needing emails [batch %s].", len(contacts), self.batch_count)
+        if facebook_for_batch:
+            logger.info("Facebook fallback enabled for batch %s.", self.batch_count)
 
         requests: List[scrapy.Request] = []
         for contact in contacts:
@@ -249,6 +276,8 @@ class EmailSpider(scrapy.Spider):
                 "pages_queued": 0,
                 "done": False,
                 "seen_urls": set(),
+                "facebook_links": set(),
+                "facebook_enabled": facebook_for_batch,
             }
             self.contact_states[int(contact_id)] = state
             start_url = self._normalize_start_url(domain)
@@ -313,6 +342,7 @@ class EmailSpider(scrapy.Spider):
                         "http_fallback": True,
                     },
                 )
+        self._maybe_finalize_contact(int(contact_id), state)
 
     def parse(self, response: scrapy.http.Response):
         contact_id = response.meta.get("contact_id")
@@ -328,6 +358,9 @@ class EmailSpider(scrapy.Spider):
             state["done"] = True
             return
 
+        if state.get("facebook_enabled"):
+            self._collect_facebook_links(response, state)
+
         emails = extract_emails_from_text(response.text or "")
         best = pick_best_email(domain, emails)
         if best:
@@ -338,11 +371,12 @@ class EmailSpider(scrapy.Spider):
 
         max_pages = max(1, self.links + 1)
         if state["pages_seen"] >= max_pages:
-            state["done"] = True
+            self._maybe_finalize_contact(int(contact_id), state)
             return
 
         links = self._extract_links(response, domain)
         if not links:
+            self._maybe_finalize_contact(int(contact_id), state)
             return
 
         for link in links:
@@ -363,6 +397,7 @@ class EmailSpider(scrapy.Spider):
                     "http_fallback": True,
                 },
             )
+        self._maybe_finalize_contact(int(contact_id), state)
 
     def _extract_links(self, response: scrapy.http.Response, domain: str) -> List[str]:
         links: List[str] = []
@@ -387,6 +422,76 @@ class EmailSpider(scrapy.Spider):
         if not self.domain_timeout:
             return False
         return (time.monotonic() - state.get("start_time", 0.0)) > self.domain_timeout
+
+    @staticmethod
+    def _is_valid_facebook_link(url: str) -> bool:
+        parsed = urlparse(url)
+        host = (parsed.netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if host not in {"facebook.com", "m.facebook.com", "mbasic.facebook.com"}:
+            return False
+        path = (parsed.path or "").lower()
+        if not path or path in {"/", "/home.php"}:
+            return False
+        blocked = (
+            "/sharer",
+            "/share",
+            "/dialog",
+            "/plugins",
+            "/tr",
+            "/login",
+            "/events",
+            "/photo",
+            "/watch",
+            "/reel",
+        )
+        return not any(token in path for token in blocked)
+
+    def _collect_facebook_links(self, response: scrapy.http.Response, state: Dict) -> None:
+        links: Set[str] = state.get("facebook_links", set())
+        for href in response.css("a::attr(href)").getall():
+            if not href:
+                continue
+            absolute = response.urljoin(href.strip())
+            if not self._is_valid_facebook_link(absolute):
+                continue
+            parsed = urlparse(absolute)
+            clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/")
+            if clean:
+                links.add(clean)
+        state["facebook_links"] = links
+
+    def _fetch_facebook_emails(self, domain: str, links: Set[str]) -> Optional[str]:
+        if not links:
+            return None
+        candidates: Set[str] = set()
+        for fb_url in list(links)[:2]:
+            html = self.http.get_text(fb_url)
+            if html:
+                candidates.update(extract_emails_from_text(html))
+            if not fb_url.endswith("/about"):
+                about_url = fb_url.rstrip("/") + "/about"
+                about_html = self.http.get_text(about_url)
+                if about_html:
+                    candidates.update(extract_emails_from_text(about_html))
+        return pick_best_email(domain, candidates) if candidates else None
+
+    def _maybe_finalize_contact(self, contact_id: int, state: Dict) -> None:
+        if state.get("done"):
+            return
+        if state.get("pages_seen", 0) < state.get("pages_queued", 0):
+            return
+
+        best = None
+        if state.get("facebook_enabled"):
+            best = self._fetch_facebook_emails(state.get("domain", ""), state.get("facebook_links", set()))
+            if best:
+                logger.info("FACEBOOK FOUND %s -> %s", state.get("domain", ""), best)
+
+        if best:
+            self._save_email(contact_id, best)
+        state["done"] = True
 
     def _save_email(self, contact_id: int, email: str) -> bool:
         if contact_id in self._saved_contacts:
@@ -414,13 +519,14 @@ def main() -> None:
     p.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
     args = p.parse_args()
 
-    if args.facebook or args.max_batches_facebook:
-        logger.info("Facebook scraping is not supported in Scrapy engine; ignoring.")
-
     base_url = normalize_base_url(args.base_url)
     http = HttpClient(timeout=20.0, max_retries=5)
     campaign_id = resolve_campaign_id(http, base_url, args.campaign)
     logger.info("Scrapy email scraper starting for campaign id=%s", campaign_id)
+    if args.facebook and args.max_batches_facebook > 0:
+        logger.info("Facebook fallback enabled for first %s batch(es).", args.max_batches_facebook)
+    elif args.facebook:
+        logger.info("Facebook checkbox enabled but max Facebook batches is 0; Facebook fallback is disabled.")
 
     settings = {
         "LOG_LEVEL": "INFO",
@@ -448,6 +554,8 @@ def main() -> None:
         domain_timeout=args.domain_timeout,
         http_timeout=20.0,
         http_max_retries=5,
+        facebook=args.facebook,
+        max_batches_facebook=args.max_batches_facebook,
     )
     process.start()
 
