@@ -33,6 +33,12 @@ if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
 
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
+from email_quality import (
+    filter_valid_emails,
+    is_allowed_domain as quality_is_allowed_domain,
+    is_same_business_domain,
+    pick_best_business_email,
+)
 
 # Prefer 'requests' for better CA bundle; fall back to urllib
 try:
@@ -236,15 +242,7 @@ ALLOWED_DOMAIN_SUFFIXES = {
 
 
 def is_allowed_domain(domain_part: str) -> bool:
-    if not domain_part or "." not in domain_part:
-        return False
-    host = domain_part.lower().strip(".")
-    if host in PUBLIC_PROVIDERS:
-        return True
-    for suffix in ALLOWED_DOMAIN_SUFFIXES:
-        if host.endswith(suffix):
-            return True
-    return False
+    return quality_is_allowed_domain(domain_part)
 
 
 def priority_score(url_or_text: str) -> int:
@@ -716,73 +714,9 @@ async def extract_emails(
             else:
                 logger.info(f"🚫 FACEBOOK DETECTION: No Facebook page links found on {url}")
 
-    # Extension-style email filtering - separate domain emails from all emails
-    all_emails = set()
-    domain_emails = set()
-
-    # Get domain for this URL using extension's logic
-    domain = get_domain_from_url(effective_url)
-
-    for email in emails:
-        # Clean email same as extension
-        cleaned_email = email.replace('u003e', '').lower().strip()
-
-        # Skip empty emails
-        if not cleaned_email or '@' not in cleaned_email:
-            continue
-
-        # Extension-style invalid pattern filtering
-        is_invalid = False
-        for invalid_pattern in BLOCK_SUBSTRINGS:
-            if invalid_pattern in cleaned_email:
-                is_invalid = True
-                break
-
-        if is_invalid:
-            continue
-
-        # Additional extension pattern filtering
-        if any(pattern in cleaned_email for pattern in ['test@', 'example@', 'noreply@', 'no-reply@']):
-            continue
-
-        # Advanced domain validation - catch phone numbers and malformed domains
-        try:
-            username, domain_part = cleaned_email.split('@', 1)
-
-            # Skip if domain looks like phone number (contains digit-hyphen-digit pattern)
-            import re
-            if re.search(r'\d+-\d+', domain_part):
-                continue
-
-            # Skip if domain contains too many numbers (likely phone number)
-            digit_count = sum(1 for c in domain_part if c.isdigit())
-            if digit_count > 4:  # Normal domains rarely have more than 4 digits
-                continue
-
-            # Skip domains that are clearly invalid
-            if domain_part.startswith('.') or domain_part.endswith('.') or '..' in domain_part:
-                continue
-
-            # Skip very short domains (less than 4 chars) or very long domains (more than 60 chars)
-            if len(domain_part) < 4 or len(domain_part) > 60:
-                continue
-
-            # Only allow common TLDs or known public providers
-            if not is_allowed_domain(domain_part):
-                continue
-
-        except ValueError:
-            # Email doesn't contain exactly one @
-            continue
-
-        # Add to all emails
-        all_emails.add(cleaned_email)
-
-        # Add to domain emails if it matches the domain
-        if domain and domain in cleaned_email:
-            domain_emails.add(cleaned_email)
-
-    # Return domain emails if available, otherwise all emails (extension logic)
+    # Shared quality rules for both Playwright and Scrapy engines.
+    all_emails = filter_valid_emails(emails)
+    domain_emails = {e for e in all_emails if is_same_business_domain(e, effective_url)}
     result_emails = domain_emails if domain_emails else all_emails
 
     logger.debug(f"Email extraction for {url}: found {len(emails)} raw, {len(all_emails)} valid, {len(domain_emails)} domain-specific, returning {len(result_emails)}")
@@ -859,60 +793,7 @@ def pick_best_facebook_email(candidates: Set[str]) -> Optional[str]:
 
 
 def pick_best_email(domain: str, candidates: Set[str], allow_public: bool = True) -> Optional[str]:
-    """Enhanced email selection with smart business vs public filtering"""
-    if not candidates:
-        return None
-
-    domain = (domain or "").lower()
-    domain = strip_url_prefix(domain)
-    if domain.startswith("www."):
-        domain = domain[4:]
-
-    # Prioritize same-domain emails (business emails)
-    same_domain = [e for e in candidates if e.endswith("@" + domain) or e.endswith("@www." + domain)]
-
-    if same_domain:
-        def sort_key(e: str) -> Tuple[int, int]:
-            pref_score = -1
-            for i, prefix in enumerate(PREFERRED_MAILBOX_ORDER):
-                if e.startswith(prefix):
-                    pref_score = i
-                    break
-            return (pref_score if pref_score >= 0 else 999, len(e))
-
-        same_domain.sort(key=sort_key)
-        return same_domain[0]
-
-    # If no business email and public emails allowed, pick best public email
-    if allow_public:
-        public_emails = [e for e in candidates if e.split("@", 1)[1] in PUBLIC_PROVIDERS]
-        if public_emails:
-            def sort_public_key(e: str) -> Tuple[int, int]:
-                pref_score = -1
-                for i, prefix in enumerate(PREFERRED_MAILBOX_ORDER):
-                    if e.startswith(prefix):
-                        pref_score = i
-                        break
-                return (pref_score if pref_score >= 0 else 999, len(e))
-
-            public_emails.sort(key=sort_public_key)
-            return public_emails[0]
-
-    # Fallback to any remaining email
-    others = list(candidates)
-    if others:
-        def sort_fallback_key(e: str) -> Tuple[int, int]:
-            pref_score = -1
-            for i, prefix in enumerate(PREFERRED_MAILBOX_ORDER):
-                if e.startswith(prefix):
-                    pref_score = i
-                    break
-            return (pref_score if pref_score >= 0 else 999, len(e))
-
-        others.sort(key=sort_fallback_key)
-        return others[0]
-
-    return None
+    return pick_best_business_email(candidates, domain, allow_public=allow_public)
 
 
 # -----------------------------

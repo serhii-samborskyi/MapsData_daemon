@@ -5,10 +5,9 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
 import time
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Dict, Iterable, List, Set
 from urllib.parse import urlparse
 
 LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
@@ -32,9 +31,14 @@ except Exception:
 import ssl
 from urllib.request import Request, urlopen
 
-DEFAULT_BASE_URL = "https://scrapiq.leadtechx.com"
+from email_quality import (
+    extract_candidate_emails_from_text,
+    normalize_domain,
+    pick_best_business_email,
+    registrable_domain,
+)
 
-EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+DEFAULT_BASE_URL = "https://scrapiq.leadtechx.com"
 
 CONTACT_PRIORITY = [
     ("contact-us", 0), ("contactus", 0), ("contact-me", 0), ("contact", 0),
@@ -46,20 +50,6 @@ CONTACT_PRIORITY = [
     ("support", 2), ("customer-service", 2),
     ("privacy-policy", 3), ("privacy", 3), ("legal", 3),
     ("services", 4), ("info", 4),
-]
-
-PREFERRED_MAILBOX_ORDER = ["info@", "contact@", "hello@", "support@", "sales@", "admin@"]
-
-PUBLIC_PROVIDERS = {
-    "gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com",
-    "aol.com", "proton.me", "protonmail.com", "yandex.com", "gmx.com", "mail.com",
-}
-
-BLOCK_SUBSTRINGS = [
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", "wixpress.com", "sentry.io",
-    "noreply", "no-reply", "abuse", "subscribe", "mailer-daemon",
-    "example.com", "domain.com", "email.com", "yourname", "wix.com",
-    ".js", ".css", ".html", ".php", ".asp",
 ]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", force=True)
@@ -146,68 +136,12 @@ def normalize_base_url(base_url: str) -> str:
     return base.rstrip("/")
 
 
-def normalize_email_candidate(raw: str) -> str:
-    if not raw:
-        return ""
-    s = raw.strip().strip("<>'\"")
-    if s.lower().startswith("mailto:"):
-        s = s.split(":", 1)[1]
-    s = s.split("?", 1)[0]
-    s = s.split("#", 1)[0]
-    s = s.split("&", 1)[0]
-    s = s.split(",", 1)[0]
-    s = s.split(";", 1)[0]
-    return s.strip().lower()
-
-
-def deobfuscate_text_for_emails(text: str) -> str:
-    t = " " + (text or "") + " "
-    t = re.sub(r"\s*(?:\(|\[)?at(?:\)|\])?\s*", "@", t, flags=re.I)
-    t = re.sub(r"\s*(?:\(|\[)?dot(?:\)|\])?\s*", ".", t, flags=re.I)
-    t = re.sub(r"\s+@\s+", "@", t)
-    t = re.sub(r"\s*\.\s*", ".", t)
-    return t
-
-
 def extract_emails_from_text(text: str) -> Set[str]:
-    found: Set[str] = set()
-    if not text:
-        return found
-    for m in EMAIL_RE.finditer(text):
-        candidate = normalize_email_candidate(m.group(0))
-        if candidate:
-            found.add(candidate)
-    deob = deobfuscate_text_for_emails(text)
-    if deob != text:
-        for m in EMAIL_RE.finditer(deob):
-            candidate = normalize_email_candidate(m.group(0))
-            if candidate:
-                found.add(candidate)
-    return found
-
-
-def is_junk_email(email: str) -> bool:
-    if not email:
-        return True
-    lower = email.lower()
-    for sub in BLOCK_SUBSTRINGS:
-        if sub in lower:
-            return True
-    return False
+    return extract_candidate_emails_from_text(text)
 
 
 def pick_best_email(domain: str, emails: Iterable[str]) -> str:
-    domain = (domain or "").lower().lstrip("www.")
-    filtered = [e for e in emails if e and not is_junk_email(e)]
-    if not filtered:
-        return ""
-    same_domain = [e for e in filtered if e.split("@")[-1].endswith(domain)] if domain else []
-    pool = same_domain or filtered
-    for prefix in PREFERRED_MAILBOX_ORDER:
-        for email in pool:
-            if email.startswith(prefix):
-                return email
-    return sorted(pool)[0]
+    return pick_best_business_email(emails, domain, allow_public=True) or ""
 
 
 def priority_score(url_or_text: str) -> int:
@@ -221,9 +155,11 @@ def priority_score(url_or_text: str) -> int:
 def same_site(a: str, b: str) -> bool:
     if not a or not b:
         return False
-    ha = a.lower().lstrip("www.")
-    hb = b.lower().lstrip("www.")
-    return ha == hb
+    ha = normalize_domain(a)
+    hb = normalize_domain(b)
+    if not ha or not hb:
+        return False
+    return ha == hb or registrable_domain(ha) == registrable_domain(hb)
 
 
 def resolve_campaign_id(http: HttpClient, base_url: str, campaign: str) -> int:
