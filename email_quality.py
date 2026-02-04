@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from typing import Iterable, Optional, Set, Tuple
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
@@ -117,13 +117,14 @@ def registrable_domain(value: str) -> str:
 def normalize_email_candidate(raw: str) -> str:
     if not raw:
         return ""
-    s = raw.strip().strip("<>\"'")
+    s = unquote(raw).strip().strip("<>\"'")
     if s.lower().startswith("mailto:"):
         s = s.split(":", 1)[1]
     for sep in ("?", "#", "&", ",", ";"):
         if sep in s:
             s = s.split(sep, 1)[0]
-    return s.strip().lower()
+    s = s.strip().strip("()[]{}<>\"'.,:")
+    return s.lower()
 
 
 def deobfuscate_text_for_emails(text: str) -> str:
@@ -297,6 +298,19 @@ def _generic_local_penalty(email: str) -> int:
     return 1 if local in GENERIC_LOCAL_PARTS else 0
 
 
+def _domain_relevance_score(email: str, business_domain: str) -> int:
+    email_domain = email.split("@", 1)[1]
+    biz_token = _business_token(business_domain)
+    email_token = _business_token(email_domain)
+    if not biz_token or not email_token:
+        return 2
+    if biz_token == email_token:
+        return 0
+    if biz_token in email_token or email_token in biz_token:
+        return 1
+    return 2
+
+
 def pick_best_business_email(candidates: Iterable[str], business_domain: str, allow_public: bool = True) -> Optional[str]:
     valid = filter_valid_emails(candidates)
     if not valid:
@@ -317,6 +331,19 @@ def pick_best_business_email(candidates: Iterable[str], business_domain: str, al
         return same_business[0]
 
     public_emails = [e for e in valid if e.split("@", 1)[1] in PUBLIC_PROVIDERS]
+    others = [e for e in valid if e not in public_emails]
+    if others:
+        others.sort(
+            key=lambda e: (
+                _domain_relevance_score(e, business_host),
+                _business_relevance_score(e, business_host),
+                _generic_local_penalty(e),
+                _mailbox_priority(e),
+                -len(e),
+            )
+        )
+        return others[0]
+
     if allow_public and public_emails:
         public_emails.sort(
             key=lambda e: (
@@ -327,10 +354,5 @@ def pick_best_business_email(candidates: Iterable[str], business_domain: str, al
             )
         )
         return public_emails[0]
-
-    others = [e for e in valid if e not in public_emails]
-    if others:
-        others.sort(key=lambda e: (_business_relevance_score(e, business_host), _generic_local_penalty(e), _mailbox_priority(e), -len(e)))
-        return others[0]
 
     return None
