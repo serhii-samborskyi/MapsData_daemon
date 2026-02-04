@@ -57,7 +57,14 @@ def _ensure_queue_dirs(queue_dir: str) -> None:
 
 
 def _job_exists(queue_dir: str, filename: str) -> bool:
-    return os.path.exists(os.path.join(queue_dir, filename))
+    for sub in ("", "processed", "failed"):
+        check_dir = queue_dir if not sub else os.path.join(queue_dir, sub)
+        if not os.path.isdir(check_dir):
+            continue
+        for name in os.listdir(check_dir):
+            if name == filename or name.startswith(f"{filename}."):
+                return True
+    return False
 
 
 def _enqueue_job(queue_dir: str, campaign_id: str, campaign_name: str, logger: logging.Logger) -> bool:
