@@ -376,6 +376,7 @@ import json
 import time
 import random
 import logging
+import ssl
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -405,25 +406,48 @@ class HttpClient:
         self.timeout = timeout
         self.max_retries = max_retries
         self.backoff = backoff
+        self.insecure = False
+        self._insecure_logged = False
 
     def _sleep(self, attempt: int):
         delay = self.backoff * (1 + attempt)
         delay *= (0.75 + random.random() * 0.5)
         time.sleep(delay)
 
+    @staticmethod
+    def _is_ssl_verify_error(exc: Exception) -> bool:
+        text = str(exc)
+        return "CERTIFICATE_VERIFY_FAILED" in text or "certificate verify failed" in text.lower()
+
+    def _switch_to_insecure(self) -> None:
+        self.insecure = True
+        if not self._insecure_logged:
+            logger.warning("SSL verification failed; switching to insecure HTTPS for API calls.")
+            self._insecure_logged = True
+
     def get_text(self, url: str, headers: Optional[Dict[str,str]] = None) -> str:
         for attempt in range(self.max_retries):
             try:
                 if requests is not None:
-                    r = requests.get(url, headers=headers, timeout=self.timeout, allow_redirects=True)
+                    r = requests.get(
+                        url,
+                        headers=headers,
+                        timeout=self.timeout,
+                        allow_redirects=True,
+                        verify=(not self.insecure),
+                    )
                     if r.status_code >= 400:
                         raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                     return r.text or ""
                 else:
                     req = urllib.request.Request(url, headers=headers or {})
-                    with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    ctx = ssl._create_unverified_context() if self.insecure else None
+                    with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
                         return resp.read().decode("utf-8", errors="ignore")
             except Exception as e:
+                if self._is_ssl_verify_error(e) and not self.insecure:
+                    self._switch_to_insecure()
+                    continue
                 if attempt == self.max_retries - 1:
                     logger.error(f"GET failed for {url}: {e}")
                     return ""
@@ -446,15 +470,26 @@ class HttpClient:
         for attempt in range(self.max_retries):
             try:
                 if requests is not None:
-                    r = requests.post(url, data=json.dumps(payload), headers={"Content-Type":"application/json", **(headers or {})}, timeout=self.timeout, allow_redirects=True)
+                    r = requests.post(
+                        url,
+                        data=json.dumps(payload),
+                        headers={"Content-Type":"application/json", **(headers or {})},
+                        timeout=self.timeout,
+                        allow_redirects=True,
+                        verify=(not self.insecure),
+                    )
                     return r.status_code, r.text or ""
                 else:
                     req = urllib.request.Request(url, data=body, headers={"Content-Type":"application/json", **(headers or {})})
-                    with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    ctx = ssl._create_unverified_context() if self.insecure else None
+                    with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
                         code = getattr(resp, "status", 200) or 200
                         text = resp.read().decode("utf-8", errors="ignore")
                         return code, text
             except Exception as e:
+                if self._is_ssl_verify_error(e) and not self.insecure:
+                    self._switch_to_insecure()
+                    continue
                 if attempt == self.max_retries - 1:
                     logger.error(f"POST failed for {url}: {e}")
                     return 599, ""
