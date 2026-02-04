@@ -211,6 +211,15 @@ def is_valid_email_candidate(email: str) -> bool:
     if _is_blocked_email_domain(domain):
         return False
 
+    # Reject emails hosted on subdomains (e.g. info@sub.example.com).
+    if normalize_domain(domain) != registrable_domain(domain):
+        return False
+
+    # Reject one-letter root domains (e.g. a.com, h.net).
+    root_label = registrable_domain(domain).split(".", 1)[0]
+    if len(root_label) <= 1:
+        return False
+
     if len(local) > 64 or local.startswith((".", "-")) or local.endswith((".", "-")):
         return False
     if ".." in local or not re.fullmatch(r"[a-z0-9._%+\-]+", local):

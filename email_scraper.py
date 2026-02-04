@@ -525,6 +525,7 @@ async def extract_emails(
     block_assets: bool = True,
     allow_third_party: bool = False,
     check_facebook: bool = False,
+    same_domain_only: bool = True,
 ) -> Set[str]:
     """
     One-shot fetch for a URL:
@@ -643,20 +644,22 @@ async def extract_emails(
                 continue
 
             full = urljoin(base, href)
-            if same_site(effective_url, full):
-                path = urlparse(full).path.lower()
-                link_text = (a.get_text() or "").lower()
+            if same_domain_only and not same_site(effective_url, full):
+                continue
 
-                # Check if link matches target paths with smart prioritization
-                path_matches = any(tp in path for tp in TARGET_PATHS)
-                text_matches = any(tp in link_text for tp in TARGET_PATHS)
+            path = urlparse(full).path.lower()
+            link_text = (a.get_text() or "").lower()
 
-                if path_matches or text_matches:
-                    # Calculate priority score based on path and text
-                    path_score = priority_score(path)
-                    text_score = priority_score(link_text)
-                    final_score = min(path_score, text_score)
-                    priority_links.append((final_score, full))
+            # Check if link matches target paths with smart prioritization
+            path_matches = any(tp in path for tp in TARGET_PATHS)
+            text_matches = any(tp in link_text for tp in TARGET_PATHS)
+
+            if path_matches or text_matches:
+                # Calculate priority score based on path and text
+                path_score = priority_score(path)
+                text_score = priority_score(link_text)
+                final_score = min(path_score, text_score)
+                priority_links.append((final_score, full))
 
         # Sort by priority (lower score = higher priority) and take top links
         priority_links.sort(key=lambda x: (x[0], x[1]))
@@ -668,9 +671,10 @@ async def extract_emails(
                 full = urljoin(base, path)
                 if full in existing:
                     continue
-                if same_site(effective_url, full):
-                    priority_links.append((priority_score(path), full))
-                    existing.add(full)
+                if same_domain_only and not same_site(effective_url, full):
+                    continue
+                priority_links.append((priority_score(path), full))
+                existing.add(full)
 
             priority_links.sort(key=lambda x: (x[0], x[1]))
 
@@ -688,6 +692,7 @@ async def extract_emails(
                 block_assets=block_assets,
                 allow_third_party=allow_third_party,
                 check_facebook=False,  # Don't check Facebook recursively
+                same_domain_only=same_domain_only,
             )
 
         results = await asyncio.gather(*[fetch_child(u) for u in children], return_exceptions=True)
@@ -696,7 +701,7 @@ async def extract_emails(
                 emails.update(r)
 
         # Check Facebook pages if enabled (only on main page, not recursively)
-        if check_facebook:
+        if check_facebook and not same_domain_only:
             facebook_links = find_facebook_page_links(soup, effective_url)
             if facebook_links:
                 logger.info(f"🔍 FACEBOOK DETECTION: Found {len(facebook_links)} Facebook page(s): {facebook_links[:3]}...") if len(facebook_links) > 3 else logger.info(f"🔍 FACEBOOK DETECTION: Found Facebook page(s): {facebook_links}")
@@ -724,71 +729,10 @@ async def extract_emails(
     return result_emails
 
 
-def pick_best_facebook_email(candidates: Set[str]) -> Optional[str]:
-    """Facebook-specific email selection - prioritize real business emails over domain matching"""
-    if not candidates:
-        return None
-
-    # Filter out obviously fake/spam emails
-    real_emails = []
-    for email in candidates:
-        email_lower = email.lower()
-
-        # Skip emails with file extensions (fake emails)
-        if any(ext in email_lower for ext in ['.js', '.png', '.jpg', '.gif', '.css', '.html', '.php', '.asp']):
-            continue
-
-        # Skip common spam patterns and privacy emails
-        if any(spam in email_lower for spam in ['test@', 'example@', 'noreply@', 'no-reply@', 'privacy@', 'privacy.']):
-            continue
-
-        # Skip emails with phone numbers in domain (like supplies@1-847-776-6001.order)
-        try:
-            username, domain_part = email_lower.split('@', 1)
-
-            # Skip if domain looks like phone number (contains digit-hyphen-digit pattern)
-            import re
-            if re.search(r'\d+-\d+', domain_part):
-                continue
-
-            # Skip if domain contains too many numbers (likely phone number)
-            digit_count = sum(1 for c in domain_part if c.isdigit())
-            if digit_count > 4:  # Normal domains rarely have more than 4 digits
-                continue
-
-            if not is_allowed_domain(domain_part):
-                continue
-
-        except ValueError:
-            # Email doesn't contain exactly one @
-            continue
-
-        real_emails.append(email)
-
-    if not real_emails:
-        return None
-
-    # Prioritize business-sounding emails (first names, company names)
-    def facebook_email_priority(e: str) -> Tuple[int, int]:
-        """Lower score = higher priority for Facebook emails"""
-        username = e.split('@')[0].lower()
-
-        # Priority 1: Real names (contains periods, common first names)
-        if '.' in username and not username.startswith('.') and not username.endswith('.'):
-            return (0, len(e))  # Highest priority
-
-        # Priority 2: Business-style emails (info, contact, sales, etc.)
-        business_prefixes = ['info', 'contact', 'sales', 'admin', 'support', 'office']
-        for prefix in business_prefixes:
-            if username.startswith(prefix):
-                return (1, len(e))
-
-        # Priority 3: Other emails
-        return (2, len(e))
-
-    real_emails.sort(key=facebook_email_priority)
-    selected = real_emails[0]
-    logger.info(f"🎯 FACEBOOK SELECTION: From {len(candidates)} total, {len(real_emails)} real emails, selected: {selected}")
+def pick_best_facebook_email(candidates: Set[str], domain: str) -> Optional[str]:
+    selected = pick_best_business_email(candidates, domain, allow_public=True)
+    if selected:
+        logger.info(f"🎯 FACEBOOK SELECTION: selected {selected} for domain={domain}")
     return selected
 
 
@@ -886,6 +830,7 @@ async def scrape_and_update_immediate(
     links: int,
     domain_timeout: float,
     kill_browser_on_timeout: bool,
+    same_domain_only: bool = True,
     facebook: bool = False,
 ) -> None:
     for attempt_insecure in (False, True):
@@ -998,6 +943,7 @@ async def scrape_and_update_immediate(
                                 block_assets=True,
                                 allow_third_party=js_enabled,
                                 check_facebook=check_facebook,
+                                same_domain_only=same_domain_only,
                             )
 
                         async def scrape_one(seq: int, contact: Dict) -> Optional[Dict]:
@@ -1071,7 +1017,7 @@ async def scrape_and_update_immediate(
                                                 pass
 
                                         if facebook_only_candidates:
-                                            best = pick_best_facebook_email(facebook_only_candidates)
+                                            best = pick_best_facebook_email(facebook_only_candidates, domain)
                                             if best:
                                                 elapsed = time.monotonic() - start_ts
                                                 print(f"[FACEBOOK SUCCESS] ({seq}/{len(contacts)}): {domain} -> {best} (from Facebook)", flush=True)
@@ -1182,7 +1128,7 @@ async def scrape_and_update_immediate(
             if status == "retry_insecure":
                 continue
 
-            if facebook and max_batches_facebook and max_batches_facebook > 0:
+            if facebook and max_batches_facebook and max_batches_facebook > 0 and not same_domain_only:
                 logger.info("Starting Facebook-only phase with concurrency=1.")
                 await run_batches(
                     use_facebook=True,
@@ -1191,6 +1137,8 @@ async def scrape_and_update_immediate(
                     phase_concurrency=1,
                     phase_label="facebook",
                 )
+            elif facebook and same_domain_only:
+                logger.info("Facebook scraping is enabled but skipped because same-domain-only mode is on.")
 
             break  # success with this insecure level
         except Exception as e:
@@ -1214,6 +1162,7 @@ def main():
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--no-kill-on-timeout", action="store_true", help="Don't restart browser on timeout")
     p.add_argument("--facebook", action="store_true", help="Check Facebook pages linked from website for additional emails")
+    p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
     args = p.parse_args()
 
     logger.info(f"Enhanced Email Scraper starting with smart filtering...")
@@ -1221,6 +1170,8 @@ def main():
     logger.info(f"Public providers: {len(PUBLIC_PROVIDERS)} recognized providers")
     if args.facebook:
         logger.info(f"Facebook page scraping: ENABLED")
+    if args.same_domain_only:
+        logger.info("Same-domain-only crawling: ENABLED")
 
     asyncio.run(scrape_and_update_immediate(
         campaign=args.campaign,
@@ -1233,6 +1184,7 @@ def main():
         max_batches=args.max_batches,
         max_batches_facebook=args.max_batches_facebook,
         kill_browser_on_timeout=not args.no_kill_on_timeout,
+        same_domain_only=args.same_domain_only,
         facebook=args.facebook,
     ))
 
