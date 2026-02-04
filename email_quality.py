@@ -20,6 +20,11 @@ PUBLIC_PROVIDERS = {
     "yandex.com",
     "gmx.com",
     "mail.com",
+    "sbcglobal.net",
+    "att.net",
+    "bellsouth.net",
+    "verizon.net",
+    "comcast.net",
 }
 
 BLOCK_SUBSTRINGS = [
@@ -112,6 +117,30 @@ ALLOWED_DOMAIN_SUFFIXES = {
 }
 
 COMMON_SECOND_LEVEL_DOMAINS = {"co", "com", "org", "net", "gov", "edu", "ac"}
+
+BLOCKED_EMAIL_DOMAINS = {
+    "cloudflareinsights.com",
+    "mysite.com",
+    "example.com",
+    "domain.com",
+    "email.com",
+    "localhost",
+    "invalid",
+}
+
+GENERIC_LOCAL_PARTS = {
+    "info",
+    "contact",
+    "hello",
+    "support",
+    "sales",
+    "admin",
+    "office",
+    "mail",
+    "email",
+    "team",
+    "usa",
+}
 
 
 def normalize_domain(value: str) -> str:
@@ -207,6 +236,18 @@ def _split_email(email: str) -> Optional[Tuple[str, str]]:
     return local, domain
 
 
+def _is_blocked_email_domain(domain: str) -> bool:
+    d = normalize_domain(domain)
+    if not d:
+        return True
+    if d in BLOCKED_EMAIL_DOMAINS:
+        return True
+    for blocked in BLOCKED_EMAIL_DOMAINS:
+        if d.endswith("." + blocked):
+            return True
+    return False
+
+
 def is_valid_email_candidate(email: str) -> bool:
     normalized = normalize_email_candidate(email)
     if not normalized or _is_blocked_pattern(normalized):
@@ -216,6 +257,9 @@ def is_valid_email_candidate(email: str) -> bool:
     if not split:
         return False
     local, domain = split
+
+    if _is_blocked_email_domain(domain):
+        return False
 
     if len(local) > 64 or local.startswith((".", "-")) or local.endswith((".", "-")):
         return False
@@ -280,6 +324,34 @@ def _mailbox_priority(email: str) -> int:
     return 999
 
 
+def _business_token(value: str) -> str:
+    root = registrable_domain(value)
+    if not root:
+        return ""
+    main = root.split(".", 1)[0]
+    return re.sub(r"[^a-z0-9]+", "", main.lower())
+
+
+def _business_relevance_score(email: str, business_domain: str) -> int:
+    local = email.split("@", 1)[0]
+    local_token = re.sub(r"[^a-z0-9]+", "", local.lower())
+    biz_token = _business_token(business_domain)
+    if not biz_token or not local_token:
+        return 2
+    if biz_token in local_token or local_token in biz_token:
+        return 0
+    # allow partial match by chunks (e.g. bakerjones vs baker-jones-heating)
+    chunks = [c for c in re.findall(r"[a-z0-9]+", biz_token) if len(c) >= 4]
+    if any(chunk in local_token for chunk in chunks):
+        return 1
+    return 2
+
+
+def _generic_local_penalty(email: str) -> int:
+    local = email.split("@", 1)[0].lower()
+    return 1 if local in GENERIC_LOCAL_PARTS else 0
+
+
 def pick_best_business_email(candidates: Iterable[str], business_domain: str, allow_public: bool = True) -> Optional[str]:
     valid = filter_valid_emails(candidates)
     if not valid:
@@ -287,10 +359,12 @@ def pick_best_business_email(candidates: Iterable[str], business_domain: str, al
 
     business_host = normalize_domain(business_domain)
 
-    def sort_key(email: str) -> Tuple[int, int]:
+    def sort_key(email: str) -> Tuple[int, int, int, int]:
         email_domain = email.split("@", 1)[1]
         exact = 0 if email_domain == business_host else 1
-        return (_mailbox_priority(email), exact, len(email))
+        business_relevance = _business_relevance_score(email, business_host)
+        local_penalty = _generic_local_penalty(email)
+        return (_mailbox_priority(email), business_relevance, local_penalty, exact)
 
     same_business = [e for e in valid if is_same_business_domain(e, business_host)]
     if same_business:
@@ -299,12 +373,19 @@ def pick_best_business_email(candidates: Iterable[str], business_domain: str, al
 
     public_emails = [e for e in valid if e.split("@", 1)[1] in PUBLIC_PROVIDERS]
     if allow_public and public_emails:
-        public_emails.sort(key=lambda e: (_mailbox_priority(e), len(e)))
+        public_emails.sort(
+            key=lambda e: (
+                _business_relevance_score(e, business_host),
+                _generic_local_penalty(e),
+                _mailbox_priority(e),
+                -len(e),
+            )
+        )
         return public_emails[0]
 
     others = [e for e in valid if e not in public_emails]
     if others:
-        others.sort(key=lambda e: (_mailbox_priority(e), len(e)))
+        others.sort(key=lambda e: (_business_relevance_score(e, business_host), _generic_local_penalty(e), _mailbox_priority(e), -len(e)))
         return others[0]
 
     return None
