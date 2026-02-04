@@ -188,6 +188,7 @@ def _run_email_scraper(
     timeout_s: float,
     domain_timeout_s: float,
     links: int,
+    min_domain_letters: int,
     facebook: bool,
     same_domain_only: bool,
     logger: logging.Logger,
@@ -207,6 +208,8 @@ def _run_email_scraper(
         str(timeout_s),
         "--links",
         str(links),
+        "--min-domain-letters",
+        str(min_domain_letters),
         "--domain-timeout",
         str(domain_timeout_s),
     ]
@@ -238,6 +241,7 @@ def run_daemon(
     timeout_s: float,
     domain_timeout_s: float,
     links: int,
+    min_domain_letters: int,
     facebook: bool,
     same_domain_only: bool,
     scraper: str,
@@ -305,6 +309,7 @@ def run_daemon(
                 timeout_s=timeout_s,
                 domain_timeout_s=domain_timeout_s,
                 links=links,
+                min_domain_letters=min_domain_letters,
                 facebook=facebook,
                 same_domain_only=same_domain_only,
                 logger=logger,
@@ -334,6 +339,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=None, help="Per-page timeout in seconds")
     parser.add_argument("--domain-timeout", type=float, default=None, help="Total timeout per domain")
     parser.add_argument("--links", type=int, default=None, help="Max child pages per domain")
+    parser.add_argument("--min-domain-letters", type=int, default=None, help="Minimum letters in email root domain")
     parser.add_argument("--max-batches", type=int, default=None, help="Max batches per campaign run (0 = unlimited)")
     parser.add_argument("--max-batches-facebook", type=int, default=None, help="Max Facebook batches per run (0 = disabled)")
     parser.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
@@ -352,6 +358,11 @@ def main() -> None:
     timeout_s = args.timeout if args.timeout is not None else email_cfg.get("timeout_s", 8.0)
     domain_timeout_s = args.domain_timeout if args.domain_timeout is not None else email_cfg.get("domain_timeout_s", 60.0)
     links = args.links if args.links is not None else email_cfg.get("links", 5)
+    min_domain_letters = (
+        args.min_domain_letters
+        if args.min_domain_letters is not None
+        else email_cfg.get("min_domain_letters", 2)
+    )
     max_batches = args.max_batches if args.max_batches is not None else email_cfg.get("max_batches", 0)
     max_batches_facebook = (
         args.max_batches_facebook
@@ -377,6 +388,7 @@ def main() -> None:
         timeout_s=timeout_s,
         domain_timeout_s=domain_timeout_s,
         links=links,
+        min_domain_letters=min_domain_letters,
         facebook=facebook,
         same_domain_only=same_domain_only,
         scraper=scraper,

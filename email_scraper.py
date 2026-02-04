@@ -38,6 +38,7 @@ from email_quality import (
     is_allowed_domain as quality_is_allowed_domain,
     is_same_business_domain,
     pick_best_business_email,
+    set_min_domain_letters,
 )
 
 # Prefer 'requests' for better CA bundle; fall back to urllib
@@ -828,11 +829,13 @@ async def scrape_and_update_immediate(
     concurrency: int,
     timeout: float,
     links: int,
+    min_domain_letters: int,
     domain_timeout: float,
     kill_browser_on_timeout: bool,
     same_domain_only: bool = True,
     facebook: bool = False,
 ) -> None:
+    set_min_domain_letters(min_domain_letters)
     for attempt_insecure in (False, True):
         http = HttpClient(timeout=20.0, max_retries=5, backoff=2.0, insecure=attempt_insecure)
         try:
@@ -1157,6 +1160,7 @@ def main():
     p.add_argument("--concurrency", type=int, default=3, help="How many parallel browser contexts")
     p.add_argument("--timeout", type=float, default=8.0, help="Per-page timeout (seconds)")
     p.add_argument("--links", type=int, default=5, help="Max child pages to visit per domain")
+    p.add_argument("--min-domain-letters", type=int, default=2, help="Minimum letters in email root domain")
     p.add_argument("--domain-timeout", type=float, default=60.0, help="Total timeout per domain")
     p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
@@ -1180,6 +1184,7 @@ def main():
         concurrency=args.concurrency,
         timeout=args.timeout,
         links=args.links,
+        min_domain_letters=args.min_domain_letters,
         domain_timeout=args.domain_timeout,
         max_batches=args.max_batches,
         max_batches_facebook=args.max_batches_facebook,

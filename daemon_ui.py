@@ -106,6 +106,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_domain_timeout.setDecimals(1)
         self.email_links = QtWidgets.QSpinBox()
         self.email_links.setRange(0, 20)
+        self.email_min_domain_letters = QtWidgets.QSpinBox()
+        self.email_min_domain_letters.setRange(1, 10)
         self.email_max_batches = QtWidgets.QSpinBox()
         self.email_max_batches.setRange(0, 200)
         self.email_max_batches_facebook = QtWidgets.QSpinBox()
@@ -118,6 +120,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         email_form.addRow("Timeout (s)", self.email_timeout)
         email_form.addRow("Domain timeout (s)", self.email_domain_timeout)
         email_form.addRow("Links per domain", self.email_links)
+        email_form.addRow("Min letters in email domain", self.email_min_domain_letters)
         email_form.addRow("Max batches per run (0 = unlimited)", self.email_max_batches)
         email_form.addRow("Max Facebook batches per run (0 = disabled)", self.email_max_batches_facebook)
         email_form.addRow("", self.email_facebook)
@@ -132,8 +135,12 @@ class DaemonUI(QtWidgets.QMainWindow):
         status_layout = QtWidgets.QFormLayout(status_group)
         self.maps_status = QtWidgets.QLabel("Stopped")
         self.email_status = QtWidgets.QLabel("Stopped")
+        self.email_regular_found = QtWidgets.QLabel("0")
+        self.email_facebook_found = QtWidgets.QLabel("0")
         status_layout.addRow("Maps daemon", self.maps_status)
         status_layout.addRow("Email daemon", self.email_status)
+        status_layout.addRow("Emails found (regular)", self.email_regular_found)
+        status_layout.addRow("Emails found (Facebook)", self.email_facebook_found)
 
         controls_group = QtWidgets.QGroupBox("Controls")
         controls_layout = QtWidgets.QGridLayout(controls_group)
@@ -167,6 +174,7 @@ class DaemonUI(QtWidgets.QMainWindow):
 
         self._apply_style()
         self._wire_actions()
+        self._reset_email_counters()
 
     def _apply_style(self) -> None:
         self.setStyleSheet(
@@ -256,6 +264,42 @@ class DaemonUI(QtWidgets.QMainWindow):
             return
         for line in data.splitlines():
             self.log_view.appendPlainText(f"[{name}] {line}")
+            if name == "email":
+                self._track_email_found(line)
+
+    def _reset_email_counters(self) -> None:
+        self._email_regular_found_count = 0
+        self._email_facebook_found_count = 0
+        self.email_regular_found.setText("0")
+        self.email_facebook_found.setText("0")
+
+    def _track_email_found(self, line: str) -> None:
+        text = (line or "").strip()
+        if not text:
+            return
+
+        if "FACEBOOK FOUND " in text and "->" in text:
+            self._email_facebook_found_count += 1
+            self.email_facebook_found.setText(str(self._email_facebook_found_count))
+            return
+
+        if "✓ DONE" in text and "->" in text:
+            if "[FB priority]" in text:
+                self._email_facebook_found_count += 1
+                self.email_facebook_found.setText(str(self._email_facebook_found_count))
+            else:
+                self._email_regular_found_count += 1
+                self.email_regular_found.setText(str(self._email_regular_found_count))
+            return
+
+        if " - INFO - FOUND " in text and "->" in text:
+            self._email_regular_found_count += 1
+            self.email_regular_found.setText(str(self._email_regular_found_count))
+            return
+
+        if text.startswith("FOUND ") and "->" in text:
+            self._email_regular_found_count += 1
+            self.email_regular_found.setText(str(self._email_regular_found_count))
 
     def _update_status(self, name: str) -> None:
         if name == "maps":
@@ -289,6 +333,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_timeout.setValue(float(email_cfg.get("timeout_s", 8.0)))
         self.email_domain_timeout.setValue(float(email_cfg.get("domain_timeout_s", 60.0)))
         self.email_links.setValue(int(email_cfg.get("links", 5)))
+        self.email_min_domain_letters.setValue(int(email_cfg.get("min_domain_letters", 2)))
         self.email_max_batches.setValue(int(email_cfg.get("max_batches", 0)))
         self.email_max_batches_facebook.setValue(int(email_cfg.get("max_batches_facebook", 0)))
         self.email_facebook.setChecked(bool(email_cfg.get("facebook", False)))
@@ -319,6 +364,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["email"]["timeout_s"] = float(self.email_timeout.value())
         cfg["email"]["domain_timeout_s"] = float(self.email_domain_timeout.value())
         cfg["email"]["links"] = int(self.email_links.value())
+        cfg["email"]["min_domain_letters"] = int(self.email_min_domain_letters.value())
         cfg["email"]["max_batches"] = int(self.email_max_batches.value())
         cfg["email"]["max_batches_facebook"] = int(self.email_max_batches_facebook.value())
         cfg["email"]["facebook"] = bool(self.email_facebook.isChecked())
@@ -356,6 +402,7 @@ class DaemonUI(QtWidgets.QMainWindow):
     def _start_email(self) -> None:
         if self.email_proc.state() != QtCore.QProcess.NotRunning:
             return
+        self._reset_email_counters()
         self._save_config()
         self.email_proc.setWorkingDirectory(self.base_dir)
         self.email_proc.start(

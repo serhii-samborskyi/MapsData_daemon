@@ -62,6 +62,7 @@ ALLOWED_DOMAIN_SUFFIXES = {
 }
 
 COMMON_SECOND_LEVEL_DOMAINS = {"co", "com", "org", "net", "gov", "edu", "ac"}
+MIN_ROOT_LABEL_LETTERS = 2
 
 BLOCKED_EMAIL_DOMAINS = {
     "cloudflareinsights.com",
@@ -104,6 +105,15 @@ def normalize_domain(value: str) -> str:
     if host.startswith("www."):
         host = host[4:]
     return host
+
+
+def set_min_domain_letters(value: int) -> None:
+    global MIN_ROOT_LABEL_LETTERS
+    try:
+        parsed = int(value)
+    except Exception:
+        parsed = 2
+    MIN_ROOT_LABEL_LETTERS = max(1, parsed)
 
 
 def registrable_domain(value: str) -> str:
@@ -215,9 +225,9 @@ def is_valid_email_candidate(email: str) -> bool:
     if normalize_domain(domain) != registrable_domain(domain):
         return False
 
-    # Reject one-letter root domains (e.g. a.com, h.net).
+    # Reject very short root domains (threshold is configurable).
     root_label = registrable_domain(domain).split(".", 1)[0]
-    if len(root_label) <= 1:
+    if len(root_label) < MIN_ROOT_LABEL_LETTERS:
         return False
 
     if len(local) > 64 or local.startswith((".", "-")) or local.endswith((".", "-")):

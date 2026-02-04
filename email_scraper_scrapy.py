@@ -36,6 +36,7 @@ from email_quality import (
     normalize_domain,
     pick_best_business_email,
     registrable_domain,
+    set_min_domain_letters,
 )
 
 DEFAULT_BASE_URL = "https://scrapiq.leadtechx.com"
@@ -489,11 +490,8 @@ class EmailSpider(scrapy.Spider):
         best = None
         if state.get("facebook_enabled"):
             best = self._fetch_facebook_emails(state.get("domain", ""), state.get("facebook_links", set()))
-            if best:
-                logger.info("FACEBOOK FOUND %s -> %s", state.get("domain", ""), best)
-
-        if best:
-            self._save_email(contact_id, best)
+        if best and self._save_email(contact_id, best):
+            logger.info("FACEBOOK FOUND %s -> %s", state.get("domain", ""), best)
         state["done"] = True
 
     def _save_email(self, contact_id: int, email: str) -> bool:
@@ -516,12 +514,14 @@ def main() -> None:
     p.add_argument("--concurrency", type=int, default=8, help="Concurrent requests")
     p.add_argument("--timeout", type=float, default=8.0, help="Per-page timeout (seconds)")
     p.add_argument("--links", type=int, default=5, help="Max child pages to visit per domain")
+    p.add_argument("--min-domain-letters", type=int, default=2, help="Minimum letters in email root domain")
     p.add_argument("--domain-timeout", type=float, default=60.0, help="Total timeout per domain")
     p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
     p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
     args = p.parse_args()
+    set_min_domain_letters(args.min_domain_letters)
 
     base_url = normalize_base_url(args.base_url)
     http = HttpClient(timeout=20.0, max_retries=5)
