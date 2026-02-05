@@ -197,6 +197,7 @@ def _run_email_scraper(
     links: int,
     min_domain_letters: int,
     facebook: bool,
+    facebook_engine: str,
     same_domain_only: bool,
     logger: logging.Logger,
 ) -> int:
@@ -226,6 +227,7 @@ def _run_email_scraper(
         args.extend(["--max-batches-facebook", str(max_batches_facebook)])
     if facebook:
         args.append("--facebook")
+        args.extend(["--facebook-engine", str(facebook_engine or "playwright")])
     if same_domain_only:
         args.append("--same-domain-only")
 
@@ -250,6 +252,7 @@ def run_daemon(
     links: int,
     min_domain_letters: int,
     facebook: bool,
+    facebook_engine: str,
     same_domain_only: bool,
     scraper: str,
     log_path: str,
@@ -318,6 +321,7 @@ def run_daemon(
                 links=links,
                 min_domain_letters=min_domain_letters,
                 facebook=facebook,
+                facebook_engine=facebook_engine,
                 same_domain_only=same_domain_only,
                 logger=logger,
             )
@@ -350,6 +354,7 @@ def main() -> None:
     parser.add_argument("--max-batches", type=int, default=None, help="Max batches per campaign run (0 = unlimited)")
     parser.add_argument("--max-batches-facebook", type=int, default=None, help="Max Facebook batches per run (0 = disabled)")
     parser.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
+    parser.add_argument("--facebook-engine", default=None, help="Facebook fallback engine (playwright or scrapy)")
     parser.add_argument("--same-domain-only", action="store_true", help="Only scrape links within the company domain")
     parser.add_argument("--scraper", default=None, help="Email scraper engine (playwright or scrapy)")
     parser.add_argument("--log-path", default=None, help="Log file path")
@@ -377,6 +382,7 @@ def main() -> None:
         else email_cfg.get("max_batches_facebook", 0)
     )
     facebook = args.facebook or bool(email_cfg.get("facebook", False))
+    facebook_engine = (args.facebook_engine or email_cfg.get("facebook_engine", "playwright")).strip().lower()
     same_domain_only = args.same_domain_only or bool(email_cfg.get("same_domain_only", True))
     scraper = (args.scraper or email_cfg.get("scraper", "playwright")).strip().lower()
     log_path = args.log_path or cfg.get("logging", {}).get("email_log", "")
@@ -397,6 +403,7 @@ def main() -> None:
         links=links,
         min_domain_letters=min_domain_letters,
         facebook=facebook,
+        facebook_engine=facebook_engine,
         same_domain_only=same_domain_only,
         scraper=scraper,
         log_path=log_path,

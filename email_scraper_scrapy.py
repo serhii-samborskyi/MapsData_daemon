@@ -211,6 +211,7 @@ class EmailSpider(scrapy.Spider):
         http_max_retries: int,
         facebook: bool,
         max_batches_facebook: int,
+        facebook_engine: str,
         same_domain_only: bool,
     ) -> None:
         super().__init__()
@@ -223,6 +224,7 @@ class EmailSpider(scrapy.Spider):
         self.http = HttpClient(timeout=http_timeout, max_retries=http_max_retries)
         self.facebook = bool(facebook)
         self.max_batches_facebook = int(max_batches_facebook or 0)
+        self.facebook_engine = (facebook_engine or "playwright").strip().lower()
         self.same_domain_only = bool(same_domain_only)
         self.batch_count = 0
         self.pull_attempt_count = 0
@@ -281,7 +283,6 @@ class EmailSpider(scrapy.Spider):
         self.batch_count += 1
         facebook_for_batch = (
             self.facebook
-            and not self.same_domain_only
             and self.max_batches_facebook > 0
             and self.batch_count <= self.max_batches_facebook
         )
@@ -494,11 +495,10 @@ class EmailSpider(scrapy.Spider):
         if not links:
             return None
         candidates: Set[str] = set()
-        candidates.update(self._fetch_facebook_emails_playwright(links))
-
-        # Keep HTTP fallback for environments where Playwright fails or is unavailable.
-        if not candidates:
-            logger.info("Facebook Playwright fallback returned no emails; retrying with HTTP fetch.")
+        engine = self.facebook_engine if self.facebook_engine in {"playwright", "scrapy"} else "playwright"
+        if engine == "playwright":
+            candidates.update(self._fetch_facebook_emails_playwright(links))
+        else:
             for fb_url in list(links)[:2]:
                 html = self.http.get_text(fb_url)
                 if html:
@@ -633,6 +633,7 @@ def main() -> None:
     p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
+    p.add_argument("--facebook-engine", default="playwright", choices=["playwright", "scrapy"], help="Engine for Facebook fallback")
     p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
     args = p.parse_args()
     set_min_domain_letters(args.min_domain_letters)
@@ -644,10 +645,11 @@ def main() -> None:
     if args.same_domain_only:
         logger.info("Same-domain-only crawling: ENABLED")
     if args.facebook and args.max_batches_facebook > 0:
-        if args.same_domain_only:
-            logger.info("Facebook scraping is enabled but skipped because same-domain-only mode is on.")
-        else:
-            logger.info("Facebook fallback enabled for first %s batch(es).", args.max_batches_facebook)
+        logger.info(
+            "Facebook fallback enabled for first %s batch(es) using engine=%s.",
+            args.max_batches_facebook,
+            args.facebook_engine,
+        )
     elif args.facebook:
         logger.info("Facebook checkbox enabled but max Facebook batches is 0; Facebook fallback is disabled.")
 
@@ -679,6 +681,7 @@ def main() -> None:
         http_max_retries=5,
         facebook=args.facebook,
         max_batches_facebook=args.max_batches_facebook,
+        facebook_engine=args.facebook_engine,
         same_domain_only=args.same_domain_only,
     )
     process.start()

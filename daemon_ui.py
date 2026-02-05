@@ -113,6 +113,9 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_max_batches_facebook = QtWidgets.QSpinBox()
         self.email_max_batches_facebook.setRange(0, 200)
         self.email_facebook = QtWidgets.QCheckBox("Enable Facebook scraping")
+        self.email_facebook_engine = QtWidgets.QComboBox()
+        self.email_facebook_engine.addItem("Playwright", "playwright")
+        self.email_facebook_engine.addItem("Scrapy (HTTP)", "scrapy")
         self.email_same_domain_only = QtWidgets.QCheckBox("Scrape only within company domain")
         email_form.addRow("Scraper engine", self.email_scraper_engine)
         email_form.addRow("Batch", self.email_batch)
@@ -123,6 +126,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         email_form.addRow("Min letters in email domain", self.email_min_domain_letters)
         email_form.addRow("Max batches per run (0 = unlimited)", self.email_max_batches)
         email_form.addRow("Max Facebook batches per run (0 = disabled)", self.email_max_batches_facebook)
+        email_form.addRow("Facebook fallback engine", self.email_facebook_engine)
         email_form.addRow("", self.email_facebook)
         email_form.addRow("", self.email_same_domain_only)
 
@@ -338,6 +342,11 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_max_batches_facebook.setValue(int(email_cfg.get("max_batches_facebook", 0)))
         self.email_facebook.setChecked(bool(email_cfg.get("facebook", False)))
         self.email_same_domain_only.setChecked(bool(email_cfg.get("same_domain_only", True)))
+        facebook_engine = str(email_cfg.get("facebook_engine", "playwright")).lower().strip()
+        facebook_engine_index = self.email_facebook_engine.findData(facebook_engine)
+        if facebook_engine_index == -1:
+            facebook_engine_index = 0
+        self.email_facebook_engine.setCurrentIndex(facebook_engine_index)
         engine = str(email_cfg.get("scraper", "playwright")).lower().strip()
         engine_index = self.email_scraper_engine.findData(engine)
         if engine_index == -1:
@@ -368,6 +377,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["email"]["max_batches"] = int(self.email_max_batches.value())
         cfg["email"]["max_batches_facebook"] = int(self.email_max_batches_facebook.value())
         cfg["email"]["facebook"] = bool(self.email_facebook.isChecked())
+        cfg["email"]["facebook_engine"] = str(self.email_facebook_engine.currentData() or "playwright")
         cfg["email"]["same_domain_only"] = bool(self.email_same_domain_only.isChecked())
         cfg["email"]["scraper"] = str(self.email_scraper_engine.currentData() or "playwright")
         return cfg

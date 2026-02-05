@@ -515,6 +515,43 @@ async def extract_emails_from_facebook(
     return valid_emails
 
 
+async def extract_emails_from_facebook_http(
+    http_client,
+    facebook_url: str,
+    timeout: float = 8.0,
+) -> Set[str]:
+    if http_client is None:
+        return set()
+    candidates: Set[str] = set()
+    targets = [facebook_url]
+    if not facebook_url.rstrip("/").endswith("/about"):
+        targets.append(facebook_url.rstrip("/") + "/about")
+
+    for target in targets:
+        try:
+            html = http_client.get_text(target, headers={"Accept": "text/html,application/xhtml+xml"})
+        except Exception:
+            html = ""
+        if not html:
+            continue
+        found = await _extract_emails_from_html(html)
+        candidates.update(found)
+    return candidates
+
+
+async def extract_emails_from_facebook_with_engine(
+    browser,
+    http_client,
+    facebook_url: str,
+    timeout: float,
+    facebook_engine: str,
+) -> Set[str]:
+    engine = (facebook_engine or "playwright").strip().lower()
+    if engine == "scrapy":
+        return await extract_emails_from_facebook_http(http_client, facebook_url, timeout=timeout)
+    return await extract_emails_from_facebook(browser, facebook_url, timeout=timeout)
+
+
 async def extract_emails(
     browser,
     url: str,
@@ -526,6 +563,8 @@ async def extract_emails(
     block_assets: bool = True,
     allow_third_party: bool = False,
     check_facebook: bool = False,
+    http_client=None,
+    facebook_engine: str = "playwright",
     same_domain_only: bool = True,
 ) -> Set[str]:
     """
@@ -702,14 +741,20 @@ async def extract_emails(
                 emails.update(r)
 
         # Check Facebook pages if enabled (only on main page, not recursively)
-        if check_facebook and not same_domain_only:
+        if check_facebook:
             facebook_links = find_facebook_page_links(soup, effective_url)
             if facebook_links:
                 logger.info(f"🔍 FACEBOOK DETECTION: Found {len(facebook_links)} Facebook page(s): {facebook_links[:3]}...") if len(facebook_links) > 3 else logger.info(f"🔍 FACEBOOK DETECTION: Found Facebook page(s): {facebook_links}")
                 for fb_url in facebook_links[:2]:  # Only check first 2 Facebook links
                     try:
                         logger.info(f"📘 FACEBOOK SCRAPING: Attempting to scrape {fb_url}...")
-                        fb_emails = await extract_emails_from_facebook(browser, fb_url, timeout=timeout)
+                        fb_emails = await extract_emails_from_facebook_with_engine(
+                            browser=browser,
+                            http_client=http_client,
+                            facebook_url=fb_url,
+                            timeout=timeout,
+                            facebook_engine=facebook_engine,
+                        )
                         if fb_emails:
                             logger.info(f"✅ FACEBOOK SUCCESS: Found {len(fb_emails)} email(s) on Facebook page {fb_url}: {list(fb_emails)}")
                             emails.update(fb_emails)
@@ -832,6 +877,7 @@ async def scrape_and_update_immediate(
     min_domain_letters: int,
     domain_timeout: float,
     kill_browser_on_timeout: bool,
+    facebook_engine: str = "playwright",
     same_domain_only: bool = True,
     facebook: bool = False,
 ) -> None:
@@ -961,6 +1007,8 @@ async def scrape_and_update_immediate(
                                 block_assets=True,
                                 allow_third_party=js_enabled,
                                 check_facebook=check_facebook,
+                                http_client=http,
+                                facebook_engine=facebook_engine,
                                 same_domain_only=same_domain_only,
                             )
 
@@ -1018,7 +1066,13 @@ async def scrape_and_update_immediate(
                                                     for fb_url in facebook_links[:2]:
                                                         try:
                                                             logger.info(f"📘 FACEBOOK SCRAPING: Attempting to scrape {fb_url}...")
-                                                            fb_emails = await extract_emails_from_facebook(browser, fb_url, timeout=timeout)
+                                                            fb_emails = await extract_emails_from_facebook_with_engine(
+                                                                browser=browser,
+                                                                http_client=http,
+                                                                facebook_url=fb_url,
+                                                                timeout=timeout,
+                                                                facebook_engine=facebook_engine,
+                                                            )
                                                             if fb_emails:
                                                                 logger.info(f"✅ FACEBOOK SUCCESS: Found {len(fb_emails)} email(s) on Facebook page {fb_url}: {list(fb_emails)}")
                                                                 facebook_only_candidates.update(fb_emails)
@@ -1146,7 +1200,7 @@ async def scrape_and_update_immediate(
             if status == "retry_insecure":
                 continue
 
-            if facebook and max_batches_facebook and max_batches_facebook > 0 and not same_domain_only:
+            if facebook and max_batches_facebook and max_batches_facebook > 0:
                 logger.info("Starting Facebook-only phase with concurrency=1.")
                 await run_batches(
                     use_facebook=True,
@@ -1155,8 +1209,6 @@ async def scrape_and_update_immediate(
                     phase_concurrency=1,
                     phase_label="facebook",
                 )
-            elif facebook and same_domain_only:
-                logger.info("Facebook scraping is enabled but skipped because same-domain-only mode is on.")
 
             break  # success with this insecure level
         except Exception as e:
@@ -1181,6 +1233,7 @@ def main():
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--no-kill-on-timeout", action="store_true", help="Don't restart browser on timeout")
     p.add_argument("--facebook", action="store_true", help="Check Facebook pages linked from website for additional emails")
+    p.add_argument("--facebook-engine", default="playwright", choices=["playwright", "scrapy"], help="Engine for Facebook fallback")
     p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
     args = p.parse_args()
 
@@ -1188,7 +1241,7 @@ def main():
     logger.info(f"Target paths: {len(TARGET_PATHS)} paths with priority scoring")
     logger.info(f"Public providers: {len(PUBLIC_PROVIDERS)} recognized providers")
     if args.facebook:
-        logger.info(f"Facebook page scraping: ENABLED")
+        logger.info(f"Facebook page scraping: ENABLED (engine={args.facebook_engine})")
     if args.same_domain_only:
         logger.info("Same-domain-only crawling: ENABLED")
 
@@ -1204,6 +1257,7 @@ def main():
         max_batches=args.max_batches,
         max_batches_facebook=args.max_batches_facebook,
         kill_browser_on_timeout=not args.no_kill_on_timeout,
+        facebook_engine=args.facebook_engine,
         same_domain_only=args.same_domain_only,
         facebook=args.facebook,
     ))

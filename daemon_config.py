@@ -24,6 +24,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "domain_timeout_s": 60.0,
         "links": 5,
         "facebook": False,
+        "facebook_engine": "playwright",
         "max_batches": 0,
         "max_batches_facebook": 0,
         "scraper": "playwright",
