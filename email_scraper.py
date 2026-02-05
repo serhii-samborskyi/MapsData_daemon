@@ -863,17 +863,32 @@ async def scrape_and_update_immediate(
                 phase_label: str,
             ) -> str:
                 batch_count = 0
+                pull_count = 0
                 while True:
-                    if max_batches_limit and batch_count >= max_batches_limit:
-                        logger.info(f"Reached max {phase_label} batches ({max_batches_limit}); stopping {phase_label} phase.")
+                    if max_batches_limit and pull_count >= max_batches_limit:
+                        logger.info(
+                            "Reached max %s pulls (%s); stopping %s phase.",
+                            phase_label,
+                            max_batches_limit,
+                            phase_label,
+                        )
                         return "done"
 
+                    pull_count += 1
                     data = http.get_json(f"{base_url}/api/campaign/{campaign_id}/nomail?batch={batch}")
                     contacts = data.get("contacts", []) if isinstance(data, dict) else []
                     if not contacts:
                         if batch_count == 0 and not attempt_insecure:
                             logger.warning("No contacts returned; retrying with --insecure mode due to possible TLS issue...")
                             return "retry_insecure"
+                        if max_batches_limit and pull_count < max_batches_limit:
+                            logger.info(
+                                "Pull %s/%s for %s phase returned 0 contacts; continuing.",
+                                pull_count,
+                                max_batches_limit,
+                                phase_label,
+                            )
+                            continue
                         logger.info(f"No contacts returned for {phase_label} phase.")
                         return "done"
 

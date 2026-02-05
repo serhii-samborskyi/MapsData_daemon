@@ -225,6 +225,7 @@ class EmailSpider(scrapy.Spider):
         self.max_batches_facebook = int(max_batches_facebook or 0)
         self.same_domain_only = bool(same_domain_only)
         self.batch_count = 0
+        self.pull_attempt_count = 0
         self._no_more_batches = False
         self.contact_states: Dict[int, Dict] = {}
         self._saved_contacts: Set[int] = set()
@@ -251,6 +252,8 @@ class EmailSpider(scrapy.Spider):
             return
         requests = self._prepare_batch_requests()
         if not requests:
+            if self.max_batches and self.pull_attempt_count < self.max_batches:
+                raise DontCloseSpider
             self._no_more_batches = True
             return
         for req in requests:
@@ -258,13 +261,22 @@ class EmailSpider(scrapy.Spider):
         raise DontCloseSpider
 
     def _prepare_batch_requests(self) -> List[scrapy.Request]:
-        if self.max_batches and self.batch_count >= self.max_batches:
-            logger.info("Reached max batches (%s); stopping.", self.max_batches)
+        if self.max_batches and self.pull_attempt_count >= self.max_batches:
+            logger.info("Reached max pulls (%s); stopping.", self.max_batches)
             return []
+        self.pull_attempt_count += 1
+
         data = self.http.get_json(f"{self.base_url}/api/campaign/{self.campaign_id}/nomail?batch={self.batch}")
         contacts = data.get("contacts", []) if isinstance(data, dict) else []
         if not contacts:
-            logger.info("No contacts returned; stopping.")
+            if self.max_batches and self.pull_attempt_count < self.max_batches:
+                logger.info(
+                    "Pull %s/%s returned 0 contacts; continuing.",
+                    self.pull_attempt_count,
+                    self.max_batches,
+                )
+            else:
+                logger.info("No contacts returned; stopping.")
             return []
         self.batch_count += 1
         facebook_for_batch = (
