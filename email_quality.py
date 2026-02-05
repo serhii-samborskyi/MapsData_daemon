@@ -50,6 +50,7 @@ BLOCK_SUBSTRINGS = [
     ".html",
     ".php",
     ".asp",
+    "browser-agent.",
 ]
 
 ALLOWED_DOMAIN_SUFFIXES = {
@@ -188,9 +189,12 @@ def _is_blocked_pattern(email: str) -> bool:
 def _split_email(email: str) -> Optional[Tuple[str, str]]:
     if email.count("@") != 1:
         return None
-    local, domain = email.split("@", 1)
+    local, raw_domain = email.split("@", 1)
     local = local.strip().lower()
-    domain = normalize_domain(domain)
+    raw_domain = (raw_domain or "").strip().lower()
+    if raw_domain.startswith(".") or raw_domain.endswith("."):
+        return None
+    domain = normalize_domain(raw_domain)
     if not local or not domain:
         return None
     return local, domain
@@ -233,6 +237,10 @@ def is_valid_email_candidate(email: str) -> bool:
     if len(local) > 64 or local.startswith((".", "-")) or local.endswith((".", "-")):
         return False
     if ".." in local or not re.fullmatch(r"[a-z0-9._%+\-]+", local):
+        return False
+    if local.startswith(("www.", "cdn.", "img.", "js.", "css.", "static.")):
+        return False
+    if local in {"www", "cdn", "img", "js", "css", "static"}:
         return False
 
     if len(domain) > 253 or domain.startswith("-") or domain.endswith("-") or ".." in domain:
