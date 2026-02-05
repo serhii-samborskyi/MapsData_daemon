@@ -28,6 +28,11 @@ try:
 except Exception:
     requests = None  # type: ignore
 
+try:
+    from playwright.sync_api import sync_playwright
+except Exception:
+    sync_playwright = None  # type: ignore
+
 import ssl
 from urllib.request import Request, urlopen
 
@@ -223,12 +228,19 @@ class EmailSpider(scrapy.Spider):
         self._no_more_batches = False
         self.contact_states: Dict[int, Dict] = {}
         self._saved_contacts: Set[int] = set()
+        self._pw_manager = None
+        self._pw_browser = None
+        self._playwright_failed = False
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super().from_crawler(crawler, *args, **kwargs)
         crawler.signals.connect(spider.spider_idle, signal=signals.spider_idle)
+        crawler.signals.connect(spider.spider_closed, signal=signals.spider_closed)
         return spider
+
+    def spider_closed(self, spider, reason) -> None:
+        self._close_playwright_browser()
 
     def start_requests(self):
         for req in self._prepare_batch_requests():
@@ -470,16 +482,106 @@ class EmailSpider(scrapy.Spider):
         if not links:
             return None
         candidates: Set[str] = set()
-        for fb_url in list(links)[:2]:
-            html = self.http.get_text(fb_url)
-            if html:
-                candidates.update(extract_emails_from_text(html))
-            if not fb_url.endswith("/about"):
-                about_url = fb_url.rstrip("/") + "/about"
-                about_html = self.http.get_text(about_url)
-                if about_html:
-                    candidates.update(extract_emails_from_text(about_html))
+        candidates.update(self._fetch_facebook_emails_playwright(links))
+
+        # Keep HTTP fallback for environments where Playwright fails or is unavailable.
+        if not candidates:
+            logger.info("Facebook Playwright fallback returned no emails; retrying with HTTP fetch.")
+            for fb_url in list(links)[:2]:
+                html = self.http.get_text(fb_url)
+                if html:
+                    candidates.update(extract_emails_from_text(html))
+                if not fb_url.endswith("/about"):
+                    about_url = fb_url.rstrip("/") + "/about"
+                    about_html = self.http.get_text(about_url)
+                    if about_html:
+                        candidates.update(extract_emails_from_text(about_html))
         return pick_best_email(domain, candidates) if candidates else None
+
+    def _get_playwright_browser(self):
+        if self._pw_browser is not None:
+            return self._pw_browser
+        if self._playwright_failed:
+            return None
+        if sync_playwright is None:
+            logger.warning("Playwright is not available for Scrapy Facebook fallback.")
+            self._playwright_failed = True
+            return None
+        try:
+            self._pw_manager = sync_playwright().start()
+            self._pw_browser = self._pw_manager.chromium.launch(headless=True)
+            return self._pw_browser
+        except Exception as exc:
+            logger.warning("Failed to start Playwright for Scrapy Facebook fallback: %s", exc)
+            self._playwright_failed = True
+            self._close_playwright_browser()
+            return None
+
+    def _close_playwright_browser(self) -> None:
+        if self._pw_browser is not None:
+            try:
+                self._pw_browser.close()
+            except Exception:
+                pass
+            self._pw_browser = None
+        if self._pw_manager is not None:
+            try:
+                self._pw_manager.stop()
+            except Exception:
+                pass
+            self._pw_manager = None
+
+    def _fetch_facebook_emails_playwright(self, links: Set[str]) -> Set[str]:
+        browser = self._get_playwright_browser()
+        if browser is None:
+            return set()
+
+        candidates: Set[str] = set()
+        page_timeout_ms = int(max(8.0, min(self.http.timeout, 30.0)) * 1000)
+        user_agent = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+
+        for fb_url in list(links)[:2]:
+            targets = [fb_url]
+            if not fb_url.endswith("/about"):
+                targets.append(fb_url.rstrip("/") + "/about")
+
+            for target in targets:
+                context = None
+                try:
+                    context = browser.new_context(java_script_enabled=True, user_agent=user_agent)
+                    page = context.new_page()
+                    page.goto(target, wait_until="domcontentloaded", timeout=page_timeout_ms)
+                    page.wait_for_timeout(1200)
+                    html = page.content() or ""
+                    if html:
+                        candidates.update(extract_emails_from_text(html))
+                    try:
+                        text = page.evaluate("() => document.body ? document.body.innerText : ''")
+                        if text:
+                            candidates.update(extract_emails_from_text(text))
+                    except Exception:
+                        pass
+                    try:
+                        mailtos = page.eval_on_selector_all(
+                            "a[href^='mailto:']",
+                            "els => els.map(el => el.getAttribute('href')).filter(Boolean)",
+                        )
+                        for m in mailtos:
+                            candidates.update(extract_emails_from_text(str(m)))
+                    except Exception:
+                        pass
+                except Exception:
+                    continue
+                finally:
+                    if context is not None:
+                        try:
+                            context.close()
+                        except Exception:
+                            pass
+        return candidates
 
     def _maybe_finalize_contact(self, contact_id: int, state: Dict) -> None:
         if state.get("done"):
