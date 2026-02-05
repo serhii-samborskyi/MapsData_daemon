@@ -236,6 +236,8 @@ def is_valid_email_candidate(email: str) -> bool:
 
     if len(local) > 64 or local.startswith((".", "-")) or local.endswith((".", "-")):
         return False
+    if len(local) < 2:
+        return False
     if ".." in local or not re.fullmatch(r"[a-z0-9._%+\-]+", local):
         return False
     if local.startswith(("www.", "cdn.", "img.", "js.", "css.", "static.")):
