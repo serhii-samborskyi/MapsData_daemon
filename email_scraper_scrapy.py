@@ -257,7 +257,7 @@ class EmailSpider(scrapy.Spider):
             self._no_more_batches = True
             return
         for req in requests:
-            self.crawler.engine.crawl(req, spider=self)
+            self.crawler.engine.crawl(req)
         raise DontCloseSpider
 
     def _prepare_batch_requests(self) -> List[scrapy.Request]:
