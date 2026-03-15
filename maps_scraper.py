@@ -784,6 +784,19 @@ def _sanitize_domain_value(raw: Optional[str]) -> str:
     return value
 
 
+def _sanitize_rating_value(raw: Optional[str]) -> str:
+    value = _strip_quotes(raw).strip()
+    if not value:
+        return "0"
+    m = re.search(r"([0-9]+(?:\.[0-9]+)?)", value)
+    if not m:
+        return "0"
+    try:
+        return str(float(m.group(1)))
+    except Exception:
+        return "0"
+
+
 def format_contacts_for_api(batch: List[Dict[str, Any]], campaign_id: str, request_id: str) -> List[Dict[str, Any]]:
     formatted: List[Dict[str, Any]] = []
     for contact in batch:
@@ -804,7 +817,7 @@ def format_contacts_for_api(batch: List[Dict[str, Any]], campaign_id: str, reque
                 "business_name": _g("companyName") or "Unknown Business",
                 "address": _g("address"),
                 "category": _g("category"),
-                "rating": _g("rating"),
+                "rating": _sanitize_rating_value(_g("rating")),
                 "review_count": int(re.sub(r'[^\d]', '', _g("reviews") or "0") or "0"),
                 "phone": _g("phone"),
                 "domain": _sanitize_domain_value(_g("website")),
@@ -901,6 +914,7 @@ class CampaignProcessor:
             out = os.path.join(self.csv_dir, f"leads_{campaign_id}_{request_id}.csv")
             write_batch_csv(batch, out, write_header=not os.path.exists(out))
         payload = format_contacts_for_api(batch, campaign_id, request_id)
+        failed_payload = list(payload)
         ok = self.api.send_contacts(payload)
         if not ok and len(payload) > 1:
             logger.warning(
@@ -909,10 +923,14 @@ class CampaignProcessor:
                 len(payload),
             )
             sent_individual = 0
+            still_failed: List[Dict[str, Any]] = []
             for lead in payload:
                 if self.api.send_contacts([lead]):
                     sent_individual += 1
+                else:
+                    still_failed.append(lead)
             ok = sent_individual == len(payload)
+            failed_payload = still_failed
             if sent_individual:
                 logger.info(
                     "Individual resend recovered %d/%d leads for request %s",
@@ -920,11 +938,19 @@ class CampaignProcessor:
                     len(payload),
                     request_id,
                 )
+            if still_failed:
+                failed_names = [str(l.get("business_name", "")) for l in still_failed[:5]]
+                logger.error(
+                    "Still failed after individual retries for request %s: %d lead(s). sample=%s",
+                    request_id,
+                    len(still_failed),
+                    failed_names,
+                )
         if ok:
             logger.info(f"Sent batch of {len(batch)} leads (total_seen={total_seen}) for request {request_id}")
         else:
             logger.error(f"Failed sending batch for request {request_id}")
-            self._store_unsent_batch(campaign_id, request_id, payload)
+            self._store_unsent_batch(campaign_id, request_id, failed_payload)
 
     def process_campaign(self, campaign: Campaign) -> None:
         logger.info(f"Starting campaign: {campaign.name} (ID: {campaign.id})")
@@ -1096,12 +1122,13 @@ def _map_result_to_contact(result: Dict[str, Any]) -> Dict[str, Any]:
         return m.group(1).replace(",", "") if m else ""
 
     website = _sanitize_domain_value(_pick(result, "Website", "Site", default=""))
+    rating = _sanitize_rating_value(_pick(result, "Rating", default=""))
 
     return {
         "companyName": _pick(result, "Name", "Business Name", "Company"),
         "address": _pick(result, "Address"),
         "phone": _pick(result, "Phone", "Telephone"),
-        "rating": str(_pick(result, "Rating", default="")),
+        "rating": rating,
         "reviews": _rev_to_str(_pick(result, "Reviews", default="")),
         "category": _pick(result, "Business Type", "Category"),
         "website": website,
