@@ -16,6 +16,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "batch_size": 20,
         "max_concurrent": 3,
         "scrape_mode": "fast",
+        "show_browser": False,
         "slow_place_pause_min_s": 0.8,
         "slow_place_pause_max_s": 1.8,
         "csv_dir": "",

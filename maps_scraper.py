@@ -543,6 +543,7 @@ MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "3"))
 CONTACTS_SEND_MAX_RETRIES = int(os.environ.get("CONTACTS_SEND_MAX_RETRIES", "5"))
 CONTACTS_SEND_RETRY_BACKOFF_S = float(os.environ.get("CONTACTS_SEND_RETRY_BACKOFF_S", "1.5"))
 DEFAULT_SCRAPE_MODE = os.environ.get("MAPS_SCRAPE_MODE", "fast")
+DEFAULT_SHOW_BROWSER = os.environ.get("MAPS_SHOW_BROWSER", "0").strip().lower() in {"1", "true", "yes", "on"}
 DEFAULT_SLOW_PLACE_PAUSE_MIN_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MIN_S", "0.8"))
 DEFAULT_SLOW_PLACE_PAUSE_MAX_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MAX_S", "1.8"))
 VALID_SCRAPE_MODES = {"fast", "slow"}
@@ -569,6 +570,15 @@ def normalize_pause_range(min_s: Optional[float], max_s: Optional[float]) -> Tup
     if high < low:
         low, high = high, low
     return low, high
+
+
+def normalize_show_browser(value: Optional[Any]) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return bool(DEFAULT_SHOW_BROWSER)
+    text = str(value).strip().lower()
+    return text in {"1", "true", "yes", "on"}
 
 try:
     import requests  # type: ignore
@@ -847,6 +857,7 @@ class CampaignProcessor:
         batch_size: int = BATCH_SIZE,
         csv_dir: Optional[str] = None,
         scrape_mode: Optional[str] = None,
+        show_browser: Optional[bool] = None,
         slow_place_pause_min_s: Optional[float] = None,
         slow_place_pause_max_s: Optional[float] = None,
     ):
@@ -854,6 +865,7 @@ class CampaignProcessor:
         self.batch_size = batch_size
         self.csv_dir = csv_dir
         self.scrape_mode = normalize_scrape_mode(scrape_mode or DEFAULT_SCRAPE_MODE)
+        self.show_browser = normalize_show_browser(show_browser)
         self.slow_place_pause_min_s, self.slow_place_pause_max_s = normalize_pause_range(
             slow_place_pause_min_s,
             slow_place_pause_max_s,
@@ -962,6 +974,7 @@ class CampaignProcessor:
                     self.batch_size,
                     batch_callback,
                     scrape_mode=self.scrape_mode,
+                    show_browser=self.show_browser,
                 )
                 if not ok:
                     logger.warning(f"Scrape returned no data for request {request.id}")
@@ -1017,6 +1030,7 @@ class CampaignProcessor:
                     pending,
                     self.batch_size,
                     on_batch_for_request,
+                    show_browser=self.show_browser,
                     pause_min_s=self.slow_place_pause_min_s,
                     pause_max_s=self.slow_place_pause_max_s,
                 )
@@ -1040,6 +1054,7 @@ def run_all(
     campaign_id: Optional[str] = None,
     campaign_name: Optional[str] = None,
     scrape_mode: Optional[str] = None,
+    show_browser: Optional[bool] = None,
     slow_place_pause_min_s: Optional[float] = None,
     slow_place_pause_max_s: Optional[float] = None,
 ) -> None:
@@ -1049,6 +1064,7 @@ def run_all(
         batch_size=BATCH_SIZE,
         csv_dir=csv_dir,
         scrape_mode=scrape_mode or DEFAULT_SCRAPE_MODE,
+        show_browser=show_browser,
         slow_place_pause_min_s=slow_place_pause_min_s,
         slow_place_pause_max_s=slow_place_pause_max_s,
     )
@@ -1166,6 +1182,7 @@ def run_campaign_slow_dedup_and_yield_batches(
     requests: List[RequestItem],
     batch_size: int,
     on_batch_for_request: Callable[[str, List[Dict[str, Any]]], None],
+    show_browser: Optional[bool] = None,
     pause_min_s: Optional[float] = None,
     pause_max_s: Optional[float] = None,
 ) -> bool:
@@ -1173,17 +1190,19 @@ def run_campaign_slow_dedup_and_yield_batches(
     from playwright.async_api import async_playwright
 
     pause_low, pause_high = normalize_pause_range(pause_min_s, pause_max_s)
+    show = normalize_show_browser(show_browser)
     logger.info(
-        "Slow campaign scrape: %d requests, pause range %.2fs..%.2fs",
+        "Slow campaign scrape: %d requests, pause range %.2fs..%.2fs, show_browser=%s",
         len(requests),
         pause_low,
         pause_high,
+        show,
     )
 
     async def _run() -> bool:
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=True,
+                headless=(not show),
                 args=[
                     '--disable-blink-features=AutomationControlled',
                     '--disable-extensions',
@@ -1276,17 +1295,19 @@ def run_scrape_and_yield_batches(
     batch_size: int,
     on_batch: Callable[[List[Dict[str, Any]]], None],
     scrape_mode: Optional[str] = None,
+    show_browser: Optional[bool] = None,
 ) -> bool:
     import asyncio
     from playwright.async_api import async_playwright
     import urllib.parse
 
     mode = normalize_scrape_mode(scrape_mode or DEFAULT_SCRAPE_MODE)
-    logger.info(f"Maps scrape mode: {mode}")
+    show = normalize_show_browser(show_browser)
+    logger.info(f"Maps scrape mode: {mode} | show_browser={show}")
 
     async def _run() -> List[Dict[str, Any]]:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=[
+            browser = await p.chromium.launch(headless=(not show), args=[
                 '--disable-blink-features=AutomationControlled','--disable-extensions','--disable-plugins','--disable-images','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding'
             ])
             context = await browser.new_context(user_agent=(

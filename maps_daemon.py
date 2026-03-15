@@ -88,6 +88,7 @@ def run_daemon(
     batch_size: int,
     max_concurrent: int,
     scrape_mode: str,
+    show_browser: bool,
     slow_place_pause_min_s: float,
     slow_place_pause_max_s: float,
     csv_dir: str,
@@ -96,9 +97,11 @@ def run_daemon(
     logger = _setup_logging(log_path)
     logger.info("Maps daemon starting")
     logger.info("Maps scrape mode: %s", maps_scraper.normalize_scrape_mode(scrape_mode))
+    logger.info("Maps show browser: %s", maps_scraper.normalize_show_browser(show_browser))
 
     maps_scraper.MAX_CONCURRENT = max_concurrent
     maps_scraper.DEFAULT_SCRAPE_MODE = maps_scraper.normalize_scrape_mode(scrape_mode)
+    maps_scraper.DEFAULT_SHOW_BROWSER = maps_scraper.normalize_show_browser(show_browser)
     (
         maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
         maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
@@ -115,6 +118,7 @@ def run_daemon(
         batch_size=batch_size,
         csv_dir=csv_dir or None,
         scrape_mode=maps_scraper.DEFAULT_SCRAPE_MODE,
+        show_browser=maps_scraper.DEFAULT_SHOW_BROWSER,
         slow_place_pause_min_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
         slow_place_pause_max_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
     )
@@ -158,6 +162,8 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=None, help="Batch size for maps upload")
     parser.add_argument("--max-concurrent", type=int, default=None, help="Max concurrent maps scraping tasks")
     parser.add_argument("--scrape-mode", choices=["fast", "slow"], default=None, help="Maps scrape mode")
+    parser.add_argument("--show-browser", dest="show_browser", action="store_const", const=True, default=None, help="Show browser window while scraping maps")
+    parser.add_argument("--hide-browser", dest="show_browser", action="store_const", const=False, help="Run maps scraping headless")
     parser.add_argument("--slow-place-pause-min", type=float, default=None, help="Slow mode minimum pause between place scrapes (seconds)")
     parser.add_argument("--slow-place-pause-max", type=float, default=None, help="Slow mode maximum pause between place scrapes (seconds)")
     parser.add_argument("--csv-dir", default=None, help="Optional CSV output directory")
@@ -172,6 +178,7 @@ def main() -> None:
     batch_size = args.batch_size if args.batch_size is not None else maps_cfg.get("batch_size", 20)
     max_concurrent = args.max_concurrent if args.max_concurrent is not None else maps_cfg.get("max_concurrent", 3)
     scrape_mode = args.scrape_mode or maps_cfg.get("scrape_mode", "fast")
+    show_browser = args.show_browser if args.show_browser is not None else maps_cfg.get("show_browser", False)
     slow_place_pause_min_s = args.slow_place_pause_min if args.slow_place_pause_min is not None else maps_cfg.get("slow_place_pause_min_s", 0.8)
     slow_place_pause_max_s = args.slow_place_pause_max if args.slow_place_pause_max is not None else maps_cfg.get("slow_place_pause_max_s", 1.8)
     csv_dir = args.csv_dir if args.csv_dir is not None else maps_cfg.get("csv_dir", "")
@@ -187,6 +194,7 @@ def main() -> None:
         batch_size=batch_size,
         max_concurrent=max_concurrent,
         scrape_mode=scrape_mode,
+        show_browser=show_browser,
         slow_place_pause_min_s=slow_place_pause_min_s,
         slow_place_pause_max_s=slow_place_pause_max_s,
         csv_dir=csv_dir,
