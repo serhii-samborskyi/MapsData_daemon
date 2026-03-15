@@ -15,6 +15,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "maps": {
         "batch_size": 20,
         "max_concurrent": 3,
+        "scrape_mode": "fast",
         "csv_dir": "",
     },
     "email": {

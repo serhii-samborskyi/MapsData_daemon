@@ -87,16 +87,24 @@ def run_daemon(
     queue_dir: str,
     batch_size: int,
     max_concurrent: int,
+    scrape_mode: str,
     csv_dir: str,
     log_path: str,
 ) -> None:
     logger = _setup_logging(log_path)
     logger.info("Maps daemon starting")
+    logger.info("Maps scrape mode: %s", maps_scraper.normalize_scrape_mode(scrape_mode))
 
     maps_scraper.MAX_CONCURRENT = max_concurrent
+    maps_scraper.DEFAULT_SCRAPE_MODE = maps_scraper.normalize_scrape_mode(scrape_mode)
 
     api = LeadsApiClient(base_url, HttpClient())
-    processor = CampaignProcessor(api, batch_size=batch_size, csv_dir=csv_dir or None)
+    processor = CampaignProcessor(
+        api,
+        batch_size=batch_size,
+        csv_dir=csv_dir or None,
+        scrape_mode=maps_scraper.DEFAULT_SCRAPE_MODE,
+    )
     global CURRENT_PROCESSOR
     CURRENT_PROCESSOR = processor
 
@@ -136,6 +144,7 @@ def main() -> None:
     parser.add_argument("--queue-dir", default=None, help="Queue directory for email jobs")
     parser.add_argument("--batch-size", type=int, default=None, help="Batch size for maps upload")
     parser.add_argument("--max-concurrent", type=int, default=None, help="Max concurrent maps scraping tasks")
+    parser.add_argument("--scrape-mode", choices=["fast", "slow"], default=None, help="Maps scrape mode")
     parser.add_argument("--csv-dir", default=None, help="Optional CSV output directory")
     parser.add_argument("--log-path", default=None, help="Log file path")
     args = parser.parse_args()
@@ -147,6 +156,7 @@ def main() -> None:
     queue_dir = args.queue_dir or cfg.get("queue_dir", "queue")
     batch_size = args.batch_size if args.batch_size is not None else maps_cfg.get("batch_size", 20)
     max_concurrent = args.max_concurrent if args.max_concurrent is not None else maps_cfg.get("max_concurrent", 3)
+    scrape_mode = args.scrape_mode or maps_cfg.get("scrape_mode", "fast")
     csv_dir = args.csv_dir if args.csv_dir is not None else maps_cfg.get("csv_dir", "")
     log_path = args.log_path or cfg.get("logging", {}).get("maps_log", "")
 
@@ -159,6 +169,7 @@ def main() -> None:
         queue_dir=queue_dir,
         batch_size=batch_size,
         max_concurrent=max_concurrent,
+        scrape_mode=scrape_mode,
         csv_dir=csv_dir,
         log_path=log_path,
     )

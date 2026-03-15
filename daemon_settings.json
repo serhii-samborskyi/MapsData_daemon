@@ -4,7 +4,13 @@
     "concurrency": 1,
     "domain_timeout_s": 10.0,
     "facebook": true,
+    "facebook_engine": "playwright",
     "links": 5,
+    "max_batches": 0,
+    "max_batches_facebook": 0,
+    "min_domain_letters": 2,
+    "same_domain_only": true,
+    "scraper": "playwright",
     "timeout_s": 8.0
   },
   "email_base_url": "https://scrapiq.leadtechx.com",
@@ -16,7 +22,8 @@
   "maps": {
     "batch_size": 20,
     "csv_dir": "",
-    "max_concurrent": 3
+    "max_concurrent": 3,
+    "scrape_mode": "slow"
   },
   "maps_base_url": "https://scrapiq.leadtechx.com/api",
   "maps_poll_interval_s": 30,

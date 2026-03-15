@@ -203,6 +203,7 @@ async def process_business(business, browser, extract_emails: bool = False) -> d
     try:
         name = business.xpath(".//div[contains(@class, 'fontHeadlineSmall')]/text()")[0] if business.xpath(".//div[contains(@class, 'fontHeadlineSmall')]/text()") else "N/A"
         logger.info(f"🔍 Processing: {name}")
+        maps_url = business.xpath(".//a[starts-with(@href, 'https://www.google.com/maps/place/')]/@href")[0] if business.xpath(".//a[starts-with(@href, 'https://www.google.com/maps/place/')]/@href") else "N/A"
         rating = business.xpath(".//span[@role='img' and contains(@aria-label, 'stars')]/span[1]/text()")[0] if business.xpath(".//span[@role='img' and contains(@aria-label, 'stars')]/span[1]/text()") else "N/A"
         reviews = business.xpath(".//span[@role='img' and contains(@aria-label, 'stars')]//span[contains(text(), '(')]/text()")[0] if business.xpath(".//span[@role='img' and contains(@aria-label, 'stars')]//span[contains(text(), '(')]/text()") else "N/A"
         if reviews != "N/A":
@@ -231,6 +232,7 @@ async def process_business(business, browser, extract_emails: bool = False) -> d
             "Hours": hours,
             "Phone": phone,
             "Website": website,
+            "Url": maps_url,
             "Email": email,
             "Sponsored": sponsored
         }
@@ -272,6 +274,150 @@ async def scrape_business_info(page, browser, max_concurrent: int = 5):
 
     logger.info(f"✅ TOTAL COMPLETED: {len(all_results)}/{len(businesses)} businesses processed successfully")
     return all_results
+
+
+def _canonical_website(url: str) -> str:
+    if not url or url == "N/A":
+        return "N/A"
+    try:
+        parsed = urlparse(str(url).strip())
+        if parsed.scheme and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+        return str(url).strip()
+    except Exception:
+        return str(url).strip() or "N/A"
+
+
+async def extract_place_details(page) -> dict:
+    raw = await page.evaluate(
+        """() => {
+            const text = (el) => (el && el.textContent ? el.textContent.replace(/\\s+/g, ' ').trim() : '');
+            const findByItem = (itemId) => document.querySelector(`[data-item-id="${itemId}"]`);
+            const addressEl = findByItem('address');
+            const locatedInEl = findByItem('locatedin');
+            const plusCodeEl = findByItem('oloc');
+            const phoneEl = document.querySelector('button[data-item-id^="phone:"]');
+            const websiteEl = document.querySelector('a[data-item-id="authority"]');
+            const bookingEl = document.querySelector('a[data-item-id^="action:"]');
+
+            const ratingNode = document.querySelector('span[role="img"][aria-label*="stars"]');
+            const ratingLabel = ratingNode ? (ratingNode.getAttribute('aria-label') || '') : '';
+            const ratingMatch = ratingLabel.match(/([0-9]+(?:\\.[0-9]+)?)/);
+            const rating = ratingMatch ? ratingMatch[1] : '';
+
+            const reviewNode = document.querySelector('button[aria-label*="reviews"], a[aria-label*="reviews"]');
+            const reviewText = reviewNode ? (reviewNode.getAttribute('aria-label') || text(reviewNode)) : '';
+            const reviewMatch = reviewText.match(/([\\d,]+)/);
+            const reviews = reviewMatch ? reviewMatch[1] : '';
+
+            const categoryNode =
+                document.querySelector('button[jsaction*="pane.rating.category"]') ||
+                document.querySelector('button[jsaction*="category"]');
+
+            const hoursSummaryNode =
+                document.querySelector('div[jsaction*="openhours"] .ZDu9vd') ||
+                document.querySelector('div[jsaction*="openhours"]');
+            const hoursRows = Array.from(document.querySelectorAll('table.eK4R0e tr'))
+                .map((row) => {
+                    const tds = row.querySelectorAll('td');
+                    if (!tds || tds.length < 2) return '';
+                    const day = text(tds[0]);
+                    const val = text(tds[1]);
+                    return day && val ? `${day}: ${val}` : '';
+                })
+                .filter(Boolean);
+
+            return {
+                name: text(document.querySelector('h1')),
+                address: text(addressEl ? (addressEl.querySelector('.Io6YTe') || addressEl) : null),
+                locatedIn: text(locatedInEl ? (locatedInEl.querySelector('.Io6YTe') || locatedInEl) : null),
+                plusCode: text(plusCodeEl ? (plusCodeEl.querySelector('.Io6YTe') || plusCodeEl) : null),
+                phone: text(phoneEl ? (phoneEl.querySelector('.Io6YTe') || phoneEl) : null),
+                website: websiteEl ? (websiteEl.getAttribute('href') || '') : '',
+                bookingLink: bookingEl ? (bookingEl.getAttribute('href') || '') : '',
+                hoursSummary: text(hoursSummaryNode),
+                hoursRows: hoursRows,
+                rating: rating,
+                reviews: reviews,
+                category: text(categoryNode),
+                url: window.location.href || '',
+            };
+        }"""
+    )
+
+    if not isinstance(raw, dict):
+        return {}
+
+    hours_rows = raw.get("hoursRows") or []
+    if isinstance(hours_rows, list):
+        hours_detail = "; ".join([str(v).strip() for v in hours_rows if str(v).strip()])
+    else:
+        hours_detail = ""
+
+    out = {
+        "Name": str(raw.get("name") or "").strip() or "N/A",
+        "Address": str(raw.get("address") or "").strip() or "N/A",
+        "Phone": str(raw.get("phone") or "").strip() or "N/A",
+        "Website": _canonical_website(str(raw.get("website") or "").strip()),
+        "Booking Link": str(raw.get("bookingLink") or "").strip() or "N/A",
+        "Located In": str(raw.get("locatedIn") or "").strip() or "N/A",
+        "Plus Code": str(raw.get("plusCode") or "").strip() or "N/A",
+        "Hours": str(raw.get("hoursSummary") or "").strip() or "N/A",
+        "Hours Detail": hours_detail or "N/A",
+        "Rating": str(raw.get("rating") or "").strip() or "N/A",
+        "Reviews": str(raw.get("reviews") or "").strip() or "N/A",
+        "Business Type": str(raw.get("category") or "").strip() or "N/A",
+        "Url": str(raw.get("url") or "").strip() or "N/A",
+    }
+    return out
+
+
+async def enrich_businesses_with_place_pages(page, businesses):
+    if not businesses:
+        return []
+
+    logger.info("Slow mode enabled: opening each place page to collect detailed business info.")
+    detail_cache = {}
+
+    for idx, business in enumerate(businesses, 1):
+        maps_url = str(business.get("Url", "") or "").strip()
+        if not maps_url or maps_url == "N/A":
+            continue
+
+        if maps_url in detail_cache:
+            detail = detail_cache[maps_url]
+        else:
+            try:
+                logger.info(f"[slow] Opening {idx}/{len(businesses)}: {business.get('Name', 'N/A')}")
+                await page.goto(maps_url, wait_until="domcontentloaded", timeout=60000)
+                await page.wait_for_selector("h1, [data-item-id='address'], [data-item-id='authority']", timeout=20000)
+                await page.wait_for_timeout(700 + int(random.random() * 700))
+                detail = await extract_place_details(page)
+                detail_cache[maps_url] = detail
+            except Exception as exc:
+                logger.warning(f"[slow] Failed detail extraction for '{business.get('Name','N/A')}': {exc}")
+                continue
+
+        for key in (
+            "Name",
+            "Address",
+            "Phone",
+            "Website",
+            "Rating",
+            "Reviews",
+            "Business Type",
+            "Hours",
+            "Url",
+            "Located In",
+            "Plus Code",
+            "Booking Link",
+            "Hours Detail",
+        ):
+            value = str(detail.get(key, "") or "").strip()
+            if value and value != "N/A":
+                business[key] = value
+
+    return businesses
 
 async def scroll_google_maps(search_query: str, max_concurrent: int = 3):
     async with async_playwright() as p:
@@ -394,6 +540,15 @@ REQUEST_TIMEOUT_S = float(os.environ.get("HTTP_TIMEOUT", "20"))
 MAX_RETRIES = int(os.environ.get("HTTP_MAX_RETRIES", "5"))
 RETRY_BACKOFF_S = float(os.environ.get("HTTP_RETRY_BACKOFF", "2.0"))
 MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "3"))
+DEFAULT_SCRAPE_MODE = os.environ.get("MAPS_SCRAPE_MODE", "fast")
+VALID_SCRAPE_MODES = {"fast", "slow"}
+
+
+def normalize_scrape_mode(mode: Optional[str]) -> str:
+    value = str(mode or "").strip().lower()
+    if value in VALID_SCRAPE_MODES:
+        return value
+    return "fast"
 
 try:
     import requests  # type: ignore
@@ -598,7 +753,26 @@ def format_contacts_for_api(batch: List[Dict[str, Any]], campaign_id: str, reque
 
 
 def write_batch_csv(batch: List[Dict[str, Any]], out_path: str, write_header: bool = False) -> None:
-    fieldnames = ["companyName","address","phone","rating","reviews","category","website","url","email","facebook","instagram","twitter","yelp"]
+    fieldnames = [
+        "companyName",
+        "address",
+        "phone",
+        "rating",
+        "reviews",
+        "category",
+        "website",
+        "url",
+        "locatedIn",
+        "hours",
+        "hoursDetail",
+        "plusCode",
+        "bookingLink",
+        "email",
+        "facebook",
+        "instagram",
+        "twitter",
+        "yelp",
+    ]
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     import csv
     with open(out_path, "a", newline="", encoding="utf-8") as f:
@@ -610,10 +784,17 @@ def write_batch_csv(batch: List[Dict[str, Any]], out_path: str, write_header: bo
 
 
 class CampaignProcessor:
-    def __init__(self, api: LeadsApiClient, batch_size: int = BATCH_SIZE, csv_dir: Optional[str] = None):
+    def __init__(
+        self,
+        api: LeadsApiClient,
+        batch_size: int = BATCH_SIZE,
+        csv_dir: Optional[str] = None,
+        scrape_mode: Optional[str] = None,
+    ):
         self.api = api
         self.batch_size = batch_size
         self.csv_dir = csv_dir
+        self.scrape_mode = normalize_scrape_mode(scrape_mode or DEFAULT_SCRAPE_MODE)
         self._stop = False
 
     def stop(self):
@@ -669,7 +850,12 @@ class CampaignProcessor:
                     self._on_batch(campaign.id, request.id, sub, total_seen)
 
             try:
-                ok = run_scrape_and_yield_batches(request.req_text, self.batch_size, batch_callback)
+                ok = run_scrape_and_yield_batches(
+                    request.req_text,
+                    self.batch_size,
+                    batch_callback,
+                    scrape_mode=self.scrape_mode,
+                )
                 if not ok:
                     logger.warning(f"Scrape returned no data for request {request.id}")
             except Exception as e:
@@ -680,9 +866,19 @@ class CampaignProcessor:
                 time.sleep(1.5)
 
 
-def run_all(csv_dir: Optional[str] = None, campaign_id: Optional[str] = None, campaign_name: Optional[str] = None) -> None:
+def run_all(
+    csv_dir: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+    campaign_name: Optional[str] = None,
+    scrape_mode: Optional[str] = None,
+) -> None:
     api = LeadsApiClient(DEFAULT_BASE_URL, HttpClient())
-    processor = CampaignProcessor(api, batch_size=BATCH_SIZE, csv_dir=csv_dir)
+    processor = CampaignProcessor(
+        api,
+        batch_size=BATCH_SIZE,
+        csv_dir=csv_dir,
+        scrape_mode=scrape_mode or DEFAULT_SCRAPE_MODE,
+    )
     if campaign_id and campaign_name:
         processor.process_campaign(Campaign(id=campaign_id, name=campaign_name))
         return
@@ -696,10 +892,18 @@ def run_all(csv_dir: Optional[str] = None, campaign_id: Optional[str] = None, ca
         processor.process_campaign(camp)
 
 
-def run_scrape_and_yield_batches(query: str, batch_size: int, on_batch: Callable[[List[Dict[str, Any]]], None]) -> bool:
+def run_scrape_and_yield_batches(
+    query: str,
+    batch_size: int,
+    on_batch: Callable[[List[Dict[str, Any]]], None],
+    scrape_mode: Optional[str] = None,
+) -> bool:
     import asyncio
     from playwright.async_api import async_playwright
     import urllib.parse
+
+    mode = normalize_scrape_mode(scrape_mode or DEFAULT_SCRAPE_MODE)
+    logger.info(f"Maps scrape mode: {mode}")
 
     async def _run() -> List[Dict[str, Any]]:
         async with async_playwright() as p:
@@ -734,6 +938,8 @@ def run_scrape_and_yield_batches(query: str, batch_size: int, on_batch: Callable
                     last = count
                     if stable >= 3: break
                 results = await scrape_business_info(page, browser, max_concurrent=MAX_CONCURRENT)
+                if mode == "slow":
+                    results = await enrich_businesses_with_place_pages(page, results)
                 try: await page.screenshot(path="screenshot.png")
                 except Exception: pass
                 await browser.close()
@@ -770,6 +976,11 @@ def run_scrape_and_yield_batches(query: str, batch_size: int, on_batch: Callable
             "category": _pick(r, "Business Type", "Category"),
             "website": _pick(r, "Website", "Site", "URL", "Url"),
             "url": _pick(r, "Url", "URL", "Maps URL", "MapUrl", default=""),
+            "locatedIn": _pick(r, "Located In", "LocatedIn"),
+            "hours": _pick(r, "Hours"),
+            "hoursDetail": _pick(r, "Hours Detail", "HoursDetail"),
+            "plusCode": _pick(r, "Plus Code", "PlusCode"),
+            "bookingLink": _pick(r, "Booking Link", "BookingLink"),
             "email": "","facebook": "","instagram": "","twitter": "","yelp": "",
         }
         batch.append(contact)

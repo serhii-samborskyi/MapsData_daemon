@@ -84,9 +84,13 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.maps_batch_size.setRange(1, 500)
         self.maps_max_concurrent = QtWidgets.QSpinBox()
         self.maps_max_concurrent.setRange(1, 20)
+        self.maps_scrape_mode = QtWidgets.QComboBox()
+        self.maps_scrape_mode.addItem("Fast (list only)", "fast")
+        self.maps_scrape_mode.addItem("Slow (open each place details)", "slow")
         self.maps_csv_dir = QtWidgets.QLineEdit()
         maps_form.addRow("Batch size", self.maps_batch_size)
         maps_form.addRow("Max concurrent", self.maps_max_concurrent)
+        maps_form.addRow("Scrape mode", self.maps_scrape_mode)
         maps_form.addRow("CSV output dir", self.maps_csv_dir)
 
         email_group = QtWidgets.QGroupBox("Email Daemon")
@@ -330,6 +334,11 @@ class DaemonUI(QtWidgets.QMainWindow):
 
         self.maps_batch_size.setValue(int(maps_cfg.get("batch_size", 20)))
         self.maps_max_concurrent.setValue(int(maps_cfg.get("max_concurrent", 3)))
+        mode = str(maps_cfg.get("scrape_mode", "fast")).lower().strip()
+        mode_index = self.maps_scrape_mode.findData(mode)
+        if mode_index == -1:
+            mode_index = 0
+        self.maps_scrape_mode.setCurrentIndex(mode_index)
         self.maps_csv_dir.setText(maps_cfg.get("csv_dir", ""))
 
         self.email_batch.setValue(int(email_cfg.get("batch", 10)))
@@ -366,6 +375,7 @@ class DaemonUI(QtWidgets.QMainWindow):
 
         cfg["maps"]["batch_size"] = int(self.maps_batch_size.value())
         cfg["maps"]["max_concurrent"] = int(self.maps_max_concurrent.value())
+        cfg["maps"]["scrape_mode"] = str(self.maps_scrape_mode.currentData() or "fast")
         cfg["maps"]["csv_dir"] = self.maps_csv_dir.text().strip()
 
         cfg["email"]["batch"] = int(self.email_batch.value())
