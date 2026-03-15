@@ -540,6 +540,8 @@ REQUEST_TIMEOUT_S = float(os.environ.get("HTTP_TIMEOUT", "20"))
 MAX_RETRIES = int(os.environ.get("HTTP_MAX_RETRIES", "5"))
 RETRY_BACKOFF_S = float(os.environ.get("HTTP_RETRY_BACKOFF", "2.0"))
 MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "3"))
+CONTACTS_SEND_MAX_RETRIES = int(os.environ.get("CONTACTS_SEND_MAX_RETRIES", "5"))
+CONTACTS_SEND_RETRY_BACKOFF_S = float(os.environ.get("CONTACTS_SEND_RETRY_BACKOFF_S", "1.5"))
 DEFAULT_SCRAPE_MODE = os.environ.get("MAPS_SCRAPE_MODE", "fast")
 DEFAULT_SLOW_PLACE_PAUSE_MIN_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MIN_S", "0.8"))
 DEFAULT_SLOW_PLACE_PAUSE_MAX_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MAX_S", "1.8"))
@@ -721,11 +723,35 @@ class LeadsApiClient:
 
     def send_contacts(self, contacts: List[Dict[str,Any]]) -> bool:
         url = f"{self.base_url}/contacts"
-        code, text = self.http.post_json(url, contacts)
-        if code >= 400 or not text:
-            logger.error(f"/contacts failed: code={code} text={text[:200]}")
-            return False
-        return True
+        retries = max(1, int(CONTACTS_SEND_MAX_RETRIES))
+        for attempt in range(1, retries + 1):
+            code, text = self.http.post_json(url, contacts)
+            if 200 <= int(code or 0) < 300:
+                if attempt > 1:
+                    logger.info(
+                        "/contacts succeeded on retry %d/%d (batch_size=%d)",
+                        attempt,
+                        retries,
+                        len(contacts),
+                    )
+                return True
+
+            snippet = (text or "")[:200]
+            retryable = int(code or 0) >= 500 or int(code or 0) in {408, 429, 599}
+            logger.error(
+                "/contacts failed attempt %d/%d: code=%s text=%s",
+                attempt,
+                retries,
+                code,
+                snippet,
+            )
+            if (not retryable) or attempt >= retries:
+                break
+
+            delay = CONTACTS_SEND_RETRY_BACKOFF_S * attempt * (0.75 + random.random() * 0.5)
+            time.sleep(delay)
+
+        return False
 
 
 PLACE_ID_RE = re.compile(r"place_id:([^\\\"/]+)")
@@ -734,6 +760,19 @@ def _strip_quotes(s: Optional[str]) -> str:
     if not s:
         return ""
     return re.sub(r'(^\\\"|\\\"$)', "", str(s)).strip()
+
+
+def _sanitize_domain_value(raw: Optional[str]) -> str:
+    value = _strip_quotes(raw).strip()
+    if not value:
+        return "none"
+    lowered = value.lower()
+    if lowered in {"n/a", "na", "none", "null"}:
+        return "none"
+    if "google.com/maps/place" in lowered or "google.com/maps/search" in lowered or "maps.google.com" in lowered:
+        return "none"
+    return value
+
 
 def format_contacts_for_api(batch: List[Dict[str, Any]], campaign_id: str, request_id: str) -> List[Dict[str, Any]]:
     formatted: List[Dict[str, Any]] = []
@@ -758,7 +797,7 @@ def format_contacts_for_api(batch: List[Dict[str, Any]], campaign_id: str, reque
                 "rating": _g("rating"),
                 "review_count": int(re.sub(r'[^\d]', '', _g("reviews") or "0") or "0"),
                 "phone": _g("phone"),
-                "domain": _g("website"),
+                "domain": _sanitize_domain_value(_g("website")),
                 "email": "",
                 "facebook": "",
                 "instagram": "",
@@ -824,6 +863,25 @@ class CampaignProcessor:
     def stop(self):
         self._stop = True
 
+    @staticmethod
+    def _store_unsent_batch(campaign_id: str, request_id: str, payload: List[Dict[str, Any]]) -> None:
+        try:
+            failed_dir = os.path.join("queue", "failed")
+            os.makedirs(failed_dir, exist_ok=True)
+            path = os.path.join(failed_dir, "maps_unsent_contacts.jsonl")
+            record = {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "campaign_id": str(campaign_id),
+                "request_id": str(request_id),
+                "size": len(payload),
+                "contacts": payload,
+            }
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            logger.error("Stored unsent batch locally: %s (size=%d)", path, len(payload))
+        except Exception as exc:
+            logger.error("Failed to persist unsent batch locally: %s", exc)
+
     def _on_batch(self, campaign_id: str, request_id: str, batch: List[Dict[str, Any]], total_seen: int) -> None:
         if not batch:
             return
@@ -832,10 +890,29 @@ class CampaignProcessor:
             write_batch_csv(batch, out, write_header=not os.path.exists(out))
         payload = format_contacts_for_api(batch, campaign_id, request_id)
         ok = self.api.send_contacts(payload)
+        if not ok and len(payload) > 1:
+            logger.warning(
+                "Batch send failed for request %s; retrying %d leads individually.",
+                request_id,
+                len(payload),
+            )
+            sent_individual = 0
+            for lead in payload:
+                if self.api.send_contacts([lead]):
+                    sent_individual += 1
+            ok = sent_individual == len(payload)
+            if sent_individual:
+                logger.info(
+                    "Individual resend recovered %d/%d leads for request %s",
+                    sent_individual,
+                    len(payload),
+                    request_id,
+                )
         if ok:
             logger.info(f"Sent batch of {len(batch)} leads (total_seen={total_seen}) for request {request_id}")
         else:
             logger.error(f"Failed sending batch for request {request_id}")
+            self._store_unsent_batch(campaign_id, request_id, payload)
 
     def process_campaign(self, campaign: Campaign) -> None:
         logger.info(f"Starting campaign: {campaign.name} (ID: {campaign.id})")
@@ -1002,6 +1079,8 @@ def _map_result_to_contact(result: Dict[str, Any]) -> Dict[str, Any]:
         m = _re.search(r"([\d,]+)", s)
         return m.group(1).replace(",", "") if m else ""
 
+    website = _sanitize_domain_value(_pick(result, "Website", "Site", default=""))
+
     return {
         "companyName": _pick(result, "Name", "Business Name", "Company"),
         "address": _pick(result, "Address"),
@@ -1009,7 +1088,7 @@ def _map_result_to_contact(result: Dict[str, Any]) -> Dict[str, Any]:
         "rating": str(_pick(result, "Rating", default="")),
         "reviews": _rev_to_str(_pick(result, "Reviews", default="")),
         "category": _pick(result, "Business Type", "Category"),
-        "website": _pick(result, "Website", "Site", "URL", "Url"),
+        "website": website,
         "url": _pick(result, "Url", "URL", "Maps URL", "MapUrl", default=""),
         "locatedIn": _pick(result, "Located In", "LocatedIn"),
         "hours": _pick(result, "Hours"),

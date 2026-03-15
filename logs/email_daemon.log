@@ -1013,3 +1013,10 @@
 2026-01-09 22:07:02,762 - INFO - Starting email scraper for campaign 11
 2026-01-09 22:07:07,466 - ERROR - Email job failed (code=-15): queue/failed/campaign_11.json.1768018027
 2026-01-09 22:07:07,466 - INFO - Email daemon stopping
+2026-03-14 22:13:46,669 - INFO - Email daemon starting
+2026-03-14 22:13:46,670 - INFO - Email scraper engine: playwright
+2026-03-14 22:13:46,939 - WARNING - SSL verification failed; switching to insecure HTTPS for discovery calls.
+2026-03-14 22:13:47,101 - INFO - Discovery: active=1 queued=0 no_nomail=0
+2026-03-14 22:13:47,102 - INFO - Starting email scraper for campaign 49
+2026-03-14 22:24:00,032 - ERROR - Email job failed (code=-15): queue/failed/campaign_49.json
+2026-03-14 22:24:00,033 - INFO - Email daemon stopping
