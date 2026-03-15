@@ -23,7 +23,9 @@
     "batch_size": 20,
     "csv_dir": "",
     "max_concurrent": 3,
-    "scrape_mode": "slow"
+    "scrape_mode": "slow",
+    "slow_place_pause_max_s": 1.8,
+    "slow_place_pause_min_s": 0.8
   },
   "maps_base_url": "https://scrapiq.leadtechx.com/api",
   "maps_poll_interval_s": 30,

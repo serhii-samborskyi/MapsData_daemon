@@ -541,6 +541,8 @@ MAX_RETRIES = int(os.environ.get("HTTP_MAX_RETRIES", "5"))
 RETRY_BACKOFF_S = float(os.environ.get("HTTP_RETRY_BACKOFF", "2.0"))
 MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "3"))
 DEFAULT_SCRAPE_MODE = os.environ.get("MAPS_SCRAPE_MODE", "fast")
+DEFAULT_SLOW_PLACE_PAUSE_MIN_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MIN_S", "0.8"))
+DEFAULT_SLOW_PLACE_PAUSE_MAX_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MAX_S", "1.8"))
 VALID_SCRAPE_MODES = {"fast", "slow"}
 
 
@@ -549,6 +551,22 @@ def normalize_scrape_mode(mode: Optional[str]) -> str:
     if value in VALID_SCRAPE_MODES:
         return value
     return "fast"
+
+
+def normalize_pause_range(min_s: Optional[float], max_s: Optional[float]) -> Tuple[float, float]:
+    try:
+        low = float(DEFAULT_SLOW_PLACE_PAUSE_MIN_S if min_s is None else min_s)
+    except Exception:
+        low = float(DEFAULT_SLOW_PLACE_PAUSE_MIN_S)
+    try:
+        high = float(DEFAULT_SLOW_PLACE_PAUSE_MAX_S if max_s is None else max_s)
+    except Exception:
+        high = float(DEFAULT_SLOW_PLACE_PAUSE_MAX_S)
+    low = max(0.0, low)
+    high = max(0.0, high)
+    if high < low:
+        low, high = high, low
+    return low, high
 
 try:
     import requests  # type: ignore
@@ -790,11 +808,17 @@ class CampaignProcessor:
         batch_size: int = BATCH_SIZE,
         csv_dir: Optional[str] = None,
         scrape_mode: Optional[str] = None,
+        slow_place_pause_min_s: Optional[float] = None,
+        slow_place_pause_max_s: Optional[float] = None,
     ):
         self.api = api
         self.batch_size = batch_size
         self.csv_dir = csv_dir
         self.scrape_mode = normalize_scrape_mode(scrape_mode or DEFAULT_SCRAPE_MODE)
+        self.slow_place_pause_min_s, self.slow_place_pause_max_s = normalize_pause_range(
+            slow_place_pause_min_s,
+            slow_place_pause_max_s,
+        )
         self._stop = False
 
     def stop(self):
@@ -815,6 +839,12 @@ class CampaignProcessor:
 
     def process_campaign(self, campaign: Campaign) -> None:
         logger.info(f"Starting campaign: {campaign.name} (ID: {campaign.id})")
+        if self.scrape_mode == "slow":
+            self._process_campaign_slow(campaign)
+            return
+        self._process_campaign_fast(campaign)
+
+    def _process_campaign_fast(self, campaign: Campaign) -> None:
         while not self._stop:
             reqs = self.api.get_requests_for_campaign_name(campaign.name)
             if not reqs:
@@ -837,7 +867,7 @@ class CampaignProcessor:
                     return
                 cleaned: List[Dict[str, Any]] = []
                 for lead in batch:
-                    key = (lead.get("companyName",""), lead.get("address",""))
+                    key = (lead.get("url",""), lead.get("companyName",""), lead.get("address",""))
                     if key in dedupe_keys:
                         continue
                     dedupe_keys.add(key)
@@ -865,12 +895,76 @@ class CampaignProcessor:
                 logger.info(f"Completed request {request.id} (total leads seen: {total_seen})")
                 time.sleep(1.5)
 
+    def _process_campaign_slow(self, campaign: Campaign) -> None:
+        logger.info(
+            "Slow mode campaign dedupe enabled. Place pause range: %.2fs..%.2fs",
+            self.slow_place_pause_min_s,
+            self.slow_place_pause_max_s,
+        )
+        while not self._stop:
+            reqs = self.api.get_requests_for_campaign_name(campaign.name)
+            if not reqs:
+                logger.info("No more requests; completing campaign.")
+                self.api.complete_campaign(campaign.id)
+                break
+
+            pending: List[RequestItem] = []
+            for request in reqs:
+                if not request.req_text:
+                    logger.warning(f"Empty req_text for request {request.id}; marking completed.")
+                    self.api.set_request_status(request.id, "completed")
+                    continue
+                pending.append(request)
+
+            if not pending:
+                time.sleep(1.0)
+                continue
+
+            logger.info(
+                "[slow] Processing %d requests together to dedupe place URLs before detail scraping.",
+                len(pending),
+            )
+            for request in pending:
+                self.api.set_request_status(request.id, "inuse")
+
+            totals_by_request: Dict[str, int] = {request.id: 0 for request in pending}
+
+            def on_batch_for_request(request_id: str, batch: List[Dict[str, Any]]) -> None:
+                if not batch:
+                    return
+                totals_by_request[request_id] = totals_by_request.get(request_id, 0) + len(batch)
+                self._on_batch(campaign.id, request_id, batch, totals_by_request[request_id])
+
+            try:
+                ok = run_campaign_slow_dedup_and_yield_batches(
+                    pending,
+                    self.batch_size,
+                    on_batch_for_request,
+                    pause_min_s=self.slow_place_pause_min_s,
+                    pause_max_s=self.slow_place_pause_max_s,
+                )
+                if not ok:
+                    logger.warning("[slow] Campaign scrape returned no data.")
+            except Exception as e:
+                logger.exception(f"[slow] Scrape error for campaign {campaign.id}: {e}")
+            finally:
+                for request in pending:
+                    self.api.set_request_status(request.id, "completed")
+                    logger.info(
+                        "Completed request %s (total leads seen: %d)",
+                        request.id,
+                        totals_by_request.get(request.id, 0),
+                    )
+                time.sleep(1.5)
+
 
 def run_all(
     csv_dir: Optional[str] = None,
     campaign_id: Optional[str] = None,
     campaign_name: Optional[str] = None,
     scrape_mode: Optional[str] = None,
+    slow_place_pause_min_s: Optional[float] = None,
+    slow_place_pause_max_s: Optional[float] = None,
 ) -> None:
     api = LeadsApiClient(DEFAULT_BASE_URL, HttpClient())
     processor = CampaignProcessor(
@@ -878,6 +972,8 @@ def run_all(
         batch_size=BATCH_SIZE,
         csv_dir=csv_dir,
         scrape_mode=scrape_mode or DEFAULT_SCRAPE_MODE,
+        slow_place_pause_min_s=slow_place_pause_min_s,
+        slow_place_pause_max_s=slow_place_pause_max_s,
     )
     if campaign_id and campaign_name:
         processor.process_campaign(Campaign(id=campaign_id, name=campaign_name))
@@ -890,6 +986,210 @@ def run_all(
         if processor._stop:
             break
         processor.process_campaign(camp)
+
+
+def _map_result_to_contact(result: Dict[str, Any]) -> Dict[str, Any]:
+    import re as _re
+
+    def _pick(d: Dict[str, Any], *keys, default=""):
+        for k in keys:
+            if k in d and d[k] not in (None, "", "N/A"):
+                return d[k]
+        return default
+
+    def _rev_to_str(v: Any) -> str:
+        s = str(v)
+        m = _re.search(r"([\d,]+)", s)
+        return m.group(1).replace(",", "") if m else ""
+
+    return {
+        "companyName": _pick(result, "Name", "Business Name", "Company"),
+        "address": _pick(result, "Address"),
+        "phone": _pick(result, "Phone", "Telephone"),
+        "rating": str(_pick(result, "Rating", default="")),
+        "reviews": _rev_to_str(_pick(result, "Reviews", default="")),
+        "category": _pick(result, "Business Type", "Category"),
+        "website": _pick(result, "Website", "Site", "URL", "Url"),
+        "url": _pick(result, "Url", "URL", "Maps URL", "MapUrl", default=""),
+        "locatedIn": _pick(result, "Located In", "LocatedIn"),
+        "hours": _pick(result, "Hours"),
+        "hoursDetail": _pick(result, "Hours Detail", "HoursDetail"),
+        "plusCode": _pick(result, "Plus Code", "PlusCode"),
+        "bookingLink": _pick(result, "Booking Link", "BookingLink"),
+        "email": "",
+        "facebook": "",
+        "instagram": "",
+        "twitter": "",
+        "yelp": "",
+    }
+
+
+async def _collect_place_urls_for_query(page, query: str) -> List[str]:
+    import urllib.parse
+
+    url = f"https://www.google.com/maps/search/{urllib.parse.quote_plus(query)}"
+    logger.info(f"[slow] Collecting place URLs for query: {query}")
+    await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    await page.wait_for_selector('//div[@role="feed"]', timeout=60000)
+
+    last = -1
+    stable = 0
+    for _ in range(60):
+        await page.evaluate(
+            """(sel) => {
+                const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                if (!el) return;
+                el.scrollBy(0, el.scrollHeight);
+            }""",
+            '//div[@role="feed"]',
+        )
+        await page.wait_for_timeout(800)
+        count = await page.evaluate(
+            """(sel) => {
+                const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                if (!el) return 0;
+                return el.querySelectorAll('a[href^="https://www.google.com/maps/place/"]').length;
+            }""",
+            '//div[@role="feed"]',
+        )
+        if count == last:
+            stable += 1
+        else:
+            stable = 0
+        last = count
+        if stable >= 3:
+            break
+
+    urls = await page.evaluate(
+        """(sel) => {
+            const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            if (!el) return [];
+            const seen = new Set();
+            const out = [];
+            for (const a of el.querySelectorAll('a[href^="https://www.google.com/maps/place/"]')) {
+                const href = (a.getAttribute('href') || '').trim();
+                if (!href || seen.has(href)) continue;
+                seen.add(href);
+                out.push(href);
+            }
+            return out;
+        }""",
+        '//div[@role="feed"]',
+    )
+    if not isinstance(urls, list):
+        return []
+    cleaned = [str(v).strip() for v in urls if str(v).strip()]
+    logger.info(f"[slow] Query '{query}' returned {len(cleaned)} place URLs")
+    return cleaned
+
+
+def run_campaign_slow_dedup_and_yield_batches(
+    requests: List[RequestItem],
+    batch_size: int,
+    on_batch_for_request: Callable[[str, List[Dict[str, Any]]], None],
+    pause_min_s: Optional[float] = None,
+    pause_max_s: Optional[float] = None,
+) -> bool:
+    import asyncio
+    from playwright.async_api import async_playwright
+
+    pause_low, pause_high = normalize_pause_range(pause_min_s, pause_max_s)
+    logger.info(
+        "Slow campaign scrape: %d requests, pause range %.2fs..%.2fs",
+        len(requests),
+        pause_low,
+        pause_high,
+    )
+
+    async def _run() -> bool:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-extensions',
+                    '--disable-plugins',
+                    '--disable-images',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                ],
+            )
+            context = await browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/114.0.0.0 Safari/537.36"
+                )
+            )
+            page = await context.new_page()
+
+            sent_any = False
+            try:
+                seen_urls: Set[str] = set()
+                ordered_targets: List[Tuple[str, str]] = []
+
+                for idx, request in enumerate(requests, 1):
+                    query = (request.req_text or "").strip()
+                    if not query:
+                        continue
+                    urls = await _collect_place_urls_for_query(page, query)
+                    added = 0
+                    for url in urls:
+                        if url in seen_urls:
+                            continue
+                        seen_urls.add(url)
+                        ordered_targets.append((url, request.id))
+                        added += 1
+                    logger.info(
+                        "[slow] Request %s (%d/%d): %d URLs, %d new, %d total unique",
+                        request.id,
+                        idx,
+                        len(requests),
+                        len(urls),
+                        added,
+                        len(ordered_targets),
+                    )
+
+                if not ordered_targets:
+                    return False
+
+                request_buffers: Dict[str, List[Dict[str, Any]]] = {}
+                for i, (place_url, request_id) in enumerate(ordered_targets, 1):
+                    try:
+                        await page.goto(place_url, wait_until="domcontentloaded", timeout=60000)
+                        await page.wait_for_selector("h1, [data-item-id='address'], [data-item-id='authority']", timeout=20000)
+                        detail = await extract_place_details(page)
+                        if not detail:
+                            continue
+                        contact = _map_result_to_contact(detail)
+                        request_buffers.setdefault(request_id, []).append(contact)
+                        if len(request_buffers[request_id]) >= batch_size:
+                            on_batch_for_request(request_id, request_buffers[request_id])
+                            request_buffers[request_id] = []
+                            sent_any = True
+                    except Exception as exc:
+                        logger.warning("[slow] Failed place %d/%d (%s): %s", i, len(ordered_targets), place_url, exc)
+                        continue
+
+                    pause = random.uniform(pause_low, pause_high)
+                    logger.info("[slow] Scraped %d/%d, pausing %.2fs", i, len(ordered_targets), pause)
+                    await page.wait_for_timeout(int(pause * 1000))
+
+                for request_id, pending in request_buffers.items():
+                    if not pending:
+                        continue
+                    on_batch_for_request(request_id, pending)
+                    sent_any = True
+                return sent_any
+            finally:
+                try:
+                    await page.screenshot(path="screenshot.png")
+                except Exception:
+                    pass
+                await browser.close()
+
+    return asyncio.run(_run())
 
 
 def run_scrape_and_yield_batches(
@@ -954,35 +1254,9 @@ def run_scrape_and_yield_batches(
     if not results:
         return False
 
-    import re as _re
-    def _pick(d: Dict[str, Any], *keys, default=""):
-        for k in keys:
-            if k in d and d[k] not in (None, "", "N/A"):
-                return d[k]
-        return default
-    def _rev_to_str(v: Any) -> str:
-        s = str(v)
-        m = _re.search(r"([\d,]+)", s)
-        return m.group(1).replace(",", "") if m else ""
-
     batch: List[Dict[str, Any]] = []; sent_any = False
     for r in results:
-        contact = {
-            "companyName": _pick(r, "Name", "Business Name", "Company"),
-            "address": _pick(r, "Address"),
-            "phone": _pick(r, "Phone", "Telephone"),
-            "rating": str(_pick(r, "Rating", default="")),
-            "reviews": _rev_to_str(_pick(r, "Reviews", default="")),
-            "category": _pick(r, "Business Type", "Category"),
-            "website": _pick(r, "Website", "Site", "URL", "Url"),
-            "url": _pick(r, "Url", "URL", "Maps URL", "MapUrl", default=""),
-            "locatedIn": _pick(r, "Located In", "LocatedIn"),
-            "hours": _pick(r, "Hours"),
-            "hoursDetail": _pick(r, "Hours Detail", "HoursDetail"),
-            "plusCode": _pick(r, "Plus Code", "PlusCode"),
-            "bookingLink": _pick(r, "Booking Link", "BookingLink"),
-            "email": "","facebook": "","instagram": "","twitter": "","yelp": "",
-        }
+        contact = _map_result_to_contact(r)
         batch.append(contact)
         if len(batch) >= batch_size:
             on_batch(batch); sent_any = True; batch = []

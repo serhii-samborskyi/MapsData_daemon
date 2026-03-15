@@ -88,6 +88,8 @@ def run_daemon(
     batch_size: int,
     max_concurrent: int,
     scrape_mode: str,
+    slow_place_pause_min_s: float,
+    slow_place_pause_max_s: float,
     csv_dir: str,
     log_path: str,
 ) -> None:
@@ -97,6 +99,15 @@ def run_daemon(
 
     maps_scraper.MAX_CONCURRENT = max_concurrent
     maps_scraper.DEFAULT_SCRAPE_MODE = maps_scraper.normalize_scrape_mode(scrape_mode)
+    (
+        maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
+        maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
+    ) = maps_scraper.normalize_pause_range(slow_place_pause_min_s, slow_place_pause_max_s)
+    logger.info(
+        "Slow mode place pause range: %.2fs..%.2fs",
+        maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
+        maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
+    )
 
     api = LeadsApiClient(base_url, HttpClient())
     processor = CampaignProcessor(
@@ -104,6 +115,8 @@ def run_daemon(
         batch_size=batch_size,
         csv_dir=csv_dir or None,
         scrape_mode=maps_scraper.DEFAULT_SCRAPE_MODE,
+        slow_place_pause_min_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
+        slow_place_pause_max_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
     )
     global CURRENT_PROCESSOR
     CURRENT_PROCESSOR = processor
@@ -145,6 +158,8 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=None, help="Batch size for maps upload")
     parser.add_argument("--max-concurrent", type=int, default=None, help="Max concurrent maps scraping tasks")
     parser.add_argument("--scrape-mode", choices=["fast", "slow"], default=None, help="Maps scrape mode")
+    parser.add_argument("--slow-place-pause-min", type=float, default=None, help="Slow mode minimum pause between place scrapes (seconds)")
+    parser.add_argument("--slow-place-pause-max", type=float, default=None, help="Slow mode maximum pause between place scrapes (seconds)")
     parser.add_argument("--csv-dir", default=None, help="Optional CSV output directory")
     parser.add_argument("--log-path", default=None, help="Log file path")
     args = parser.parse_args()
@@ -157,6 +172,8 @@ def main() -> None:
     batch_size = args.batch_size if args.batch_size is not None else maps_cfg.get("batch_size", 20)
     max_concurrent = args.max_concurrent if args.max_concurrent is not None else maps_cfg.get("max_concurrent", 3)
     scrape_mode = args.scrape_mode or maps_cfg.get("scrape_mode", "fast")
+    slow_place_pause_min_s = args.slow_place_pause_min if args.slow_place_pause_min is not None else maps_cfg.get("slow_place_pause_min_s", 0.8)
+    slow_place_pause_max_s = args.slow_place_pause_max if args.slow_place_pause_max is not None else maps_cfg.get("slow_place_pause_max_s", 1.8)
     csv_dir = args.csv_dir if args.csv_dir is not None else maps_cfg.get("csv_dir", "")
     log_path = args.log_path or cfg.get("logging", {}).get("maps_log", "")
 
@@ -170,6 +187,8 @@ def main() -> None:
         batch_size=batch_size,
         max_concurrent=max_concurrent,
         scrape_mode=scrape_mode,
+        slow_place_pause_min_s=slow_place_pause_min_s,
+        slow_place_pause_max_s=slow_place_pause_max_s,
         csv_dir=csv_dir,
         log_path=log_path,
     )
