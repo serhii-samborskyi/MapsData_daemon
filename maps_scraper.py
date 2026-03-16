@@ -546,6 +546,7 @@ DEFAULT_SCRAPE_MODE = os.environ.get("MAPS_SCRAPE_MODE", "fast")
 DEFAULT_SHOW_BROWSER = os.environ.get("MAPS_SHOW_BROWSER", "0").strip().lower() in {"1", "true", "yes", "on"}
 DEFAULT_SLOW_PLACE_PAUSE_MIN_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MIN_S", "0.8"))
 DEFAULT_SLOW_PLACE_PAUSE_MAX_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MAX_S", "1.8"))
+DEFAULT_DETAIL_WORKERS = int(os.environ.get("MAPS_DETAIL_WORKERS", "1"))
 VALID_SCRAPE_MODES = {"fast", "slow"}
 
 
@@ -579,6 +580,18 @@ def normalize_show_browser(value: Optional[Any]) -> bool:
         return bool(DEFAULT_SHOW_BROWSER)
     text = str(value).strip().lower()
     return text in {"1", "true", "yes", "on"}
+
+
+def normalize_detail_workers(value: Optional[Any]) -> int:
+    if value is None:
+        base = DEFAULT_DETAIL_WORKERS
+    else:
+        base = value
+    try:
+        workers = int(base)
+    except Exception:
+        workers = int(DEFAULT_DETAIL_WORKERS)
+    return max(1, workers)
 
 try:
     import requests  # type: ignore
@@ -873,6 +886,7 @@ class CampaignProcessor:
         show_browser: Optional[bool] = None,
         slow_place_pause_min_s: Optional[float] = None,
         slow_place_pause_max_s: Optional[float] = None,
+        detail_workers: Optional[int] = None,
     ):
         self.api = api
         self.batch_size = batch_size
@@ -883,6 +897,7 @@ class CampaignProcessor:
             slow_place_pause_min_s,
             slow_place_pause_max_s,
         )
+        self.detail_workers = normalize_detail_workers(detail_workers)
         self._stop = False
 
     def stop(self):
@@ -1013,9 +1028,10 @@ class CampaignProcessor:
 
     def _process_campaign_slow(self, campaign: Campaign) -> None:
         logger.info(
-            "Slow mode campaign dedupe enabled. Place pause range: %.2fs..%.2fs",
+            "Slow mode campaign dedupe enabled. Place pause range: %.2fs..%.2fs | detail_workers=%d",
             self.slow_place_pause_min_s,
             self.slow_place_pause_max_s,
+            self.detail_workers,
         )
         while not self._stop:
             reqs = self.api.get_requests_for_campaign_name(campaign.name)
@@ -1059,6 +1075,7 @@ class CampaignProcessor:
                     show_browser=self.show_browser,
                     pause_min_s=self.slow_place_pause_min_s,
                     pause_max_s=self.slow_place_pause_max_s,
+                    detail_workers=self.detail_workers,
                 )
                 if not ok:
                     logger.warning("[slow] Campaign scrape returned no data.")
@@ -1083,6 +1100,7 @@ def run_all(
     show_browser: Optional[bool] = None,
     slow_place_pause_min_s: Optional[float] = None,
     slow_place_pause_max_s: Optional[float] = None,
+    detail_workers: Optional[int] = None,
 ) -> None:
     api = LeadsApiClient(DEFAULT_BASE_URL, HttpClient())
     processor = CampaignProcessor(
@@ -1093,6 +1111,7 @@ def run_all(
         show_browser=show_browser,
         slow_place_pause_min_s=slow_place_pause_min_s,
         slow_place_pause_max_s=slow_place_pause_max_s,
+        detail_workers=detail_workers,
     )
     if campaign_id and campaign_name:
         processor.process_campaign(Campaign(id=campaign_id, name=campaign_name))
@@ -1212,18 +1231,21 @@ def run_campaign_slow_dedup_and_yield_batches(
     show_browser: Optional[bool] = None,
     pause_min_s: Optional[float] = None,
     pause_max_s: Optional[float] = None,
+    detail_workers: Optional[int] = None,
 ) -> bool:
     import asyncio
     from playwright.async_api import async_playwright
 
     pause_low, pause_high = normalize_pause_range(pause_min_s, pause_max_s)
     show = normalize_show_browser(show_browser)
+    workers = normalize_detail_workers(detail_workers)
     logger.info(
-        "Slow campaign scrape: %d requests, pause range %.2fs..%.2fs, show_browser=%s",
+        "Slow campaign scrape: %d requests, pause range %.2fs..%.2fs, show_browser=%s, detail_workers=%d",
         len(requests),
         pause_low,
         pause_high,
         show,
+        workers,
     )
 
     async def _run() -> bool:
@@ -1280,32 +1302,75 @@ def run_campaign_slow_dedup_and_yield_batches(
                     return False
 
                 request_buffers: Dict[str, List[Dict[str, Any]]] = {}
-                for i, (place_url, request_id) in enumerate(ordered_targets, 1):
-                    try:
-                        await page.goto(place_url, wait_until="domcontentloaded", timeout=60000)
-                        await page.wait_for_selector("h1, [data-item-id='address'], [data-item-id='authority']", timeout=20000)
-                        detail = await extract_place_details(page)
-                        if not detail:
-                            continue
-                        contact = _map_result_to_contact(detail)
-                        request_buffers.setdefault(request_id, []).append(contact)
-                        if len(request_buffers[request_id]) >= batch_size:
-                            on_batch_for_request(request_id, request_buffers[request_id])
-                            request_buffers[request_id] = []
-                            sent_any = True
-                    except Exception as exc:
-                        logger.warning("[slow] Failed place %d/%d (%s): %s", i, len(ordered_targets), place_url, exc)
-                        continue
+                buffer_lock = asyncio.Lock()
+                callback_lock = asyncio.Lock()
+                target_iter = iter(enumerate(ordered_targets, 1))
+                target_iter_lock = asyncio.Lock()
 
-                    pause = random.uniform(pause_low, pause_high)
-                    logger.info("[slow] Scraped %d/%d, pausing %.2fs", i, len(ordered_targets), pause)
-                    await page.wait_for_timeout(int(pause * 1000))
+                async def _emit_batch(request_id: str, batch: List[Dict[str, Any]]) -> None:
+                    nonlocal sent_any
+                    if not batch:
+                        return
+                    async with callback_lock:
+                        try:
+                            await asyncio.to_thread(on_batch_for_request, request_id, batch)
+                            sent_any = True
+                        except Exception as exc:
+                            logger.exception("[slow] Batch callback failed for request %s: %s", request_id, exc)
+
+                async def _worker(worker_id: int) -> None:
+                    worker_page = await context.new_page()
+                    try:
+                        while True:
+                            async with target_iter_lock:
+                                try:
+                                    idx, (place_url, request_id) = next(target_iter)
+                                except StopIteration:
+                                    break
+                            to_emit: Optional[List[Dict[str, Any]]] = None
+                            try:
+                                await worker_page.goto(place_url, wait_until="domcontentloaded", timeout=60000)
+                                await worker_page.wait_for_selector("h1, [data-item-id='address'], [data-item-id='authority']", timeout=20000)
+                                detail = await extract_place_details(worker_page)
+                                if detail:
+                                    contact = _map_result_to_contact(detail)
+                                    async with buffer_lock:
+                                        request_buffers.setdefault(request_id, []).append(contact)
+                                        if len(request_buffers[request_id]) >= batch_size:
+                                            to_emit = list(request_buffers[request_id])
+                                            request_buffers[request_id] = []
+                            except Exception as exc:
+                                logger.warning(
+                                    "[slow][worker-%d] Failed place %d/%d (%s): %s",
+                                    worker_id,
+                                    idx,
+                                    len(ordered_targets),
+                                    place_url,
+                                    exc,
+                                )
+
+                            pause = random.uniform(pause_low, pause_high)
+                            logger.info(
+                                "[slow][worker-%d] Scraped %d/%d, pausing %.2fs",
+                                worker_id,
+                                idx,
+                                len(ordered_targets),
+                                pause,
+                            )
+                            await worker_page.wait_for_timeout(int(pause * 1000))
+
+                            if to_emit:
+                                await _emit_batch(request_id, to_emit)
+                    finally:
+                        await worker_page.close()
+
+                worker_tasks = [asyncio.create_task(_worker(i + 1)) for i in range(workers)]
+                await asyncio.gather(*worker_tasks)
 
                 for request_id, pending in request_buffers.items():
                     if not pending:
                         continue
-                    on_batch_for_request(request_id, pending)
-                    sent_any = True
+                    await _emit_batch(request_id, list(pending))
                 return sent_any
             finally:
                 try:

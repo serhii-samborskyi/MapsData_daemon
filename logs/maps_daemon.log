@@ -10292,3 +10292,158 @@
 2026-03-15 23:18:35,846 - INFO - No more requests; completing campaign.
 2026-03-15 23:18:35,996 - INFO - Queued email job: queue/campaign_54.json
 2026-03-15 23:19:36,159 - INFO - Maps daemon stopping
+2026-03-15 23:42:05,934 - INFO - Maps daemon starting
+2026-03-15 23:42:05,944 - INFO - Maps scrape mode: slow
+2026-03-15 23:42:05,944 - INFO - Maps show browser: True
+2026-03-15 23:42:05,945 - INFO - Maps detail workers: 3
+2026-03-15 23:42:05,945 - INFO - Slow mode place pause range: 0.80s..3.00s
+2026-03-15 23:42:06,125 - INFO - Processing campaign 55: dentists_palatine_test2
+2026-03-15 23:42:06,125 - INFO - Starting campaign: dentists_palatine_test2 (ID: 55)
+2026-03-15 23:42:06,126 - INFO - Slow mode campaign dedupe enabled. Place pause range: 0.80s..3.00s | detail_workers=3
+2026-03-15 23:42:06,268 - INFO - [slow] Processing 2 requests together to dedupe place URLs before detail scraping.
+2026-03-15 23:42:06,558 - INFO - Slow campaign scrape: 2 requests, pause range 0.80s..3.00s, show_browser=True, detail_workers=3
+2026-03-15 23:42:09,112 - INFO - [slow] Collecting place URLs for query: dentist palatine
+2026-03-15 23:42:24,474 - INFO - [slow] Query 'dentist palatine' returned 72 place URLs
+2026-03-15 23:42:24,474 - INFO - [slow] Request 2765 (1/2): 72 URLs, 72 new, 72 total unique
+2026-03-15 23:42:24,474 - INFO - [slow] Collecting place URLs for query: dentist schaumburg
+2026-03-15 23:42:39,825 - INFO - [slow] Query 'dentist schaumburg' returned 72 place URLs
+2026-03-15 23:42:39,825 - INFO - [slow] Request 2766 (2/2): 72 URLs, 70 new, 142 total unique
+2026-03-15 23:42:41,907 - INFO - [slow][worker-1] Scraped 1/142, pausing 2.24s
+2026-03-15 23:42:41,916 - INFO - [slow][worker-3] Scraped 3/142, pausing 2.34s
+2026-03-15 23:42:41,920 - INFO - [slow][worker-2] Scraped 2/142, pausing 1.92s
+2026-03-15 23:42:45,528 - INFO - [slow][worker-2] Scraped 4/142, pausing 2.10s
+2026-03-15 23:42:45,727 - INFO - [slow][worker-1] Scraped 5/142, pausing 2.52s
+2026-03-15 23:42:46,116 - INFO - [slow][worker-3] Scraped 6/142, pausing 0.92s
+2026-03-15 23:42:48,656 - INFO - [slow][worker-3] Scraped 7/142, pausing 2.11s
+2026-03-15 23:42:49,082 - INFO - [slow][worker-2] Scraped 8/142, pausing 1.12s
+2026-03-15 23:42:49,400 - INFO - [slow][worker-1] Scraped 9/142, pausing 1.50s
+2026-03-15 23:42:51,545 - INFO - [slow][worker-2] Scraped 10/142, pausing 0.97s
+2026-03-15 23:42:51,924 - INFO - [slow][worker-3] Scraped 11/142, pausing 2.94s
+2026-03-15 23:42:52,072 - INFO - [slow][worker-1] Scraped 12/142, pausing 2.79s
+2026-03-15 23:42:52,714 - INFO - Sent batch of 10 leads (total_seen=10) for request 2765
+2026-03-15 23:42:54,360 - INFO - [slow][worker-2] Scraped 13/142, pausing 1.50s
+2026-03-15 23:42:56,024 - INFO - [slow][worker-3] Scraped 15/142, pausing 0.88s
+2026-03-15 23:42:56,194 - INFO - [slow][worker-1] Scraped 14/142, pausing 2.34s
+2026-03-15 23:42:57,077 - INFO - [slow][worker-2] Scraped 16/142, pausing 2.42s
+2026-03-15 23:42:58,052 - INFO - [slow][worker-3] Scraped 17/142, pausing 2.68s
+2026-03-15 23:42:59,924 - INFO - [slow][worker-1] Scraped 18/142, pausing 2.36s
+2026-03-15 23:43:00,793 - INFO - [slow][worker-2] Scraped 19/142, pausing 1.15s
+2026-03-15 23:43:01,755 - INFO - [slow][worker-3] Scraped 20/142, pausing 1.22s
+2026-03-15 23:43:03,059 - INFO - [slow][worker-2] Scraped 21/142, pausing 1.07s
+2026-03-15 23:43:03,531 - INFO - Sent batch of 10 leads (total_seen=20) for request 2765
+2026-03-15 23:43:03,596 - INFO - [slow][worker-1] Scraped 22/142, pausing 2.23s
+2026-03-15 23:43:04,695 - INFO - [slow][worker-3] Scraped 23/142, pausing 2.16s
+2026-03-15 23:43:05,370 - INFO - [slow][worker-2] Scraped 24/142, pausing 1.70s
+2026-03-15 23:43:07,344 - INFO - [slow][worker-1] Scraped 25/142, pausing 0.93s
+2026-03-15 23:43:08,002 - INFO - [slow][worker-3] Scraped 26/142, pausing 1.57s
+2026-03-15 23:43:08,410 - INFO - [slow][worker-2] Scraped 27/142, pausing 1.57s
+2026-03-15 23:43:09,624 - INFO - [slow][worker-1] Scraped 28/142, pausing 2.04s
+2026-03-15 23:43:10,599 - INFO - [slow][worker-3] Scraped 29/142, pausing 2.38s
+2026-03-15 23:43:11,338 - INFO - [slow][worker-2] Scraped 30/142, pausing 2.87s
+2026-03-15 23:43:12,718 - INFO - [slow][worker-1] Scraped 31/142, pausing 2.93s
+2026-03-15 23:43:14,098 - INFO - [slow][worker-3] Scraped 32/142, pausing 1.67s
+2026-03-15 23:43:14,379 - INFO - Sent batch of 10 leads (total_seen=30) for request 2765
+2026-03-15 23:43:15,491 - INFO - [slow][worker-2] Scraped 33/142, pausing 2.74s
+2026-03-15 23:43:16,915 - INFO - [slow][worker-1] Scraped 34/142, pausing 1.33s
+2026-03-15 23:43:17,025 - INFO - [slow][worker-3] Scraped 35/142, pausing 0.82s
+2026-03-15 23:43:18,982 - INFO - [slow][worker-3] Scraped 36/142, pausing 1.26s
+2026-03-15 23:43:19,297 - INFO - [slow][worker-2] Scraped 37/142, pausing 0.89s
+2026-03-15 23:43:19,467 - INFO - [slow][worker-1] Scraped 38/142, pausing 2.28s
+2026-03-15 23:43:21,348 - INFO - [slow][worker-3] Scraped 40/142, pausing 2.48s
+2026-03-15 23:43:21,423 - INFO - [slow][worker-2] Scraped 39/142, pausing 1.98s
+2026-03-15 23:43:23,157 - INFO - [slow][worker-1] Scraped 41/142, pausing 1.89s
+2026-03-15 23:43:23,561 - INFO - Sent batch of 10 leads (total_seen=40) for request 2765
+2026-03-15 23:43:24,612 - INFO - [slow][worker-2] Scraped 42/142, pausing 1.24s
+2026-03-15 23:43:24,837 - INFO - [slow][worker-3] Scraped 43/142, pausing 2.27s
+2026-03-15 23:43:26,409 - INFO - [slow][worker-1] Scraped 44/142, pausing 2.67s
+2026-03-15 23:43:26,938 - INFO - [slow][worker-2] Scraped 45/142, pausing 1.92s
+2026-03-15 23:43:28,374 - INFO - [slow][worker-3] Scraped 46/142, pausing 1.23s
+2026-03-15 23:43:30,255 - INFO - [slow][worker-2] Scraped 47/142, pausing 1.22s
+2026-03-15 23:43:30,535 - INFO - [slow][worker-1] Scraped 48/142, pausing 2.22s
+2026-03-15 23:43:30,623 - INFO - [slow][worker-3] Scraped 49/142, pausing 1.59s
+2026-03-15 23:43:32,814 - INFO - [slow][worker-2] Scraped 50/142, pausing 1.47s
+2026-03-15 23:43:33,297 - INFO - [slow][worker-3] Scraped 51/142, pausing 2.75s
+2026-03-15 23:43:34,056 - INFO - [slow][worker-1] Scraped 52/142, pausing 2.35s
+2026-03-15 23:43:34,456 - INFO - Sent batch of 10 leads (total_seen=50) for request 2765
+2026-03-15 23:43:35,636 - INFO - [slow][worker-2] Scraped 53/142, pausing 2.80s
+2026-03-15 23:43:36,913 - INFO - [slow][worker-3] Scraped 54/142, pausing 1.33s
+2026-03-15 23:43:37,926 - INFO - [slow][worker-1] Scraped 55/142, pausing 2.19s
+2026-03-15 23:43:39,676 - INFO - [slow][worker-3] Scraped 56/142, pausing 1.38s
+2026-03-15 23:43:39,710 - INFO - [slow][worker-2] Scraped 57/142, pausing 1.59s
+2026-03-15 23:43:41,472 - INFO - [slow][worker-1] Scraped 58/142, pausing 1.39s
+2026-03-15 23:43:42,077 - INFO - [slow][worker-3] Scraped 59/142, pausing 2.48s
+2026-03-15 23:43:42,438 - INFO - [slow][worker-2] Scraped 60/142, pausing 1.57s
+2026-03-15 23:43:44,148 - INFO - [slow][worker-1] Scraped 61/142, pausing 2.64s
+2026-03-15 23:43:44,221 - INFO - Sent batch of 10 leads (total_seen=60) for request 2765
+2026-03-15 23:43:45,528 - INFO - [slow][worker-2] Scraped 62/142, pausing 0.80s
+2026-03-15 23:43:45,685 - INFO - [slow][worker-3] Scraped 63/142, pausing 1.90s
+2026-03-15 23:43:47,457 - INFO - [slow][worker-2] Scraped 64/142, pausing 0.99s
+2026-03-15 23:43:47,762 - INFO - [slow][worker-1] Scraped 65/142, pausing 0.81s
+2026-03-15 23:43:48,739 - INFO - [slow][worker-3] Scraped 66/142, pausing 2.25s
+2026-03-15 23:43:49,637 - INFO - [slow][worker-1] Scraped 68/142, pausing 2.81s
+2026-03-15 23:43:49,691 - INFO - [slow][worker-2] Scraped 67/142, pausing 2.86s
+2026-03-15 23:43:54,702 - INFO - [slow][worker-3] Scraped 69/142, pausing 2.76s
+2026-03-15 23:43:57,575 - INFO - [slow][worker-1] Scraped 70/142, pausing 2.71s
+2026-03-15 23:43:58,420 - INFO - [slow][worker-2] Scraped 71/142, pausing 2.94s
+2026-03-15 23:44:00,471 - INFO - Sent batch of 10 leads (total_seen=70) for request 2765
+2026-03-15 23:44:01,977 - INFO - [slow][worker-3] Scraped 72/142, pausing 1.33s
+2026-03-15 23:44:06,462 - INFO - [slow][worker-1] Scraped 73/142, pausing 2.49s
+2026-03-15 23:44:08,455 - INFO - [slow][worker-2] Scraped 74/142, pausing 2.24s
+2026-03-15 23:44:09,920 - INFO - [slow][worker-3] Scraped 75/142, pausing 0.97s
+2026-03-15 23:44:15,165 - INFO - [slow][worker-3] Scraped 78/142, pausing 2.46s
+2026-03-15 23:44:15,867 - INFO - [slow][worker-1] Scraped 76/142, pausing 1.38s
+2026-03-15 23:44:16,574 - INFO - [slow][worker-2] Scraped 77/142, pausing 1.84s
+2026-03-15 23:44:22,926 - INFO - [slow][worker-1] Scraped 79/142, pausing 2.66s
+2026-03-15 23:44:23,255 - INFO - [slow][worker-3] Scraped 80/142, pausing 1.21s
+2026-03-15 23:44:23,303 - INFO - [slow][worker-2] Scraped 81/142, pausing 2.34s
+2026-03-15 23:44:30,250 - INFO - [slow][worker-1] Scraped 83/142, pausing 2.91s
+2026-03-15 23:44:31,315 - INFO - [slow][worker-3] Scraped 82/142, pausing 0.91s
+2026-03-15 23:44:31,611 - INFO - [slow][worker-2] Scraped 84/142, pausing 1.37s
+2026-03-15 23:44:33,453 - INFO - Sent batch of 10 leads (total_seen=10) for request 2766
+2026-03-15 23:44:37,223 - INFO - [slow][worker-3] Scraped 85/142, pausing 2.97s
+2026-03-15 23:44:38,348 - INFO - [slow][worker-2] Scraped 86/142, pausing 2.59s
+2026-03-15 23:44:38,904 - INFO - [slow][worker-1] Scraped 87/142, pausing 2.06s
+2026-03-15 23:44:45,543 - INFO - [slow][worker-1] Scraped 90/142, pausing 2.94s
+2026-03-15 23:44:45,558 - INFO - [slow][worker-3] Scraped 88/142, pausing 2.23s
+2026-03-15 23:44:46,336 - INFO - [slow][worker-2] Scraped 89/142, pausing 2.63s
+2026-03-15 23:44:51,805 - INFO - [slow][worker-3] Scraped 91/142, pausing 2.80s
+2026-03-15 23:44:53,986 - INFO - [slow][worker-1] Scraped 92/142, pausing 2.05s
+2026-03-15 23:44:54,803 - INFO - [slow][worker-2] Scraped 93/142, pausing 1.79s
+2026-03-15 23:44:56,308 - INFO - Sent batch of 10 leads (total_seen=20) for request 2766
+2026-03-15 23:44:57,944 - INFO - [slow][worker-3] Scraped 94/142, pausing 0.82s
+2026-03-15 23:45:01,958 - INFO - [slow][worker-1] Scraped 95/142, pausing 2.61s
+2026-03-15 23:45:02,706 - INFO - [slow][worker-2] Scraped 96/142, pausing 2.77s
+2026-03-15 23:45:03,697 - INFO - [slow][worker-3] Scraped 97/142, pausing 1.73s
+2026-03-15 23:45:09,571 - INFO - [slow][worker-1] Scraped 98/142, pausing 2.83s
+2026-03-15 23:45:11,377 - INFO - [slow][worker-3] Scraped 99/142, pausing 2.39s
+2026-03-15 23:45:11,981 - INFO - [slow][worker-2] Scraped 100/142, pausing 1.14s
+2026-03-15 23:45:17,573 - INFO - [slow][worker-2] Scraped 102/142, pausing 1.73s
+2026-03-15 23:45:19,573 - INFO - [slow][worker-3] Scraped 103/142, pausing 2.30s
+2026-03-15 23:45:19,696 - INFO - [slow][worker-1] Scraped 101/142, pausing 2.73s
+2026-03-15 23:45:20,892 - INFO - [slow][worker-2] Scraped 104/142, pausing 0.97s
+2026-03-15 23:45:22,045 - INFO - Sent batch of 10 leads (total_seen=30) for request 2766
+2026-03-15 23:45:22,935 - INFO - [slow][worker-2] Scraped 105/142, pausing 2.92s
+2026-03-15 23:45:22,939 - INFO - [slow][worker-3] Scraped 106/142, pausing 1.49s
+2026-03-15 23:45:23,374 - INFO - [slow][worker-1] Scraped 107/142, pausing 2.12s
+2026-03-15 23:45:25,603 - INFO - [slow][worker-3] Scraped 108/142, pausing 2.99s
+2026-03-15 23:45:26,626 - INFO - [slow][worker-1] Scraped 109/142, pausing 1.51s
+2026-03-15 23:45:27,170 - INFO - [slow][worker-2] Scraped 110/142, pausing 1.02s
+2026-03-15 23:45:29,367 - INFO - [slow][worker-1] Scraped 111/142, pausing 1.00s
+2026-03-15 23:45:29,542 - INFO - [slow][worker-3] Scraped 113/142, pausing 0.97s
+2026-03-15 23:45:29,702 - INFO - [slow][worker-2] Scraped 112/142, pausing 1.35s
+2026-03-15 23:45:30,663 - INFO - Sent batch of 10 leads (total_seen=40) for request 2766
+2026-03-15 23:45:51,116 - WARNING - [slow][worker-1] Failed place 114/142 (https://www.google.com/maps/place/Hoffman+Smiles/data=!4m7!3m6!1s0x880faf4a576303ab:0x4df0c191c95f0faf!8m2!3d42.0457058!4d-88.0864271!16s%2Fg%2F1vd3wd5f!19sChIJqwNjV0qvD4gRrw9fyZHB8E0?authuser=0&hl=en&rclk=1): Page.wait_for_selector: Timeout 20000ms exceeded.
+Call log:
+  - waiting for locator("h1, [data-item-id='address'], [data-item-id='authority']") to be visible
+
+2026-03-15 23:45:51,116 - INFO - [slow][worker-1] Scraped 114/142, pausing 2.14s
+2026-03-15 23:45:51,453 - WARNING - [slow][worker-3] Failed place 115/142 (https://www.google.com/maps/place/ImplantWIDE+Schaumburg/data=!4m7!3m6!1s0x880faf74a36fb185:0x7dd32f1a58ac1177!8m2!3d42.0425409!4d-88.0540088!16s%2Fg%2F11b6pxzs57!19sChIJhbFvo3SvD4gRdxGsWBov030?authuser=0&hl=en&rclk=1): Page.wait_for_selector: Timeout 20000ms exceeded.
+Call log:
+  - waiting for locator("h1, [data-item-id='address'], [data-item-id='authority']") to be visible
+
+2026-03-15 23:45:51,453 - INFO - [slow][worker-3] Scraped 115/142, pausing 2.61s
+2026-03-15 23:45:51,958 - WARNING - [slow][worker-2] Failed place 116/142 (https://www.google.com/maps/place/Silc+Periodontics/data=!4m7!3m6!1s0x880faf96377370bf:0x251f8f17c8409584!8m2!3d42.0464899!4d-88.0595865!16s%2Fg%2F1tfzy279!19sChIJv3BzN5avD4gRhJVAyBePHyU?authuser=0&hl=en&rclk=1): Page.wait_for_selector: Timeout 20000ms exceeded.
+Call log:
+  - waiting for locator("h1, [data-item-id='address'], [data-item-id='authority']") to be visible
+
+2026-03-15 23:45:51,958 - INFO - [slow][worker-2] Scraped 116/142, pausing 2.65s

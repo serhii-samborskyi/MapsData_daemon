@@ -15,6 +15,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "maps": {
         "batch_size": 20,
         "max_concurrent": 3,
+        "detail_workers": 1,
         "scrape_mode": "fast",
         "show_browser": False,
         "slow_place_pause_min_s": 0.8,

@@ -22,6 +22,7 @@
   "maps": {
     "batch_size": 10,
     "csv_dir": "",
+    "detail_workers": 3,
     "max_concurrent": 3,
     "scrape_mode": "slow",
     "show_browser": true,

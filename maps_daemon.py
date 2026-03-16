@@ -87,6 +87,7 @@ def run_daemon(
     queue_dir: str,
     batch_size: int,
     max_concurrent: int,
+    detail_workers: int,
     scrape_mode: str,
     show_browser: bool,
     slow_place_pause_min_s: float,
@@ -98,8 +99,10 @@ def run_daemon(
     logger.info("Maps daemon starting")
     logger.info("Maps scrape mode: %s", maps_scraper.normalize_scrape_mode(scrape_mode))
     logger.info("Maps show browser: %s", maps_scraper.normalize_show_browser(show_browser))
+    logger.info("Maps detail workers: %d", maps_scraper.normalize_detail_workers(detail_workers))
 
     maps_scraper.MAX_CONCURRENT = max_concurrent
+    maps_scraper.DEFAULT_DETAIL_WORKERS = maps_scraper.normalize_detail_workers(detail_workers)
     maps_scraper.DEFAULT_SCRAPE_MODE = maps_scraper.normalize_scrape_mode(scrape_mode)
     maps_scraper.DEFAULT_SHOW_BROWSER = maps_scraper.normalize_show_browser(show_browser)
     (
@@ -121,6 +124,7 @@ def run_daemon(
         show_browser=maps_scraper.DEFAULT_SHOW_BROWSER,
         slow_place_pause_min_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
         slow_place_pause_max_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
+        detail_workers=maps_scraper.DEFAULT_DETAIL_WORKERS,
     )
     global CURRENT_PROCESSOR
     CURRENT_PROCESSOR = processor
@@ -161,6 +165,7 @@ def main() -> None:
     parser.add_argument("--queue-dir", default=None, help="Queue directory for email jobs")
     parser.add_argument("--batch-size", type=int, default=None, help="Batch size for maps upload")
     parser.add_argument("--max-concurrent", type=int, default=None, help="Max concurrent maps scraping tasks")
+    parser.add_argument("--detail-workers", type=int, default=None, help="Slow mode detail-page worker count")
     parser.add_argument("--scrape-mode", choices=["fast", "slow"], default=None, help="Maps scrape mode")
     parser.add_argument("--show-browser", dest="show_browser", action="store_const", const=True, default=None, help="Show browser window while scraping maps")
     parser.add_argument("--hide-browser", dest="show_browser", action="store_const", const=False, help="Run maps scraping headless")
@@ -177,6 +182,7 @@ def main() -> None:
     queue_dir = args.queue_dir or cfg.get("queue_dir", "queue")
     batch_size = args.batch_size if args.batch_size is not None else maps_cfg.get("batch_size", 20)
     max_concurrent = args.max_concurrent if args.max_concurrent is not None else maps_cfg.get("max_concurrent", 3)
+    detail_workers = args.detail_workers if args.detail_workers is not None else maps_cfg.get("detail_workers", 1)
     scrape_mode = args.scrape_mode or maps_cfg.get("scrape_mode", "fast")
     show_browser = args.show_browser if args.show_browser is not None else maps_cfg.get("show_browser", False)
     slow_place_pause_min_s = args.slow_place_pause_min if args.slow_place_pause_min is not None else maps_cfg.get("slow_place_pause_min_s", 0.8)
@@ -193,6 +199,7 @@ def main() -> None:
         queue_dir=queue_dir,
         batch_size=batch_size,
         max_concurrent=max_concurrent,
+        detail_workers=detail_workers,
         scrape_mode=scrape_mode,
         show_browser=show_browser,
         slow_place_pause_min_s=slow_place_pause_min_s,
