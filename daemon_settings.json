@@ -24,6 +24,8 @@
     "csv_dir": "",
     "detail_workers": 3,
     "max_concurrent": 3,
+    "scroll_pause_max_s": 0.8,
+    "scroll_pause_min_s": 0.8,
     "scrape_mode": "slow",
     "show_browser": true,
     "slow_place_pause_max_s": 3.0,

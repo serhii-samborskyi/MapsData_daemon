@@ -92,6 +92,8 @@ def run_daemon(
     show_browser: bool,
     slow_place_pause_min_s: float,
     slow_place_pause_max_s: float,
+    scroll_pause_min_s: float,
+    scroll_pause_max_s: float,
     csv_dir: str,
     log_path: str,
 ) -> None:
@@ -109,10 +111,19 @@ def run_daemon(
         maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
         maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
     ) = maps_scraper.normalize_pause_range(slow_place_pause_min_s, slow_place_pause_max_s)
+    (
+        maps_scraper.DEFAULT_SCROLL_PAUSE_MIN_S,
+        maps_scraper.DEFAULT_SCROLL_PAUSE_MAX_S,
+    ) = maps_scraper.normalize_scroll_pause_range(scroll_pause_min_s, scroll_pause_max_s)
     logger.info(
         "Slow mode place pause range: %.2fs..%.2fs",
         maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
         maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
+    )
+    logger.info(
+        "Maps feed scroll pause range: %.2fs..%.2fs",
+        maps_scraper.DEFAULT_SCROLL_PAUSE_MIN_S,
+        maps_scraper.DEFAULT_SCROLL_PAUSE_MAX_S,
     )
 
     api = LeadsApiClient(base_url, HttpClient())
@@ -124,6 +135,8 @@ def run_daemon(
         show_browser=maps_scraper.DEFAULT_SHOW_BROWSER,
         slow_place_pause_min_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
         slow_place_pause_max_s=maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MAX_S,
+        scroll_pause_min_s=maps_scraper.DEFAULT_SCROLL_PAUSE_MIN_S,
+        scroll_pause_max_s=maps_scraper.DEFAULT_SCROLL_PAUSE_MAX_S,
         detail_workers=maps_scraper.DEFAULT_DETAIL_WORKERS,
     )
     global CURRENT_PROCESSOR
@@ -171,6 +184,8 @@ def main() -> None:
     parser.add_argument("--hide-browser", dest="show_browser", action="store_const", const=False, help="Run maps scraping headless")
     parser.add_argument("--slow-place-pause-min", type=float, default=None, help="Slow mode minimum pause between place scrapes (seconds)")
     parser.add_argument("--slow-place-pause-max", type=float, default=None, help="Slow mode maximum pause between place scrapes (seconds)")
+    parser.add_argument("--scroll-pause-min", type=float, default=None, help="Minimum pause between feed scrolls (seconds)")
+    parser.add_argument("--scroll-pause-max", type=float, default=None, help="Maximum pause between feed scrolls (seconds)")
     parser.add_argument("--csv-dir", default=None, help="Optional CSV output directory")
     parser.add_argument("--log-path", default=None, help="Log file path")
     args = parser.parse_args()
@@ -187,6 +202,8 @@ def main() -> None:
     show_browser = args.show_browser if args.show_browser is not None else maps_cfg.get("show_browser", False)
     slow_place_pause_min_s = args.slow_place_pause_min if args.slow_place_pause_min is not None else maps_cfg.get("slow_place_pause_min_s", 0.8)
     slow_place_pause_max_s = args.slow_place_pause_max if args.slow_place_pause_max is not None else maps_cfg.get("slow_place_pause_max_s", 1.8)
+    scroll_pause_min_s = args.scroll_pause_min if args.scroll_pause_min is not None else maps_cfg.get("scroll_pause_min_s", 0.8)
+    scroll_pause_max_s = args.scroll_pause_max if args.scroll_pause_max is not None else maps_cfg.get("scroll_pause_max_s", 0.8)
     csv_dir = args.csv_dir if args.csv_dir is not None else maps_cfg.get("csv_dir", "")
     log_path = args.log_path or cfg.get("logging", {}).get("maps_log", "")
 
@@ -204,6 +221,8 @@ def main() -> None:
         show_browser=show_browser,
         slow_place_pause_min_s=slow_place_pause_min_s,
         slow_place_pause_max_s=slow_place_pause_max_s,
+        scroll_pause_min_s=scroll_pause_min_s,
+        scroll_pause_max_s=scroll_pause_max_s,
         csv_dir=csv_dir,
         log_path=log_path,
     )

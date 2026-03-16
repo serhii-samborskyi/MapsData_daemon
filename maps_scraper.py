@@ -546,6 +546,8 @@ DEFAULT_SCRAPE_MODE = os.environ.get("MAPS_SCRAPE_MODE", "fast")
 DEFAULT_SHOW_BROWSER = os.environ.get("MAPS_SHOW_BROWSER", "0").strip().lower() in {"1", "true", "yes", "on"}
 DEFAULT_SLOW_PLACE_PAUSE_MIN_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MIN_S", "0.8"))
 DEFAULT_SLOW_PLACE_PAUSE_MAX_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MAX_S", "1.8"))
+DEFAULT_SCROLL_PAUSE_MIN_S = float(os.environ.get("MAPS_SCROLL_PAUSE_MIN_S", "0.8"))
+DEFAULT_SCROLL_PAUSE_MAX_S = float(os.environ.get("MAPS_SCROLL_PAUSE_MAX_S", "0.8"))
 DEFAULT_DETAIL_WORKERS = int(os.environ.get("MAPS_DETAIL_WORKERS", "1"))
 VALID_SCRAPE_MODES = {"fast", "slow"}
 
@@ -566,6 +568,22 @@ def normalize_pause_range(min_s: Optional[float], max_s: Optional[float]) -> Tup
         high = float(DEFAULT_SLOW_PLACE_PAUSE_MAX_S if max_s is None else max_s)
     except Exception:
         high = float(DEFAULT_SLOW_PLACE_PAUSE_MAX_S)
+    low = max(0.0, low)
+    high = max(0.0, high)
+    if high < low:
+        low, high = high, low
+    return low, high
+
+
+def normalize_scroll_pause_range(min_s: Optional[float], max_s: Optional[float]) -> Tuple[float, float]:
+    try:
+        low = float(DEFAULT_SCROLL_PAUSE_MIN_S if min_s is None else min_s)
+    except Exception:
+        low = float(DEFAULT_SCROLL_PAUSE_MIN_S)
+    try:
+        high = float(DEFAULT_SCROLL_PAUSE_MAX_S if max_s is None else max_s)
+    except Exception:
+        high = float(DEFAULT_SCROLL_PAUSE_MAX_S)
     low = max(0.0, low)
     high = max(0.0, high)
     if high < low:
@@ -886,6 +904,8 @@ class CampaignProcessor:
         show_browser: Optional[bool] = None,
         slow_place_pause_min_s: Optional[float] = None,
         slow_place_pause_max_s: Optional[float] = None,
+        scroll_pause_min_s: Optional[float] = None,
+        scroll_pause_max_s: Optional[float] = None,
         detail_workers: Optional[int] = None,
     ):
         self.api = api
@@ -896,6 +916,10 @@ class CampaignProcessor:
         self.slow_place_pause_min_s, self.slow_place_pause_max_s = normalize_pause_range(
             slow_place_pause_min_s,
             slow_place_pause_max_s,
+        )
+        self.scroll_pause_min_s, self.scroll_pause_max_s = normalize_scroll_pause_range(
+            scroll_pause_min_s,
+            scroll_pause_max_s,
         )
         self.detail_workers = normalize_detail_workers(detail_workers)
         self._stop = False
@@ -1016,6 +1040,8 @@ class CampaignProcessor:
                     batch_callback,
                     scrape_mode=self.scrape_mode,
                     show_browser=self.show_browser,
+                    scroll_pause_min_s=self.scroll_pause_min_s,
+                    scroll_pause_max_s=self.scroll_pause_max_s,
                 )
                 if not ok:
                     logger.warning(f"Scrape returned no data for request {request.id}")
@@ -1028,9 +1054,11 @@ class CampaignProcessor:
 
     def _process_campaign_slow(self, campaign: Campaign) -> None:
         logger.info(
-            "Slow mode campaign dedupe enabled. Place pause range: %.2fs..%.2fs | detail_workers=%d",
+            "Slow mode campaign dedupe enabled. Place pause range: %.2fs..%.2fs | scroll pause range: %.2fs..%.2fs | detail_workers=%d",
             self.slow_place_pause_min_s,
             self.slow_place_pause_max_s,
+            self.scroll_pause_min_s,
+            self.scroll_pause_max_s,
             self.detail_workers,
         )
         while not self._stop:
@@ -1075,6 +1103,8 @@ class CampaignProcessor:
                     show_browser=self.show_browser,
                     pause_min_s=self.slow_place_pause_min_s,
                     pause_max_s=self.slow_place_pause_max_s,
+                    scroll_pause_min_s=self.scroll_pause_min_s,
+                    scroll_pause_max_s=self.scroll_pause_max_s,
                     detail_workers=self.detail_workers,
                 )
                 if not ok:
@@ -1100,6 +1130,8 @@ def run_all(
     show_browser: Optional[bool] = None,
     slow_place_pause_min_s: Optional[float] = None,
     slow_place_pause_max_s: Optional[float] = None,
+    scroll_pause_min_s: Optional[float] = None,
+    scroll_pause_max_s: Optional[float] = None,
     detail_workers: Optional[int] = None,
 ) -> None:
     api = LeadsApiClient(DEFAULT_BASE_URL, HttpClient())
@@ -1111,6 +1143,8 @@ def run_all(
         show_browser=show_browser,
         slow_place_pause_min_s=slow_place_pause_min_s,
         slow_place_pause_max_s=slow_place_pause_max_s,
+        scroll_pause_min_s=scroll_pause_min_s,
+        scroll_pause_max_s=scroll_pause_max_s,
         detail_workers=detail_workers,
     )
     if campaign_id and campaign_name:
@@ -1165,11 +1199,17 @@ def _map_result_to_contact(result: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def _collect_place_urls_for_query(page, query: str) -> List[str]:
+async def _collect_place_urls_for_query(
+    page,
+    query: str,
+    pause_min_s: Optional[float] = None,
+    pause_max_s: Optional[float] = None,
+) -> List[str]:
     import urllib.parse
 
     url = f"https://www.google.com/maps/search/{urllib.parse.quote_plus(query)}"
     logger.info(f"[slow] Collecting place URLs for query: {query}")
+    scroll_pause_low, scroll_pause_high = normalize_scroll_pause_range(pause_min_s, pause_max_s)
     await page.goto(url, wait_until="domcontentloaded", timeout=60000)
     await page.wait_for_selector('//div[@role="feed"]', timeout=60000)
 
@@ -1184,7 +1224,8 @@ async def _collect_place_urls_for_query(page, query: str) -> List[str]:
             }""",
             '//div[@role="feed"]',
         )
-        await page.wait_for_timeout(800)
+        scroll_pause = random.uniform(scroll_pause_low, scroll_pause_high)
+        await page.wait_for_timeout(int(scroll_pause * 1000))
         count = await page.evaluate(
             """(sel) => {
                 const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
@@ -1231,19 +1272,24 @@ def run_campaign_slow_dedup_and_yield_batches(
     show_browser: Optional[bool] = None,
     pause_min_s: Optional[float] = None,
     pause_max_s: Optional[float] = None,
+    scroll_pause_min_s: Optional[float] = None,
+    scroll_pause_max_s: Optional[float] = None,
     detail_workers: Optional[int] = None,
 ) -> bool:
     import asyncio
     from playwright.async_api import async_playwright
 
     pause_low, pause_high = normalize_pause_range(pause_min_s, pause_max_s)
+    scroll_pause_low, scroll_pause_high = normalize_scroll_pause_range(scroll_pause_min_s, scroll_pause_max_s)
     show = normalize_show_browser(show_browser)
     workers = normalize_detail_workers(detail_workers)
     logger.info(
-        "Slow campaign scrape: %d requests, pause range %.2fs..%.2fs, show_browser=%s, detail_workers=%d",
+        "Slow campaign scrape: %d requests, place pause %.2fs..%.2fs, scroll pause %.2fs..%.2fs, show_browser=%s, detail_workers=%d",
         len(requests),
         pause_low,
         pause_high,
+        scroll_pause_low,
+        scroll_pause_high,
         show,
         workers,
     )
@@ -1280,7 +1326,12 @@ def run_campaign_slow_dedup_and_yield_batches(
                     query = (request.req_text or "").strip()
                     if not query:
                         continue
-                    urls = await _collect_place_urls_for_query(page, query)
+                    urls = await _collect_place_urls_for_query(
+                        page,
+                        query,
+                        pause_min_s=scroll_pause_low,
+                        pause_max_s=scroll_pause_high,
+                    )
                     added = 0
                     for url in urls:
                         if url in seen_urls:
@@ -1388,6 +1439,8 @@ def run_scrape_and_yield_batches(
     on_batch: Callable[[List[Dict[str, Any]]], None],
     scrape_mode: Optional[str] = None,
     show_browser: Optional[bool] = None,
+    scroll_pause_min_s: Optional[float] = None,
+    scroll_pause_max_s: Optional[float] = None,
 ) -> bool:
     import asyncio
     from playwright.async_api import async_playwright
@@ -1395,7 +1448,14 @@ def run_scrape_and_yield_batches(
 
     mode = normalize_scrape_mode(scrape_mode or DEFAULT_SCRAPE_MODE)
     show = normalize_show_browser(show_browser)
-    logger.info(f"Maps scrape mode: {mode} | show_browser={show}")
+    scroll_pause_low, scroll_pause_high = normalize_scroll_pause_range(scroll_pause_min_s, scroll_pause_max_s)
+    logger.info(
+        "Maps scrape mode: %s | show_browser=%s | scroll pause range: %.2fs..%.2fs",
+        mode,
+        show,
+        scroll_pause_low,
+        scroll_pause_high,
+    )
 
     async def _run() -> List[Dict[str, Any]]:
         async with async_playwright() as p:
@@ -1419,7 +1479,8 @@ def run_scrape_and_yield_batches(
                         if (!el) return;
                         el.scrollBy(0, el.scrollHeight);
                     }""", '//div[@role="feed"]')
-                    await page.wait_for_timeout(800)
+                    scroll_pause = random.uniform(scroll_pause_low, scroll_pause_high)
+                    await page.wait_for_timeout(int(scroll_pause * 1000))
                     count = await page.evaluate("""(sel) => {
                         const el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
                         if (!el) return 0;

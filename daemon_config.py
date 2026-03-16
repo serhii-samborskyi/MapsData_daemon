@@ -20,6 +20,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "show_browser": False,
         "slow_place_pause_min_s": 0.8,
         "slow_place_pause_max_s": 1.8,
+        "scroll_pause_min_s": 0.8,
+        "scroll_pause_max_s": 0.8,
         "csv_dir": "",
     },
     "email": {

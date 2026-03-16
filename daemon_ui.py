@@ -96,6 +96,12 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.maps_slow_pause_max = QtWidgets.QDoubleSpinBox()
         self.maps_slow_pause_max.setRange(0.0, 30.0)
         self.maps_slow_pause_max.setDecimals(1)
+        self.maps_scroll_pause_min = QtWidgets.QDoubleSpinBox()
+        self.maps_scroll_pause_min.setRange(0.0, 30.0)
+        self.maps_scroll_pause_min.setDecimals(1)
+        self.maps_scroll_pause_max = QtWidgets.QDoubleSpinBox()
+        self.maps_scroll_pause_max.setRange(0.0, 30.0)
+        self.maps_scroll_pause_max.setDecimals(1)
         self.maps_csv_dir = QtWidgets.QLineEdit()
         maps_form.addRow("Batch size", self.maps_batch_size)
         maps_form.addRow("Max concurrent", self.maps_max_concurrent)
@@ -104,6 +110,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         maps_form.addRow("", self.maps_show_browser)
         maps_form.addRow("Slow pause min (s)", self.maps_slow_pause_min)
         maps_form.addRow("Slow pause max (s)", self.maps_slow_pause_max)
+        maps_form.addRow("Scroll pause min (s)", self.maps_scroll_pause_min)
+        maps_form.addRow("Scroll pause max (s)", self.maps_scroll_pause_max)
         maps_form.addRow("CSV output dir", self.maps_csv_dir)
 
         email_group = QtWidgets.QGroupBox("Email Daemon")
@@ -356,6 +364,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.maps_show_browser.setChecked(bool(maps_cfg.get("show_browser", False)))
         self.maps_slow_pause_min.setValue(float(maps_cfg.get("slow_place_pause_min_s", 0.8)))
         self.maps_slow_pause_max.setValue(float(maps_cfg.get("slow_place_pause_max_s", 1.8)))
+        self.maps_scroll_pause_min.setValue(float(maps_cfg.get("scroll_pause_min_s", 0.8)))
+        self.maps_scroll_pause_max.setValue(float(maps_cfg.get("scroll_pause_max_s", 0.8)))
         self.maps_csv_dir.setText(maps_cfg.get("csv_dir", ""))
 
         self.email_batch.setValue(int(email_cfg.get("batch", 10)))
@@ -399,8 +409,14 @@ class DaemonUI(QtWidgets.QMainWindow):
         slow_max = float(self.maps_slow_pause_max.value())
         if slow_max < slow_min:
             slow_min, slow_max = slow_max, slow_min
+        scroll_min = float(self.maps_scroll_pause_min.value())
+        scroll_max = float(self.maps_scroll_pause_max.value())
+        if scroll_max < scroll_min:
+            scroll_min, scroll_max = scroll_max, scroll_min
         cfg["maps"]["slow_place_pause_min_s"] = slow_min
         cfg["maps"]["slow_place_pause_max_s"] = slow_max
+        cfg["maps"]["scroll_pause_min_s"] = scroll_min
+        cfg["maps"]["scroll_pause_max_s"] = scroll_max
         cfg["maps"]["csv_dir"] = self.maps_csv_dir.text().strip()
 
         cfg["email"]["batch"] = int(self.email_batch.value())
