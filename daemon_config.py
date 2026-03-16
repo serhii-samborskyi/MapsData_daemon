@@ -14,7 +14,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "queue_dir": "queue",
     "maps": {
         "batch_size": 20,
-        "max_concurrent": 3,
+        "max_concurrent": 1,
         "detail_workers": 1,
         "scrape_mode": "fast",
         "show_browser": False,

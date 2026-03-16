@@ -196,7 +196,7 @@ def main() -> None:
     poll_interval_s = args.poll_interval if args.poll_interval is not None else cfg.get("maps_poll_interval_s", 30)
     queue_dir = args.queue_dir or cfg.get("queue_dir", "queue")
     batch_size = args.batch_size if args.batch_size is not None else maps_cfg.get("batch_size", 20)
-    max_concurrent = args.max_concurrent if args.max_concurrent is not None else maps_cfg.get("max_concurrent", 3)
+    max_concurrent = args.max_concurrent if args.max_concurrent is not None else maps_cfg.get("max_concurrent", 1)
     detail_workers = args.detail_workers if args.detail_workers is not None else maps_cfg.get("detail_workers", 1)
     scrape_mode = args.scrape_mode or maps_cfg.get("scrape_mode", "fast")
     show_browser = args.show_browser if args.show_browser is not None else maps_cfg.get("show_browser", False)

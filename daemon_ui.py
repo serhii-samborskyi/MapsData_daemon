@@ -35,6 +35,39 @@ class DaemonUI(QtWidgets.QMainWindow):
         self._wire_process(self.maps_proc, "maps")
         self._wire_process(self.email_proc, "email")
 
+    def _create_collapsible_section(self, title: str, content: QtWidgets.QWidget, expanded: bool = True) -> QtWidgets.QWidget:
+        section = QtWidgets.QWidget(self)
+        layout = QtWidgets.QVBoxLayout(section)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        toggle = QtWidgets.QToolButton(section)
+        toggle.setObjectName("sectionToggle")
+        toggle.setText(title)
+        toggle.setCheckable(True)
+        toggle.setChecked(expanded)
+        toggle.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        toggle.setArrowType(QtCore.Qt.DownArrow if expanded else QtCore.Qt.RightArrow)
+        toggle.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+
+        body = QtWidgets.QFrame(section)
+        body.setObjectName("sectionBody")
+        body_layout = QtWidgets.QVBoxLayout(body)
+        body_layout.setContentsMargins(10, 10, 10, 10)
+        body_layout.setSpacing(8)
+        body_layout.addWidget(content)
+        body.setVisible(expanded)
+
+        def _on_toggle(checked: bool) -> None:
+            toggle.setArrowType(QtCore.Qt.DownArrow if checked else QtCore.Qt.RightArrow)
+            body.setVisible(checked)
+
+        toggle.toggled.connect(_on_toggle)
+
+        layout.addWidget(toggle)
+        layout.addWidget(body)
+        return section
+
     def _build_ui(self) -> None:
         self.setWindowTitle("Maps + Email Daemon Control")
         self.setMinimumSize(980, 680)
@@ -63,8 +96,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         header.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         left_layout.addWidget(header)
 
-        general_group = QtWidgets.QGroupBox("General")
-        general_form = QtWidgets.QFormLayout(general_group)
+        general_content = QtWidgets.QWidget()
+        general_form = QtWidgets.QFormLayout(general_content)
         self.maps_base_url = QtWidgets.QLineEdit()
         self.email_base_url = QtWidgets.QLineEdit()
         self.queue_dir = QtWidgets.QLineEdit()
@@ -78,8 +111,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         general_form.addRow("Maps poll interval (s)", self.maps_poll_interval)
         general_form.addRow("Email poll interval (s)", self.email_poll_interval)
 
-        maps_group = QtWidgets.QGroupBox("Maps Daemon")
-        maps_form = QtWidgets.QFormLayout(maps_group)
+        maps_content = QtWidgets.QWidget()
+        maps_form = QtWidgets.QFormLayout(maps_content)
         self.maps_batch_size = QtWidgets.QSpinBox()
         self.maps_batch_size.setRange(1, 500)
         self.maps_max_concurrent = QtWidgets.QSpinBox()
@@ -114,8 +147,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         maps_form.addRow("Scroll pause max (s)", self.maps_scroll_pause_max)
         maps_form.addRow("CSV output dir", self.maps_csv_dir)
 
-        email_group = QtWidgets.QGroupBox("Email Daemon")
-        email_form = QtWidgets.QFormLayout(email_group)
+        email_content = QtWidgets.QWidget()
+        email_form = QtWidgets.QFormLayout(email_content)
         self.email_scraper_engine = QtWidgets.QComboBox()
         self.email_scraper_engine.addItem("Playwright (more emails)", "playwright")
         self.email_scraper_engine.addItem("Scrapy (faster)", "scrapy")
@@ -155,9 +188,9 @@ class DaemonUI(QtWidgets.QMainWindow):
         email_form.addRow("", self.email_facebook)
         email_form.addRow("", self.email_same_domain_only)
 
-        left_layout.addWidget(general_group)
-        left_layout.addWidget(maps_group)
-        left_layout.addWidget(email_group)
+        left_layout.addWidget(self._create_collapsible_section("General", general_content, expanded=False))
+        left_layout.addWidget(self._create_collapsible_section("Maps Daemon", maps_content, expanded=False))
+        left_layout.addWidget(self._create_collapsible_section("Email Daemon", email_content, expanded=False))
         left_layout.addStretch(1)
 
         status_group = QtWidgets.QGroupBox("Status")
@@ -231,6 +264,23 @@ class DaemonUI(QtWidgets.QMainWindow):
                 padding: 0 6px;
                 color: #6b705c;
                 font-weight: 600;
+            }
+            QToolButton#sectionToggle {
+                text-align: left;
+                color: #6b705c;
+                font-weight: 600;
+                background: #ffffff;
+                border: 1px solid #d6d1c4;
+                border-radius: 8px;
+                padding: 6px 10px;
+            }
+            QToolButton#sectionToggle:hover {
+                background: #f7f4ee;
+            }
+            QFrame#sectionBody {
+                background: #ffffff;
+                border: 1px solid #d6d1c4;
+                border-radius: 8px;
             }
             QLineEdit, QSpinBox, QDoubleSpinBox {
                 background: #fbfaf7;
@@ -354,7 +404,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_poll_interval.setValue(int(cfg.get("email_poll_interval_s", 15)))
 
         self.maps_batch_size.setValue(int(maps_cfg.get("batch_size", 20)))
-        self.maps_max_concurrent.setValue(int(maps_cfg.get("max_concurrent", 3)))
+        self.maps_max_concurrent.setValue(int(maps_cfg.get("max_concurrent", 1)))
         self.maps_detail_workers.setValue(int(maps_cfg.get("detail_workers", 1)))
         mode = str(maps_cfg.get("scrape_mode", "fast")).lower().strip()
         mode_index = self.maps_scrape_mode.findData(mode)
