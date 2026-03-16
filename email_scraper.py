@@ -862,6 +862,61 @@ class HttpClient:
         return {"error": "unknown"}
 
 
+def _save_ok(resp: Dict) -> bool:
+    return isinstance(resp, dict) and not resp.get("error")
+
+
+def _save_email_immediate(
+    http: HttpClient,
+    base_url: str,
+    campaign_id: int,
+    contact_id: int,
+    email: str,
+    retries: int = 3,
+) -> Tuple[bool, Dict]:
+    url = f"{base_url}/api/campaign/{campaign_id}/email_update"
+    payload_single = {"id": str(contact_id), "email": email}
+    payload_batch = {"contacts": [{"id": str(contact_id), "email": email}]}
+    last_resp: Dict = {"error": "unknown"}
+
+    for attempt in range(1, max(1, retries) + 1):
+        resp = http.post_json(url, payload_single)
+        if _save_ok(resp):
+            return True, resp
+        last_resp = resp if isinstance(resp, dict) else {"error": str(resp)}
+
+        # Some deployments only accept batch-shaped payloads; try both immediately.
+        resp2 = http.post_json(url, payload_batch)
+        if _save_ok(resp2):
+            return True, resp2
+        last_resp = resp2 if isinstance(resp2, dict) else {"error": str(resp2)}
+
+        if attempt < retries:
+            time.sleep(0.6 * attempt)
+
+    return False, last_resp
+
+
+def _save_email_batch(
+    http: HttpClient,
+    base_url: str,
+    campaign_id: int,
+    updates: List[Dict[str, str]],
+    retries: int = 3,
+) -> Tuple[bool, Dict]:
+    url = f"{base_url}/api/campaign/{campaign_id}/email_update"
+    payload = {"contacts": updates}
+    last_resp: Dict = {"error": "unknown"}
+    for attempt in range(1, max(1, retries) + 1):
+        resp = http.post_json(url, payload)
+        if _save_ok(resp):
+            return True, resp
+        last_resp = resp if isinstance(resp, dict) else {"error": str(resp)}
+        if attempt < retries:
+            time.sleep(0.8 * attempt)
+    return False, last_resp
+
+
 # -----------------------------
 # Main scraping flow (immediate-save)
 # -----------------------------
@@ -1093,9 +1148,15 @@ async def scrape_and_update_immediate(
                                             if best:
                                                 elapsed = time.monotonic() - start_ts
                                                 print(f"[FACEBOOK SUCCESS] ({seq}/{len(contacts)}): {domain} -> {best} (from Facebook)", flush=True)
-                                                payload = {"id": str(cid), "email": best}
-                                                resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", payload)
-                                                if isinstance(resp, dict) and not resp.get("error"):
+                                                ok_save, resp = _save_email_immediate(
+                                                    http=http,
+                                                    base_url=base_url,
+                                                    campaign_id=campaign_id,
+                                                    contact_id=cid,
+                                                    email=best,
+                                                    retries=3,
+                                                )
+                                                if ok_save:
                                                     logger.info(f"✓ DONE ({seq}/{len(contacts)}): {domain} -> {best} [FB priority] [{elapsed:.1f}s]")
                                                     return None
                                                 logger.warning(f"SAVE DEFERRED ({seq}/{len(contacts)}): {domain} -> {best} [FB]; {resp}")
@@ -1166,9 +1227,15 @@ async def scrape_and_update_immediate(
                                     logger.info(f"∅ DONE ({seq}/{len(contacts)}): {domain} (no email) [{elapsed:.1f}s]")
                                     return None
 
-                                payload = {"id": str(cid), "email": best}
-                                resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", payload)
-                                if isinstance(resp, dict) and not resp.get("error"):
+                                ok_save, resp = _save_email_immediate(
+                                    http=http,
+                                    base_url=base_url,
+                                    campaign_id=campaign_id,
+                                    contact_id=cid,
+                                    email=best,
+                                    retries=3,
+                                )
+                                if ok_save:
                                     logger.info(f"✓ DONE ({seq}/{len(contacts)}): {domain} -> {best} [{elapsed:.1f}s]")
                                     return None
                                 logger.warning(f"SAVE DEFERRED ({seq}/{len(contacts)}): {domain} -> {best}; {resp}")
@@ -1186,9 +1253,36 @@ async def scrape_and_update_immediate(
 
                     unsaved = [r for r in results if isinstance(r, dict) and r.get("email")]
                     if unsaved:
-                        batch_payload = {"contacts": [{"id": u["id"], "email": u["email"]} for u in unsaved]}
-                        resp = http.post_json(f"{base_url}/api/campaign/{campaign_id}/email_update", batch_payload)
-                        logger.info(f"BATCH SAVE: {len(unsaved)} email(s) → {resp}")
+                        updates = [{"id": str(u["id"]), "email": str(u["email"])} for u in unsaved]
+                        ok_batch, resp = _save_email_batch(
+                            http=http,
+                            base_url=base_url,
+                            campaign_id=campaign_id,
+                            updates=updates,
+                            retries=3,
+                        )
+                        if ok_batch:
+                            logger.info(f"BATCH SAVE: {len(unsaved)} email(s) → {resp}")
+                        else:
+                            # Final fallback: try each deferred item immediately again.
+                            recovered = 0
+                            for u in updates:
+                                ok_single, _ = _save_email_immediate(
+                                    http=http,
+                                    base_url=base_url,
+                                    campaign_id=campaign_id,
+                                    contact_id=int(str(u.get("id", "0")) or 0),
+                                    email=str(u.get("email", "")),
+                                    retries=2,
+                                )
+                                if ok_single:
+                                    recovered += 1
+                            logger.warning(
+                                "BATCH SAVE DEFERRED: %d/%d recovered by final single-save fallback; last_resp=%s",
+                                recovered,
+                                len(updates),
+                                resp,
+                            )
 
             status = await run_batches(
                 use_facebook=False,
