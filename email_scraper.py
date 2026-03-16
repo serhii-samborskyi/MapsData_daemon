@@ -1284,10 +1284,25 @@ async def scrape_and_update_immediate(
                                 resp,
                             )
 
+            effective_regular_max_batches = int(max_batches or 0)
+            if (
+                facebook
+                and int(max_batches_facebook or 0) > 0
+                and effective_regular_max_batches <= 0
+            ):
+                effective_regular_max_batches = int(max_batches_facebook)
+                logger.info(
+                    "Facebook phase is enabled (max_batches_facebook=%s). "
+                    "Regular phase max batches was unlimited, so it is auto-capped to %s "
+                    "to ensure Facebook phase starts.",
+                    max_batches_facebook,
+                    effective_regular_max_batches,
+                )
+
             status = await run_batches(
                 use_facebook=False,
                 facebook_only=False,
-                max_batches_limit=max_batches,
+                max_batches_limit=effective_regular_max_batches,
                 phase_concurrency=concurrency,
                 phase_label="regular",
             )

@@ -259,6 +259,13 @@ def run_daemon(
 ) -> None:
     logger = _setup_logging(log_path)
     logger.info("Email daemon starting")
+    logger.info(
+        "Email settings: max_batches=%s, max_batches_facebook=%s, facebook=%s, facebook_engine=%s",
+        max_batches,
+        max_batches_facebook,
+        facebook,
+        facebook_engine,
+    )
 
     base_url = _normalize_base_url(base_url)
 
