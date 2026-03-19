@@ -33,5 +33,24 @@
   },
   "maps_base_url": "https://scrapiq.leadtechx.com/api",
   "maps_poll_interval_s": 30,
+  "pipeline": {
+    "actor": "daemon",
+    "base_url": "https://scrapiq.leadtechx.com",
+    "claim_interval_s": 10,
+    "enabled": true,
+    "fast_concurrency": 3,
+    "fast_batches_multiplier": 1.1,
+    "fast_max_batches_cap": 0,
+    "fast_scraper": "scrapy",
+    "fallback_batches_multiplier": 1.0,
+    "fallback_concurrency": 1,
+    "fallback_facebook_batches_multiplier": 1.0,
+    "fallback_max_batches": 0,
+    "fallback_max_batches_facebook": 0,
+    "fallback_scraper": "playwright",
+    "heartbeat_interval_s": 30,
+    "lease_seconds": 120,
+    "worker_id": ""
+  },
   "queue_dir": "queue"
 }

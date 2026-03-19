@@ -69,7 +69,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         return section
 
     def _build_ui(self) -> None:
-        self.setWindowTitle("Maps + Email Daemon Control")
+        self.setWindowTitle("Maps + Email Pipeline Control")
         self.setMinimumSize(980, 680)
 
         font = QtGui.QFont("IBM Plex Sans", 10)
@@ -91,7 +91,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         root_layout.addWidget(left, 3)
         root_layout.addWidget(right, 2)
 
-        header = QtWidgets.QLabel("Maps + Email Daemons")
+        header = QtWidgets.QLabel("Maps + Email Workers")
         header.setObjectName("header")
         header.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         left_layout.addWidget(header)
@@ -110,6 +110,64 @@ class DaemonUI(QtWidgets.QMainWindow):
         general_form.addRow("Queue dir", self.queue_dir)
         general_form.addRow("Maps poll interval (s)", self.maps_poll_interval)
         general_form.addRow("Email poll interval (s)", self.email_poll_interval)
+
+        pipeline_content = QtWidgets.QWidget()
+        pipeline_form = QtWidgets.QFormLayout(pipeline_content)
+        self.pipeline_enabled = QtWidgets.QCheckBox("Enable pipeline mode")
+        self.pipeline_base_url = QtWidgets.QLineEdit()
+        self.pipeline_actor = QtWidgets.QLineEdit()
+        self.pipeline_worker_id = QtWidgets.QLineEdit()
+        self.pipeline_claim_interval = QtWidgets.QSpinBox()
+        self.pipeline_claim_interval.setRange(1, 3600)
+        self.pipeline_lease_seconds = QtWidgets.QSpinBox()
+        self.pipeline_lease_seconds.setRange(10, 7200)
+        self.pipeline_heartbeat_interval = QtWidgets.QSpinBox()
+        self.pipeline_heartbeat_interval.setRange(1, 3600)
+        self.pipeline_fast_scraper = QtWidgets.QComboBox()
+        self.pipeline_fast_scraper.addItem("Scrapy (fast)", "scrapy")
+        self.pipeline_fast_scraper.addItem("Playwright", "playwright")
+        self.pipeline_fast_concurrency = QtWidgets.QSpinBox()
+        self.pipeline_fast_concurrency.setRange(1, 20)
+        self.pipeline_fast_batches_multiplier = QtWidgets.QDoubleSpinBox()
+        self.pipeline_fast_batches_multiplier.setRange(0.1, 3.0)
+        self.pipeline_fast_batches_multiplier.setDecimals(2)
+        self.pipeline_fast_batches_multiplier.setSingleStep(0.05)
+        self.pipeline_fast_max_batches_cap = QtWidgets.QSpinBox()
+        self.pipeline_fast_max_batches_cap.setRange(0, 10000)
+        self.pipeline_fallback_scraper = QtWidgets.QComboBox()
+        self.pipeline_fallback_scraper.addItem("Playwright", "playwright")
+        self.pipeline_fallback_scraper.addItem("Scrapy", "scrapy")
+        self.pipeline_fallback_concurrency = QtWidgets.QSpinBox()
+        self.pipeline_fallback_concurrency.setRange(1, 20)
+        self.pipeline_fallback_batches_multiplier = QtWidgets.QDoubleSpinBox()
+        self.pipeline_fallback_batches_multiplier.setRange(0.1, 3.0)
+        self.pipeline_fallback_batches_multiplier.setDecimals(2)
+        self.pipeline_fallback_batches_multiplier.setSingleStep(0.05)
+        self.pipeline_fallback_fb_batches_multiplier = QtWidgets.QDoubleSpinBox()
+        self.pipeline_fallback_fb_batches_multiplier.setRange(0.1, 3.0)
+        self.pipeline_fallback_fb_batches_multiplier.setDecimals(2)
+        self.pipeline_fallback_fb_batches_multiplier.setSingleStep(0.05)
+        self.pipeline_fallback_max_batches = QtWidgets.QSpinBox()
+        self.pipeline_fallback_max_batches.setRange(0, 10000)
+        self.pipeline_fallback_max_batches_facebook = QtWidgets.QSpinBox()
+        self.pipeline_fallback_max_batches_facebook.setRange(0, 10000)
+        pipeline_form.addRow("", self.pipeline_enabled)
+        pipeline_form.addRow("Pipeline base URL", self.pipeline_base_url)
+        pipeline_form.addRow("Actor", self.pipeline_actor)
+        pipeline_form.addRow("Worker ID override", self.pipeline_worker_id)
+        pipeline_form.addRow("Claim interval (s)", self.pipeline_claim_interval)
+        pipeline_form.addRow("Lease seconds", self.pipeline_lease_seconds)
+        pipeline_form.addRow("Heartbeat interval (s)", self.pipeline_heartbeat_interval)
+        pipeline_form.addRow("Fast stage scraper", self.pipeline_fast_scraper)
+        pipeline_form.addRow("Fast stage concurrency", self.pipeline_fast_concurrency)
+        pipeline_form.addRow("Fast stage batches multiplier", self.pipeline_fast_batches_multiplier)
+        pipeline_form.addRow("Fast stage max batch cap (0=auto)", self.pipeline_fast_max_batches_cap)
+        pipeline_form.addRow("Fallback stage scraper", self.pipeline_fallback_scraper)
+        pipeline_form.addRow("Fallback stage concurrency", self.pipeline_fallback_concurrency)
+        pipeline_form.addRow("Fallback batches multiplier", self.pipeline_fallback_batches_multiplier)
+        pipeline_form.addRow("Fallback FB multiplier", self.pipeline_fallback_fb_batches_multiplier)
+        pipeline_form.addRow("Fallback max batches cap (0=no cap)", self.pipeline_fallback_max_batches)
+        pipeline_form.addRow("Fallback FB max cap (0=no cap)", self.pipeline_fallback_max_batches_facebook)
 
         maps_content = QtWidgets.QWidget()
         maps_form = QtWidgets.QFormLayout(maps_content)
@@ -189,6 +247,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         email_form.addRow("", self.email_same_domain_only)
 
         left_layout.addWidget(self._create_collapsible_section("General", general_content, expanded=False))
+        left_layout.addWidget(self._create_collapsible_section("Pipeline", pipeline_content, expanded=True))
         left_layout.addWidget(self._create_collapsible_section("Maps Daemon", maps_content, expanded=False))
         left_layout.addWidget(self._create_collapsible_section("Email Daemon", email_content, expanded=False))
         left_layout.addStretch(1)
@@ -331,6 +390,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.btn_start_both.clicked.connect(self._start_both)
         self.btn_stop_both.clicked.connect(self._stop_both)
         self.btn_clear_log.clicked.connect(self.log_view.clear)
+        self.pipeline_enabled.stateChanged.connect(self._update_mode_labels)
 
     def _wire_process(self, proc: QtCore.QProcess, name: str) -> None:
         proc.readyReadStandardOutput.connect(lambda n=name, p=proc: self._append_log(n, p))
@@ -343,7 +403,7 @@ class DaemonUI(QtWidgets.QMainWindow):
             return
         for line in data.splitlines():
             self.log_view.appendPlainText(f"[{name}] {line}")
-            if name == "email":
+            if name in {"email", "maps"}:
                 self._track_email_found(line)
 
     def _reset_email_counters(self) -> None:
@@ -391,17 +451,64 @@ class DaemonUI(QtWidgets.QMainWindow):
             self.email_status.setText("Running" if running else "Stopped")
             self.btn_start_email.setEnabled(not running)
             self.btn_stop_email.setEnabled(running)
+        self._update_mode_labels()
+
+    def _update_mode_labels(self) -> None:
+        pipeline_mode = bool(self.pipeline_enabled.isChecked())
+        if pipeline_mode:
+            self.btn_start_maps.setText("Start Worker A")
+            self.btn_stop_maps.setText("Stop Worker A")
+            self.btn_start_email.setText("Start Worker B")
+            self.btn_stop_email.setText("Stop Worker B")
+            self.btn_start_both.setText("Start 2 Workers")
+            self.btn_stop_both.setText("Stop 2 Workers")
+        else:
+            self.btn_start_maps.setText("Start Maps")
+            self.btn_stop_maps.setText("Stop Maps")
+            self.btn_start_email.setText("Start Email")
+            self.btn_stop_email.setText("Stop Email")
+            self.btn_start_both.setText("Start Both")
+            self.btn_stop_both.setText("Stop Both")
+
+    def _daemon_mode_flag(self) -> str:
+        return "--pipeline-mode" if bool(self.pipeline_enabled.isChecked()) else "--legacy-mode"
 
     def _load_config_to_form(self) -> None:
         cfg = self.config
         maps_cfg = cfg.get("maps", {})
         email_cfg = cfg.get("email", {})
+        pipeline_cfg = cfg.get("pipeline", {})
 
         self.maps_base_url.setText(cfg.get("maps_base_url", DEFAULT_CONFIG["maps_base_url"]))
         self.email_base_url.setText(cfg.get("email_base_url", DEFAULT_CONFIG["email_base_url"]))
         self.queue_dir.setText(cfg.get("queue_dir", DEFAULT_CONFIG["queue_dir"]))
         self.maps_poll_interval.setValue(int(cfg.get("maps_poll_interval_s", 30)))
         self.email_poll_interval.setValue(int(cfg.get("email_poll_interval_s", 15)))
+        self.pipeline_enabled.setChecked(bool(pipeline_cfg.get("enabled", True)))
+        self.pipeline_base_url.setText(str(pipeline_cfg.get("base_url", "")))
+        self.pipeline_actor.setText(str(pipeline_cfg.get("actor", "daemon")))
+        self.pipeline_worker_id.setText(str(pipeline_cfg.get("worker_id", "")))
+        self.pipeline_claim_interval.setValue(int(pipeline_cfg.get("claim_interval_s", 10)))
+        self.pipeline_lease_seconds.setValue(int(pipeline_cfg.get("lease_seconds", 120)))
+        self.pipeline_heartbeat_interval.setValue(int(pipeline_cfg.get("heartbeat_interval_s", 30)))
+        fast_engine = str(pipeline_cfg.get("fast_scraper", "scrapy")).lower().strip()
+        fast_engine_index = self.pipeline_fast_scraper.findData(fast_engine)
+        if fast_engine_index == -1:
+            fast_engine_index = 0
+        self.pipeline_fast_scraper.setCurrentIndex(fast_engine_index)
+        self.pipeline_fast_concurrency.setValue(int(pipeline_cfg.get("fast_concurrency", 3)))
+        self.pipeline_fast_batches_multiplier.setValue(float(pipeline_cfg.get("fast_batches_multiplier", 1.1)))
+        self.pipeline_fast_max_batches_cap.setValue(int(pipeline_cfg.get("fast_max_batches_cap", 0)))
+        fallback_engine = str(pipeline_cfg.get("fallback_scraper", "playwright")).lower().strip()
+        fallback_engine_index = self.pipeline_fallback_scraper.findData(fallback_engine)
+        if fallback_engine_index == -1:
+            fallback_engine_index = 0
+        self.pipeline_fallback_scraper.setCurrentIndex(fallback_engine_index)
+        self.pipeline_fallback_concurrency.setValue(int(pipeline_cfg.get("fallback_concurrency", 1)))
+        self.pipeline_fallback_batches_multiplier.setValue(float(pipeline_cfg.get("fallback_batches_multiplier", 1.0)))
+        self.pipeline_fallback_fb_batches_multiplier.setValue(float(pipeline_cfg.get("fallback_facebook_batches_multiplier", 1.0)))
+        self.pipeline_fallback_max_batches.setValue(int(pipeline_cfg.get("fallback_max_batches", 0)))
+        self.pipeline_fallback_max_batches_facebook.setValue(int(pipeline_cfg.get("fallback_max_batches_facebook", 0)))
 
         self.maps_batch_size.setValue(int(maps_cfg.get("batch_size", 20)))
         self.maps_max_concurrent.setValue(int(maps_cfg.get("max_concurrent", 1)))
@@ -441,6 +548,7 @@ class DaemonUI(QtWidgets.QMainWindow):
 
         self._update_status("maps")
         self._update_status("email")
+        self._update_mode_labels()
 
     def _collect_form_config(self) -> Dict[str, Any]:
         cfg = load_config(self.config_path)
@@ -449,6 +557,27 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["queue_dir"] = self.queue_dir.text().strip()
         cfg["maps_poll_interval_s"] = int(self.maps_poll_interval.value())
         cfg["email_poll_interval_s"] = int(self.email_poll_interval.value())
+        pipeline_cfg = cfg.get("pipeline", {})
+        if not isinstance(pipeline_cfg, dict):
+            pipeline_cfg = {}
+        cfg["pipeline"] = pipeline_cfg
+        pipeline_cfg["enabled"] = bool(self.pipeline_enabled.isChecked())
+        pipeline_cfg["base_url"] = self.pipeline_base_url.text().strip()
+        pipeline_cfg["actor"] = self.pipeline_actor.text().strip() or "daemon"
+        pipeline_cfg["worker_id"] = self.pipeline_worker_id.text().strip()
+        pipeline_cfg["claim_interval_s"] = int(self.pipeline_claim_interval.value())
+        pipeline_cfg["lease_seconds"] = int(self.pipeline_lease_seconds.value())
+        pipeline_cfg["heartbeat_interval_s"] = int(self.pipeline_heartbeat_interval.value())
+        pipeline_cfg["fast_scraper"] = str(self.pipeline_fast_scraper.currentData() or "scrapy")
+        pipeline_cfg["fast_concurrency"] = int(self.pipeline_fast_concurrency.value())
+        pipeline_cfg["fast_batches_multiplier"] = float(self.pipeline_fast_batches_multiplier.value())
+        pipeline_cfg["fast_max_batches_cap"] = int(self.pipeline_fast_max_batches_cap.value())
+        pipeline_cfg["fallback_scraper"] = str(self.pipeline_fallback_scraper.currentData() or "playwright")
+        pipeline_cfg["fallback_concurrency"] = int(self.pipeline_fallback_concurrency.value())
+        pipeline_cfg["fallback_batches_multiplier"] = float(self.pipeline_fallback_batches_multiplier.value())
+        pipeline_cfg["fallback_facebook_batches_multiplier"] = float(self.pipeline_fallback_fb_batches_multiplier.value())
+        pipeline_cfg["fallback_max_batches"] = int(self.pipeline_fallback_max_batches.value())
+        pipeline_cfg["fallback_max_batches_facebook"] = int(self.pipeline_fallback_max_batches_facebook.value())
 
         cfg["maps"]["batch_size"] = int(self.maps_batch_size.value())
         cfg["maps"]["max_concurrent"] = int(self.maps_max_concurrent.value())
@@ -499,9 +628,10 @@ class DaemonUI(QtWidgets.QMainWindow):
             return
         self._save_config()
         self.maps_proc.setWorkingDirectory(self.base_dir)
+        mode_flag = self._daemon_mode_flag()
         self.maps_proc.start(
             sys.executable,
-            ["maps_daemon.py", "--config", self.config_path],
+            ["maps_daemon.py", "--config", self.config_path, mode_flag],
         )
 
     def _stop_maps(self) -> None:
@@ -516,9 +646,10 @@ class DaemonUI(QtWidgets.QMainWindow):
         self._reset_email_counters()
         self._save_config()
         self.email_proc.setWorkingDirectory(self.base_dir)
+        mode_flag = self._daemon_mode_flag()
         self.email_proc.start(
             sys.executable,
-            ["email_daemon.py", "--config", self.config_path],
+            ["email_daemon.py", "--config", self.config_path, mode_flag],
         )
 
     def _stop_email(self) -> None:

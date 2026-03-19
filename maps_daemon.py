@@ -18,6 +18,7 @@ if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
 import maps_scraper
 from daemon_config import load_config
 from maps_scraper import Campaign, CampaignProcessor, HttpClient, LeadsApiClient
+from pipeline_runtime import PipelineContext, default_worker_id, run_pipeline_worker
 
 
 STOP = False
@@ -170,9 +171,52 @@ def run_daemon(
     logger.info("Maps daemon stopping")
 
 
+def run_pipeline_daemon(
+    cfg: dict,
+    log_path: str,
+    worker_id: str,
+    actor: str,
+    claim_interval_s: float,
+    lease_seconds: int,
+    heartbeat_interval_s: float,
+) -> None:
+    logger = _setup_logging(log_path)
+    logger.info("Maps daemon starting in pipeline mode")
+
+    maps_cfg = cfg.get("maps", {})
+    email_cfg = cfg.get("email", {})
+    pipeline_cfg = cfg.get("pipeline", {})
+    ctx = PipelineContext(
+        maps_base_url=str(cfg.get("maps_base_url", "")).strip(),
+        email_base_url=str(cfg.get("email_base_url", "")).strip(),
+        maps_cfg=maps_cfg if isinstance(maps_cfg, dict) else {},
+        email_cfg=email_cfg if isinstance(email_cfg, dict) else {},
+        pipeline_cfg=pipeline_cfg if isinstance(pipeline_cfg, dict) else {},
+        base_dir=os.path.dirname(__file__),
+    )
+
+    run_pipeline_worker(
+        logger=logger,
+        ctx=ctx,
+        worker_id=worker_id,
+        actor=actor,
+        claim_interval_s=claim_interval_s,
+        lease_seconds=lease_seconds,
+        heartbeat_interval_s=heartbeat_interval_s,
+        should_stop=lambda: STOP,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Maps daemon: watch for campaigns and scrape businesses.")
     parser.add_argument("--config", default="daemon_settings.json", help="Path to config JSON")
+    parser.add_argument("--pipeline-mode", dest="pipeline_mode", action="store_const", const=True, default=None, help="Run pipeline worker mode (claim stages from API)")
+    parser.add_argument("--legacy-mode", dest="pipeline_mode", action="store_const", const=False, help="Run legacy active-campaign polling mode")
+    parser.add_argument("--worker-id", default=None, help="Pipeline worker id (defaults to host+pid)")
+    parser.add_argument("--actor", default=None, help="Pipeline actor name")
+    parser.add_argument("--claim-interval", type=float, default=None, help="Pipeline claim polling interval in seconds")
+    parser.add_argument("--lease-seconds", type=int, default=None, help="Pipeline lease length in seconds")
+    parser.add_argument("--heartbeat-interval", type=float, default=None, help="Pipeline heartbeat interval in seconds")
     parser.add_argument("--maps-base-url", default=None, help="Maps API base URL (includes /api)")
     parser.add_argument("--poll-interval", type=float, default=None, help="Polling interval in seconds")
     parser.add_argument("--queue-dir", default=None, help="Queue directory for email jobs")
@@ -191,6 +235,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    pipeline_cfg = cfg.get("pipeline", {})
     maps_cfg = cfg.get("maps", {})
     base_url = args.maps_base_url or cfg.get("maps_base_url")
     poll_interval_s = args.poll_interval if args.poll_interval is not None else cfg.get("maps_poll_interval_s", 30)
@@ -206,9 +251,41 @@ def main() -> None:
     scroll_pause_max_s = args.scroll_pause_max if args.scroll_pause_max is not None else maps_cfg.get("scroll_pause_max_s", 0.8)
     csv_dir = args.csv_dir if args.csv_dir is not None else maps_cfg.get("csv_dir", "")
     log_path = args.log_path or cfg.get("logging", {}).get("maps_log", "")
+    pipeline_mode = args.pipeline_mode
+    if pipeline_mode is None:
+        pipeline_mode = bool(pipeline_cfg.get("enabled", True))
+    actor = args.actor or str(pipeline_cfg.get("actor", "daemon")).strip() or "daemon"
+    worker_id = args.worker_id or str(pipeline_cfg.get("worker_id", "")).strip() or default_worker_id("maps")
+    claim_interval_s = (
+        args.claim_interval
+        if args.claim_interval is not None
+        else float(pipeline_cfg.get("claim_interval_s", 10))
+    )
+    lease_seconds = (
+        args.lease_seconds
+        if args.lease_seconds is not None
+        else int(pipeline_cfg.get("lease_seconds", 120))
+    )
+    heartbeat_interval_s = (
+        args.heartbeat_interval
+        if args.heartbeat_interval is not None
+        else float(pipeline_cfg.get("heartbeat_interval_s", 30))
+    )
 
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
+
+    if pipeline_mode:
+        run_pipeline_daemon(
+            cfg=cfg,
+            log_path=log_path,
+            worker_id=worker_id,
+            actor=actor,
+            claim_interval_s=claim_interval_s,
+            lease_seconds=lease_seconds,
+            heartbeat_interval_s=heartbeat_interval_s,
+        )
+        return
 
     run_daemon(
         base_url=base_url,
