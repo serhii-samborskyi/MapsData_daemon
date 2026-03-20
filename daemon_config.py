@@ -43,6 +43,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "base_url": "",
         "actor": "daemon",
         "worker_id": "",
+        "auto_start_on_run_not_started": True,
+        "auto_start_cooldown_s": 30,
         "claim_interval_s": 10,
         "lease_seconds": 120,
         "heartbeat_interval_s": 30,

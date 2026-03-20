@@ -35,6 +35,8 @@
   "maps_poll_interval_s": 30,
   "pipeline": {
     "actor": "daemon",
+    "auto_start_cooldown_s": 30,
+    "auto_start_on_run_not_started": true,
     "base_url": "https://scrapiq.leadtechx.com",
     "claim_interval_s": 10,
     "enabled": true,

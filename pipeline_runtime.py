@@ -63,6 +63,20 @@ class PipelineApiClient:
         }
         return self._request_json("POST", "/api/pipeline/claim", payload)
 
+    def list_active_campaigns(self) -> list[Dict[str, Any]]:
+        data = self._request_json("GET", "/api/campaigns/active")
+        campaigns = data.get("campaigns", []) if isinstance(data, dict) else []
+        if not isinstance(campaigns, list):
+            return []
+        return [campaign for campaign in campaigns if isinstance(campaign, dict)]
+
+    def start_pipeline(self, campaign_id: str, actor: str, retry: bool = False) -> Dict[str, Any]:
+        payload = {
+            "actor": str(actor or "daemon").strip() or "daemon",
+            "retry": bool(retry),
+        }
+        return self._request_json("POST", f"/api/campaign/{campaign_id}/pipeline/start", payload)
+
     def heartbeat(self, run_id: str, worker_id: str, stage: str, lease_seconds: int) -> Dict[str, Any]:
         payload = {
             "worker_id": worker_id,
@@ -88,7 +102,8 @@ class PipelineApiClient:
         return self._request_json("POST", f"/api/pipeline/{run_id}/fail", payload)
 
     def cleanup_contacts(self, campaign_id: str) -> Dict[str, Any]:
-        return self._request_json("POST", f"/api/campaign/{campaign_id}/contacts/cleanup", {})
+        payload = {"campaign_id": str(campaign_id).strip()}
+        return self._request_json("POST", f"/api/campaign/{campaign_id}/contacts/cleanup", payload)
 
     def get_stats(self, campaign_id: str) -> Dict[str, Any]:
         return self._request_json("GET", f"/api/campaign/{campaign_id}/stats")
@@ -448,8 +463,12 @@ def run_pipeline_worker(
     heartbeat_interval_s: float,
     should_stop: Callable[[], bool],
 ) -> None:
-    api = PipelineApiClient(ctx.pipeline_cfg.get("base_url") or ctx.email_base_url, logger)
+    pipeline_cfg = ctx.pipeline_cfg if isinstance(ctx.pipeline_cfg, dict) else {}
+    api = PipelineApiClient(pipeline_cfg.get("base_url") or ctx.email_base_url, logger)
     no_claim_counter = 0
+    auto_start_enabled = bool(pipeline_cfg.get("auto_start_on_run_not_started", True))
+    auto_start_cooldown_s = max(5.0, _coerce_float(pipeline_cfg.get("auto_start_cooldown_s", 30), 30.0))
+    last_auto_start_ts = 0.0
 
     def _clean_scalar(value: Any) -> str:
         s = str(value or "").strip()
@@ -464,6 +483,35 @@ def run_pipeline_worker(
         lease_seconds,
         claim_interval_s,
     )
+
+    def _auto_start_from_active() -> None:
+        nonlocal last_auto_start_ts
+        now = time.time()
+        if (now - last_auto_start_ts) < auto_start_cooldown_s:
+            return
+        last_auto_start_ts = now
+
+        active = api.list_active_campaigns()
+        if not active:
+            logger.info("Auto-start check: no active campaigns found.")
+            return
+
+        for camp in active:
+            campaign_id = _clean_scalar(camp.get("id", ""))
+            if not campaign_id:
+                continue
+            resp = api.start_pipeline(campaign_id=campaign_id, actor=actor, retry=False)
+            if not resp:
+                logger.warning("Auto-start pipeline failed for campaign=%s (empty response).", campaign_id)
+                continue
+            logger.info(
+                "Auto-start pipeline: campaign=%s status=%s idempotent=%s run_id=%s stage=%s",
+                campaign_id,
+                str(resp.get("status", "none")),
+                str(resp.get("idempotent", "none")),
+                _clean_scalar(resp.get("run_id", "")) or "none",
+                _clean_scalar(resp.get("current_stage", "")) or "none",
+            )
 
     while not should_stop():
         claim = api.claim(worker_id=worker_id, actor=actor, lease_seconds=lease_seconds)
@@ -507,6 +555,9 @@ def run_pipeline_worker(
             claimed = False
         if not claimed:
             no_claim_counter += 1
+            reason = str(claim.get("reason", "")).strip().lower()
+            if auto_start_enabled and reason == "run_not_started":
+                _auto_start_from_active()
             if claim:
                 # Emit every poll while idle so operator sees worker is alive and polling.
                 reason = str(claim.get("reason", "")).strip() or "none"
