@@ -14,10 +14,6 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
-import maps_scraper
-from maps_scraper import Campaign, CampaignProcessor, HttpClient, LeadsApiClient
-
-
 class PipelineApiClient:
     def __init__(self, base_url: str, logger: logging.Logger, timeout_s: float = 20.0) -> None:
         base = (base_url or "").strip().rstrip("/")
@@ -227,6 +223,8 @@ def _run_subprocess_with_stop(
 
 
 def _configure_maps_runtime(ctx: PipelineContext, logger: logging.Logger) -> None:
+    import maps_scraper
+
     max_concurrent = _coerce_int(ctx.maps_cfg.get("max_concurrent", 1), 1)
     detail_workers = _coerce_int(ctx.maps_cfg.get("detail_workers", 1), 1)
     scrape_mode = str(ctx.maps_cfg.get("scrape_mode", "fast"))
@@ -265,6 +263,9 @@ def _run_maps_stage(
     logger: logging.Logger,
     should_stop: Callable[[], bool],
 ) -> None:
+    import maps_scraper
+    from maps_scraper import Campaign, CampaignProcessor, HttpClient, LeadsApiClient
+
     _configure_maps_runtime(ctx, logger)
 
     if not campaign_name:
@@ -429,6 +430,8 @@ def _run_email_stage(
 
 
 def _run_finalize_stage(campaign_id: str, ctx: PipelineContext, api: PipelineApiClient, logger: logging.Logger) -> None:
+    from maps_scraper import HttpClient, LeadsApiClient
+
     maps_api = LeadsApiClient(ctx.maps_base_url, HttpClient())
     maps_api.complete_campaign(str(campaign_id))
     stats = api.get_stats(campaign_id)
@@ -446,6 +449,13 @@ def run_pipeline_worker(
     should_stop: Callable[[], bool],
 ) -> None:
     api = PipelineApiClient(ctx.pipeline_cfg.get("base_url") or ctx.email_base_url, logger)
+    no_claim_counter = 0
+
+    def _clean_scalar(value: Any) -> str:
+        s = str(value or "").strip()
+        if s.lower() in {"none", "null", "nil", "n/a"}:
+            return ""
+        return s
 
     logger.info(
         "Pipeline worker starting: worker_id=%s actor=%s lease_seconds=%s claim_interval_s=%s",
@@ -457,14 +467,75 @@ def run_pipeline_worker(
 
     while not should_stop():
         claim = api.claim(worker_id=worker_id, actor=actor, lease_seconds=lease_seconds)
-        if not bool(claim.get("claimed")):
+        run_obj = claim.get("run", {}) if isinstance(claim.get("run"), dict) else {}
+        claim_run_id = (
+            _clean_scalar(claim.get("run_id", ""))
+            or _clean_scalar(run_obj.get("run_id", ""))
+            or _clean_scalar(run_obj.get("id", ""))
+        )
+        claim_stage = (
+            _clean_scalar(claim.get("stage", ""))
+            or _clean_scalar(claim.get("current_stage", ""))
+            or _clean_scalar(run_obj.get("stage", ""))
+            or _clean_scalar(run_obj.get("current_stage", ""))
+        )
+        claim_campaign_id = (
+            _clean_scalar(claim.get("campaign_id", ""))
+            or _clean_scalar(run_obj.get("campaign_id", ""))
+            or _clean_scalar(run_obj.get("campaign", ""))
+        )
+        claimed_flag = str(claim.get("claimed", "")).strip().lower()
+        status_flag = str(claim.get("status", "")).strip().lower()
+        identifiers_present = bool(claim_run_id and claim_campaign_id and claim_stage)
+        explicit_claim_true = (
+            bool(claim.get("claimed"))
+            or claimed_flag in {"true", "1", "yes"}
+            or status_flag == "claimed"
+        )
+        claimed = (
+            (explicit_claim_true and identifiers_present)
+            or ((not explicit_claim_true) and identifiers_present)
+        )
+        if explicit_claim_true and not identifiers_present:
+            logger.warning(
+                "Ignoring malformed claim response: explicit claim without identifiers (run_id=%s campaign_id=%s stage=%s keys=%s)",
+                claim_run_id or "missing",
+                claim_campaign_id or "missing",
+                claim_stage or "missing",
+                ",".join(sorted(claim.keys())),
+            )
+            claimed = False
+        if not claimed:
+            no_claim_counter += 1
+            if claim:
+                # Emit every poll while idle so operator sees worker is alive and polling.
+                reason = str(claim.get("reason", "")).strip() or "none"
+                current_stage = str(claim.get("current_stage", "")).strip() or "none"
+                pipeline_status = str(claim.get("pipeline_status", "")).strip() or "none"
+                logger.info(
+                    "No claimable run (reason=%s pipeline_status=%s current_stage=%s claimed=%s run_id=%s campaign_id=%s stage=%s poll=%s keys=%s).",
+                    reason,
+                    pipeline_status,
+                    current_stage,
+                    str(claim.get("claimed", "none")),
+                    _clean_scalar(claim.get("run_id", "")) or "none",
+                    _clean_scalar(claim.get("campaign_id", "")) or "none",
+                    _clean_scalar(claim.get("stage", "")) or _clean_scalar(claim.get("current_stage", "")) or "none",
+                    no_claim_counter,
+                    ",".join(sorted(claim.keys())),
+                )
             time.sleep(max(1.0, claim_interval_s))
             continue
+        no_claim_counter = 0
 
-        run_id = str(claim.get("run_id", "")).strip()
-        campaign_id = str(claim.get("campaign_id", "")).strip()
-        stage = str(claim.get("stage", "")).strip().lower()
-        campaign_name = str(claim.get("campaign_name", "")).strip()
+        run_id = claim_run_id
+        campaign_id = claim_campaign_id
+        stage = claim_stage.strip().lower()
+        campaign_name = (
+            str(claim.get("campaign_name", "")).strip()
+            or str(run_obj.get("campaign_name", "")).strip()
+            or str(run_obj.get("name", "")).strip()
+        )
 
         if not run_id or not campaign_id or not stage:
             logger.error("Invalid claim payload: %s", claim)

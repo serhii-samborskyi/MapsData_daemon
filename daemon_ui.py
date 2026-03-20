@@ -395,7 +395,12 @@ class DaemonUI(QtWidgets.QMainWindow):
     def _wire_process(self, proc: QtCore.QProcess, name: str) -> None:
         proc.readyReadStandardOutput.connect(lambda n=name, p=proc: self._append_log(n, p))
         proc.stateChanged.connect(lambda _state, n=name: self._update_status(n))
-        proc.finished.connect(lambda _code, _status, n=name: self._update_status(n))
+        proc.finished.connect(lambda code, status, n=name: self._on_process_finished(n, code, status))
+
+    def _on_process_finished(self, name: str, code: int, status: QtCore.QProcess.ExitStatus) -> None:
+        status_name = "NormalExit" if status == QtCore.QProcess.NormalExit else "CrashExit"
+        self.log_view.appendPlainText(f"[ui] {name} exited: code={code}, status={status_name}")
+        self._update_status(name)
 
     def _append_log(self, name: str, proc: QtCore.QProcess) -> None:
         data = proc.readAllStandardOutput().data().decode("utf-8", "ignore")
