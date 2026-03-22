@@ -12701,3 +12701,497 @@ RuntimeError: Unsupported pipeline stage: none
 2026-03-19 23:29:42,961 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=13 keys=campaign_id,claimed,reason,run_id,stage).
 2026-03-19 23:29:53,138 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=14 keys=campaign_id,claimed,reason,run_id,stage).
 2026-03-19 23:30:03,324 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=15 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:40:47,731 - INFO - Maps daemon starting in pipeline mode
+2026-03-22 14:40:47,731 - INFO - Pipeline worker starting: worker_id=maps-MacBook-Pro-2-68460 actor=daemon lease_seconds=120 claim_interval_s=10.0
+2026-03-22 14:40:48,130 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 14:40:48,130 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=1 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:40:58,285 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=2 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:41:08,441 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=3 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:41:18,923 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 14:41:18,923 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=4 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:41:29,083 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=5 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:41:39,238 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=6 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:41:49,411 - INFO - Claimed pipeline run=8 campaign=73 stage=maps_scrape
+2026-03-22 14:41:49,563 - INFO - Maps runtime configured: mode=slow show_browser=True workers=1
+2026-03-22 14:41:49,706 - INFO - Pipeline maps stage: processing campaign 73 (dental wi 2)
+2026-03-22 14:41:49,707 - INFO - Starting campaign: dental wi 2 (ID: 73)
+2026-03-22 14:41:49,707 - INFO - Slow mode campaign dedupe enabled. Place pause range: 0.80s..3.00s | scroll pause range: 0.80s..0.80s | detail_workers=1
+2026-03-22 14:41:49,849 - INFO - [slow] Processing 2 requests together to dedupe place URLs before detail scraping.
+2026-03-22 14:41:50,131 - INFO - Slow campaign scrape: 2 requests, place pause 0.80s..3.00s, scroll pause 0.80s..0.80s, show_browser=True, detail_workers=1
+2026-03-22 14:41:52,651 - INFO - [slow] Collecting place URLs for query: dentist near Milwaukee , WI
+2026-03-22 14:42:13,836 - INFO - [slow] Query 'dentist near Milwaukee , WI' returned 114 place URLs
+2026-03-22 14:42:13,836 - INFO - [slow] Request 3019 (1/2): 114 URLs, 114 new, 114 total unique
+2026-03-22 14:42:13,836 - INFO - [slow] Collecting place URLs for query: dentist near Madison, WI
+2026-03-22 14:42:32,451 - INFO - [slow] Query 'dentist near Madison, WI' returned 86 place URLs
+2026-03-22 14:42:32,452 - INFO - [slow] Request 3020 (2/2): 86 URLs, 86 new, 200 total unique
+2026-03-22 14:42:33,778 - INFO - [slow][worker-1] Scraped 1/200, pausing 1.23s
+2026-03-22 14:42:36,186 - INFO - [slow][worker-1] Scraped 2/200, pausing 1.28s
+2026-03-22 14:42:38,354 - INFO - [slow][worker-1] Scraped 3/200, pausing 2.23s
+2026-03-22 14:42:41,484 - INFO - [slow][worker-1] Scraped 4/200, pausing 1.35s
+2026-03-22 14:42:43,707 - INFO - [slow][worker-1] Scraped 5/200, pausing 1.76s
+2026-03-22 14:42:46,365 - INFO - [slow][worker-1] Scraped 6/200, pausing 0.99s
+2026-03-22 14:42:48,384 - INFO - [slow][worker-1] Scraped 7/200, pausing 1.79s
+2026-03-22 14:42:51,105 - INFO - [slow][worker-1] Scraped 8/200, pausing 1.34s
+2026-03-22 14:42:53,322 - INFO - [slow][worker-1] Scraped 9/200, pausing 1.73s
+2026-03-22 14:42:55,970 - INFO - [slow][worker-1] Scraped 10/200, pausing 1.52s
+2026-03-22 14:42:57,675 - INFO - Sent batch of 10 leads (total_seen=10) for request 3019
+2026-03-22 14:42:58,648 - INFO - [slow][worker-1] Scraped 11/200, pausing 2.63s
+2026-03-22 14:43:02,186 - INFO - [slow][worker-1] Scraped 12/200, pausing 2.35s
+2026-03-22 14:43:05,469 - INFO - [slow][worker-1] Scraped 13/200, pausing 1.66s
+2026-03-22 14:43:08,028 - INFO - [slow][worker-1] Scraped 14/200, pausing 2.85s
+2026-03-22 14:43:11,847 - INFO - [slow][worker-1] Scraped 15/200, pausing 0.83s
+2026-03-22 14:43:13,699 - INFO - [slow][worker-1] Scraped 16/200, pausing 2.29s
+2026-03-22 14:43:16,840 - INFO - [slow][worker-1] Scraped 17/200, pausing 2.42s
+2026-03-22 14:43:20,227 - INFO - [slow][worker-1] Scraped 18/200, pausing 1.99s
+2026-03-22 14:43:23,178 - INFO - [slow][worker-1] Scraped 19/200, pausing 2.69s
+2026-03-22 14:43:26,773 - INFO - [slow][worker-1] Scraped 20/200, pausing 1.25s
+2026-03-22 14:43:28,187 - INFO - Sent batch of 10 leads (total_seen=20) for request 3019
+2026-03-22 14:43:29,086 - INFO - [slow][worker-1] Scraped 21/200, pausing 0.86s
+2026-03-22 14:43:30,727 - INFO - [slow][worker-1] Scraped 22/200, pausing 2.29s
+2026-03-22 14:43:33,928 - INFO - [slow][worker-1] Scraped 23/200, pausing 1.75s
+2026-03-22 14:43:36,580 - INFO - [slow][worker-1] Scraped 24/200, pausing 2.92s
+2026-03-22 14:43:40,437 - INFO - [slow][worker-1] Scraped 25/200, pausing 2.75s
+2026-03-22 14:43:44,063 - INFO - [slow][worker-1] Scraped 26/200, pausing 2.70s
+2026-03-22 14:43:47,620 - INFO - [slow][worker-1] Scraped 27/200, pausing 1.75s
+2026-03-22 14:43:50,257 - INFO - [slow][worker-1] Scraped 28/200, pausing 2.90s
+2026-03-22 14:43:54,057 - INFO - [slow][worker-1] Scraped 29/200, pausing 1.65s
+2026-03-22 14:43:56,625 - INFO - [slow][worker-1] Scraped 30/200, pausing 2.16s
+2026-03-22 14:43:58,971 - INFO - Sent batch of 10 leads (total_seen=30) for request 3019
+2026-03-22 14:43:59,918 - INFO - [slow][worker-1] Scraped 31/200, pausing 1.80s
+2026-03-22 14:44:02,626 - INFO - [slow][worker-1] Scraped 32/200, pausing 1.65s
+2026-03-22 14:44:05,390 - INFO - [slow][worker-1] Scraped 33/200, pausing 2.71s
+2026-03-22 14:44:09,070 - INFO - [slow][worker-1] Scraped 34/200, pausing 1.18s
+2026-03-22 14:44:11,202 - INFO - [slow][worker-1] Scraped 35/200, pausing 2.73s
+2026-03-22 14:44:14,897 - INFO - [slow][worker-1] Scraped 36/200, pausing 1.34s
+2026-03-22 14:44:17,144 - INFO - [slow][worker-1] Scraped 37/200, pausing 1.95s
+2026-03-22 14:44:20,223 - INFO - [slow][worker-1] Scraped 38/200, pausing 1.66s
+2026-03-22 14:44:22,793 - INFO - [slow][worker-1] Scraped 39/200, pausing 2.60s
+2026-03-22 14:44:26,321 - INFO - [slow][worker-1] Scraped 40/200, pausing 2.55s
+2026-03-22 14:44:29,039 - INFO - Sent batch of 10 leads (total_seen=40) for request 3019
+2026-03-22 14:44:29,950 - INFO - [slow][worker-1] Scraped 41/200, pausing 1.86s
+2026-03-22 14:44:32,699 - INFO - [slow][worker-1] Scraped 42/200, pausing 1.67s
+2026-03-22 14:44:35,263 - INFO - [slow][worker-1] Scraped 43/200, pausing 1.71s
+2026-03-22 14:44:37,843 - INFO - [slow][worker-1] Scraped 44/200, pausing 1.82s
+2026-03-22 14:44:40,573 - INFO - [slow][worker-1] Scraped 45/200, pausing 2.56s
+2026-03-22 14:44:44,018 - INFO - [slow][worker-1] Scraped 46/200, pausing 1.32s
+2026-03-22 14:44:46,260 - INFO - [slow][worker-1] Scraped 47/200, pausing 1.28s
+2026-03-22 14:44:48,462 - INFO - [slow][worker-1] Scraped 48/200, pausing 1.60s
+2026-03-22 14:44:51,023 - INFO - [slow][worker-1] Scraped 49/200, pausing 2.47s
+2026-03-22 14:44:54,384 - INFO - [slow][worker-1] Scraped 50/200, pausing 2.39s
+2026-03-22 14:44:56,937 - INFO - Sent batch of 10 leads (total_seen=50) for request 3019
+2026-03-22 14:44:57,829 - INFO - [slow][worker-1] Scraped 51/200, pausing 2.72s
+2026-03-22 14:45:01,467 - INFO - [slow][worker-1] Scraped 52/200, pausing 1.48s
+2026-03-22 14:45:03,891 - INFO - [slow][worker-1] Scraped 53/200, pausing 1.77s
+2026-03-22 14:45:06,685 - INFO - [slow][worker-1] Scraped 54/200, pausing 2.15s
+2026-03-22 14:45:09,795 - INFO - [slow][worker-1] Scraped 55/200, pausing 2.34s
+2026-03-22 14:45:13,126 - INFO - [slow][worker-1] Scraped 56/200, pausing 1.40s
+2026-03-22 14:45:15,641 - INFO - [slow][worker-1] Scraped 57/200, pausing 1.19s
+2026-03-22 14:45:17,611 - INFO - [slow][worker-1] Scraped 58/200, pausing 1.19s
+2026-03-22 14:45:19,780 - INFO - [slow][worker-1] Scraped 59/200, pausing 2.85s
+2026-03-22 14:45:23,578 - INFO - [slow][worker-1] Scraped 60/200, pausing 2.71s
+2026-03-22 14:45:26,448 - INFO - Sent batch of 10 leads (total_seen=60) for request 3019
+2026-03-22 14:45:27,304 - INFO - [slow][worker-1] Scraped 61/200, pausing 0.86s
+2026-03-22 14:45:29,135 - INFO - [slow][worker-1] Scraped 62/200, pausing 0.83s
+2026-03-22 14:45:30,925 - INFO - [slow][worker-1] Scraped 63/200, pausing 1.32s
+2026-03-22 14:45:33,474 - INFO - [slow][worker-1] Scraped 64/200, pausing 1.65s
+2026-03-22 14:45:36,081 - INFO - [slow][worker-1] Scraped 65/200, pausing 0.93s
+2026-03-22 14:45:38,111 - INFO - [slow][worker-1] Scraped 66/200, pausing 2.47s
+2026-03-22 14:45:41,504 - INFO - [slow][worker-1] Scraped 67/200, pausing 2.53s
+2026-03-22 14:45:44,936 - INFO - [slow][worker-1] Scraped 68/200, pausing 2.07s
+2026-03-22 14:45:48,112 - INFO - [slow][worker-1] Scraped 69/200, pausing 1.70s
+2026-03-22 14:45:50,959 - INFO - [slow][worker-1] Scraped 70/200, pausing 2.85s
+2026-03-22 14:45:53,982 - INFO - Sent batch of 10 leads (total_seen=70) for request 3019
+2026-03-22 14:45:54,842 - INFO - [slow][worker-1] Scraped 71/200, pausing 2.69s
+2026-03-22 14:45:58,425 - INFO - [slow][worker-1] Scraped 72/200, pausing 2.39s
+2026-03-22 14:46:01,744 - INFO - [slow][worker-1] Scraped 73/200, pausing 1.04s
+2026-03-22 14:46:03,698 - INFO - [slow][worker-1] Scraped 74/200, pausing 1.85s
+2026-03-22 14:46:06,560 - INFO - [slow][worker-1] Scraped 75/200, pausing 2.67s
+2026-03-22 14:46:10,192 - INFO - [slow][worker-1] Scraped 76/200, pausing 2.18s
+2026-03-22 14:46:13,266 - INFO - [slow][worker-1] Scraped 77/200, pausing 2.27s
+2026-03-22 14:46:16,445 - INFO - [slow][worker-1] Scraped 78/200, pausing 1.82s
+2026-03-22 14:46:19,223 - INFO - [slow][worker-1] Scraped 79/200, pausing 1.81s
+2026-03-22 14:46:22,027 - INFO - [slow][worker-1] Scraped 80/200, pausing 2.73s
+2026-03-22 14:46:24,910 - INFO - Sent batch of 10 leads (total_seen=80) for request 3019
+2026-03-22 14:46:25,878 - INFO - [slow][worker-1] Scraped 81/200, pausing 1.09s
+2026-03-22 14:46:27,860 - INFO - [slow][worker-1] Scraped 82/200, pausing 1.11s
+2026-03-22 14:46:29,894 - INFO - [slow][worker-1] Scraped 83/200, pausing 1.91s
+2026-03-22 14:46:32,718 - INFO - [slow][worker-1] Scraped 84/200, pausing 2.83s
+2026-03-22 14:46:36,835 - INFO - [slow][worker-1] Scraped 85/200, pausing 1.06s
+2026-03-22 14:46:38,794 - INFO - [slow][worker-1] Scraped 86/200, pausing 2.12s
+2026-03-22 14:46:41,824 - INFO - [slow][worker-1] Scraped 87/200, pausing 1.66s
+2026-03-22 14:46:44,370 - INFO - [slow][worker-1] Scraped 88/200, pausing 1.55s
+2026-03-22 14:46:46,789 - INFO - [slow][worker-1] Scraped 89/200, pausing 2.29s
+2026-03-22 14:46:49,969 - INFO - [slow][worker-1] Scraped 90/200, pausing 1.67s
+2026-03-22 14:46:51,799 - INFO - Sent batch of 10 leads (total_seen=90) for request 3019
+2026-03-22 14:46:52,777 - INFO - [slow][worker-1] Scraped 91/200, pausing 0.84s
+2026-03-22 14:46:54,612 - INFO - [slow][worker-1] Scraped 92/200, pausing 2.93s
+2026-03-22 14:46:58,401 - INFO - [slow][worker-1] Scraped 93/200, pausing 1.19s
+2026-03-22 14:47:00,514 - INFO - [slow][worker-1] Scraped 94/200, pausing 0.98s
+2026-03-22 14:47:02,442 - INFO - [slow][worker-1] Scraped 95/200, pausing 1.23s
+2026-03-22 14:47:04,624 - INFO - [slow][worker-1] Scraped 96/200, pausing 1.23s
+2026-03-22 14:47:06,814 - INFO - [slow][worker-1] Scraped 97/200, pausing 2.70s
+2026-03-22 14:47:10,377 - INFO - [slow][worker-1] Scraped 98/200, pausing 1.90s
+2026-03-22 14:47:13,212 - INFO - [slow][worker-1] Scraped 99/200, pausing 2.74s
+2026-03-22 14:47:16,824 - INFO - [slow][worker-1] Scraped 100/200, pausing 1.17s
+2026-03-22 14:47:18,178 - INFO - Sent batch of 10 leads (total_seen=100) for request 3019
+2026-03-22 14:47:19,012 - INFO - [slow][worker-1] Scraped 101/200, pausing 2.09s
+2026-03-22 14:47:21,959 - INFO - [slow][worker-1] Scraped 102/200, pausing 1.39s
+2026-03-22 14:47:24,302 - INFO - [slow][worker-1] Scraped 103/200, pausing 2.77s
+2026-03-22 14:47:28,014 - INFO - [slow][worker-1] Scraped 104/200, pausing 2.19s
+2026-03-22 14:47:31,042 - INFO - [slow][worker-1] Scraped 105/200, pausing 1.66s
+2026-03-22 14:47:33,545 - INFO - [slow][worker-1] Scraped 106/200, pausing 0.94s
+2026-03-22 14:47:35,399 - INFO - [slow][worker-1] Scraped 107/200, pausing 2.37s
+2026-03-22 14:47:38,637 - INFO - [slow][worker-1] Scraped 108/200, pausing 2.34s
+2026-03-22 14:47:41,925 - INFO - [slow][worker-1] Scraped 109/200, pausing 1.91s
+2026-03-22 14:47:44,727 - INFO - [slow][worker-1] Scraped 110/200, pausing 1.28s
+2026-03-22 14:47:46,165 - INFO - Sent batch of 10 leads (total_seen=110) for request 3019
+2026-03-22 14:47:47,110 - INFO - [slow][worker-1] Scraped 111/200, pausing 1.41s
+2026-03-22 14:47:49,408 - INFO - [slow][worker-1] Scraped 112/200, pausing 2.86s
+2026-03-22 14:47:53,270 - INFO - [slow][worker-1] Scraped 113/200, pausing 2.63s
+2026-03-22 14:47:56,763 - INFO - [slow][worker-1] Scraped 114/200, pausing 0.94s
+2026-03-22 14:47:58,665 - INFO - [slow][worker-1] Scraped 115/200, pausing 1.08s
+2026-03-22 14:48:00,660 - INFO - [slow][worker-1] Scraped 116/200, pausing 1.66s
+2026-03-22 14:48:03,315 - INFO - [slow][worker-1] Scraped 117/200, pausing 1.13s
+2026-03-22 14:48:05,422 - INFO - [slow][worker-1] Scraped 118/200, pausing 2.11s
+2026-03-22 14:48:08,499 - INFO - [slow][worker-1] Scraped 119/200, pausing 1.74s
+2026-03-22 14:48:11,184 - INFO - [slow][worker-1] Scraped 120/200, pausing 1.91s
+2026-03-22 14:48:14,025 - INFO - [slow][worker-1] Scraped 121/200, pausing 1.55s
+2026-03-22 14:48:16,538 - INFO - [slow][worker-1] Scraped 122/200, pausing 2.77s
+2026-03-22 14:48:22,312 - INFO - [slow][worker-1] Scraped 123/200, pausing 1.52s
+2026-03-22 14:48:24,757 - INFO - [slow][worker-1] Scraped 124/200, pausing 2.46s
+2026-03-22 14:48:27,378 - INFO - Sent batch of 10 leads (total_seen=10) for request 3020
+2026-03-22 14:48:28,308 - INFO - [slow][worker-1] Scraped 125/200, pausing 2.22s
+2026-03-22 14:48:31,517 - INFO - [slow][worker-1] Scraped 126/200, pausing 2.29s
+2026-03-22 14:48:34,716 - INFO - [slow][worker-1] Scraped 127/200, pausing 1.87s
+2026-03-22 14:48:37,449 - INFO - [slow][worker-1] Scraped 128/200, pausing 2.00s
+2026-03-22 14:48:40,458 - INFO - [slow][worker-1] Scraped 129/200, pausing 2.48s
+2026-03-22 14:48:43,873 - INFO - [slow][worker-1] Scraped 130/200, pausing 2.44s
+2026-03-22 14:48:47,228 - INFO - [slow][worker-1] Scraped 131/200, pausing 1.10s
+2026-03-22 14:48:49,214 - INFO - [slow][worker-1] Scraped 132/200, pausing 1.64s
+2026-03-22 14:48:51,848 - INFO - [slow][worker-1] Scraped 133/200, pausing 2.88s
+2026-03-22 14:48:55,702 - INFO - [slow][worker-1] Scraped 134/200, pausing 1.04s
+2026-03-22 14:48:56,911 - INFO - Sent batch of 10 leads (total_seen=20) for request 3020
+2026-03-22 14:48:57,906 - INFO - [slow][worker-1] Scraped 135/200, pausing 1.52s
+2026-03-22 14:49:00,609 - INFO - [slow][worker-1] Scraped 136/200, pausing 1.23s
+2026-03-22 14:49:02,797 - INFO - [slow][worker-1] Scraped 137/200, pausing 2.36s
+2026-03-22 14:49:06,093 - INFO - [slow][worker-1] Scraped 138/200, pausing 1.02s
+2026-03-22 14:49:08,214 - INFO - [slow][worker-1] Scraped 139/200, pausing 1.67s
+2026-03-22 14:49:10,890 - INFO - [slow][worker-1] Scraped 140/200, pausing 1.60s
+2026-03-22 14:49:13,590 - INFO - [slow][worker-1] Scraped 141/200, pausing 2.96s
+2026-03-22 14:49:17,582 - INFO - [slow][worker-1] Scraped 142/200, pausing 1.93s
+2026-03-22 14:49:20,451 - INFO - [slow][worker-1] Scraped 143/200, pausing 2.85s
+2026-03-22 14:49:24,304 - INFO - [slow][worker-1] Scraped 144/200, pausing 1.85s
+2026-03-22 14:49:26,325 - INFO - Sent batch of 10 leads (total_seen=30) for request 3020
+2026-03-22 14:49:27,312 - INFO - [slow][worker-1] Scraped 145/200, pausing 2.11s
+2026-03-22 14:49:30,304 - INFO - [slow][worker-1] Scraped 146/200, pausing 2.14s
+2026-03-22 14:49:33,364 - INFO - [slow][worker-1] Scraped 147/200, pausing 2.73s
+2026-03-22 14:49:37,023 - INFO - [slow][worker-1] Scraped 148/200, pausing 2.82s
+2026-03-22 14:49:40,954 - INFO - [slow][worker-1] Scraped 149/200, pausing 1.57s
+2026-03-22 14:49:43,464 - INFO - [slow][worker-1] Scraped 150/200, pausing 1.53s
+2026-03-22 14:49:45,932 - INFO - [slow][worker-1] Scraped 151/200, pausing 2.68s
+2026-03-22 14:49:49,604 - INFO - [slow][worker-1] Scraped 152/200, pausing 2.59s
+2026-03-22 14:49:53,175 - INFO - [slow][worker-1] Scraped 153/200, pausing 1.32s
+2026-03-22 14:49:55,486 - INFO - [slow][worker-1] Scraped 154/200, pausing 1.46s
+2026-03-22 14:49:57,106 - INFO - Sent batch of 10 leads (total_seen=40) for request 3020
+2026-03-22 14:49:58,045 - INFO - [slow][worker-1] Scraped 155/200, pausing 2.53s
+2026-03-22 14:50:01,577 - INFO - [slow][worker-1] Scraped 156/200, pausing 1.58s
+2026-03-22 14:50:04,047 - INFO - [slow][worker-1] Scraped 157/200, pausing 2.05s
+2026-03-22 14:50:07,127 - INFO - [slow][worker-1] Scraped 158/200, pausing 1.30s
+2026-03-22 14:50:09,421 - INFO - [slow][worker-1] Scraped 159/200, pausing 2.15s
+2026-03-22 14:50:12,536 - INFO - [slow][worker-1] Scraped 160/200, pausing 2.41s
+2026-03-22 14:50:15,957 - INFO - [slow][worker-1] Scraped 161/200, pausing 1.84s
+2026-03-22 14:50:18,740 - INFO - [slow][worker-1] Scraped 162/200, pausing 1.22s
+2026-03-22 14:50:20,938 - INFO - [slow][worker-1] Scraped 163/200, pausing 2.17s
+2026-03-22 14:50:24,057 - INFO - [slow][worker-1] Scraped 164/200, pausing 2.49s
+2026-03-22 14:50:26,713 - INFO - Sent batch of 10 leads (total_seen=50) for request 3020
+2026-03-22 14:50:27,676 - INFO - [slow][worker-1] Scraped 165/200, pausing 2.18s
+2026-03-22 14:50:30,806 - INFO - [slow][worker-1] Scraped 166/200, pausing 0.93s
+2026-03-22 14:50:32,671 - INFO - [slow][worker-1] Scraped 167/200, pausing 2.03s
+2026-03-22 14:50:35,667 - INFO - [slow][worker-1] Scraped 168/200, pausing 1.23s
+2026-03-22 14:50:37,895 - INFO - [slow][worker-1] Scraped 169/200, pausing 1.85s
+2026-03-22 14:50:40,658 - INFO - [slow][worker-1] Scraped 170/200, pausing 1.52s
+2026-03-22 14:50:43,100 - INFO - [slow][worker-1] Scraped 171/200, pausing 1.53s
+2026-03-22 14:50:45,651 - INFO - [slow][worker-1] Scraped 172/200, pausing 1.78s
+2026-03-22 14:50:48,365 - INFO - [slow][worker-1] Scraped 173/200, pausing 1.35s
+2026-03-22 14:50:50,662 - INFO - [slow][worker-1] Scraped 174/200, pausing 1.61s
+2026-03-22 14:50:52,426 - INFO - Sent batch of 10 leads (total_seen=60) for request 3020
+2026-03-22 14:50:53,402 - INFO - [slow][worker-1] Scraped 175/200, pausing 1.09s
+2026-03-22 14:50:55,390 - INFO - [slow][worker-1] Scraped 176/200, pausing 2.61s
+2026-03-22 14:50:58,939 - INFO - [slow][worker-1] Scraped 177/200, pausing 1.02s
+2026-03-22 14:51:00,959 - INFO - [slow][worker-1] Scraped 178/200, pausing 1.86s
+2026-03-22 14:51:03,750 - INFO - [slow][worker-1] Scraped 179/200, pausing 1.64s
+2026-03-22 14:51:06,332 - INFO - [slow][worker-1] Scraped 180/200, pausing 2.16s
+2026-03-22 14:51:09,432 - INFO - [slow][worker-1] Scraped 181/200, pausing 1.90s
+2026-03-22 14:51:12,225 - INFO - [slow][worker-1] Scraped 182/200, pausing 1.99s
+2026-03-22 14:51:15,164 - INFO - [slow][worker-1] Scraped 183/200, pausing 1.30s
+2026-03-22 14:51:17,423 - INFO - [slow][worker-1] Scraped 184/200, pausing 2.88s
+2026-03-22 14:51:20,499 - INFO - Sent batch of 10 leads (total_seen=70) for request 3020
+2026-03-22 14:51:21,735 - INFO - [slow][worker-1] Scraped 185/200, pausing 2.72s
+2026-03-22 14:51:25,553 - INFO - [slow][worker-1] Scraped 186/200, pausing 2.47s
+2026-03-22 14:51:28,957 - INFO - [slow][worker-1] Scraped 187/200, pausing 2.64s
+2026-03-22 14:51:32,450 - INFO - [slow][worker-1] Scraped 188/200, pausing 1.59s
+2026-03-22 14:51:34,977 - INFO - [slow][worker-1] Scraped 189/200, pausing 1.25s
+2026-03-22 14:51:37,148 - INFO - [slow][worker-1] Scraped 190/200, pausing 1.79s
+2026-03-22 14:51:39,912 - INFO - [slow][worker-1] Scraped 191/200, pausing 1.44s
+2026-03-22 14:51:42,447 - INFO - [slow][worker-1] Scraped 192/200, pausing 2.20s
+2026-03-22 14:51:45,539 - INFO - [slow][worker-1] Scraped 193/200, pausing 1.28s
+2026-03-22 14:51:47,655 - INFO - [slow][worker-1] Scraped 194/200, pausing 1.56s
+2026-03-22 14:51:49,401 - INFO - Sent batch of 10 leads (total_seen=80) for request 3020
+2026-03-22 14:51:50,405 - INFO - [slow][worker-1] Scraped 195/200, pausing 2.89s
+2026-03-22 14:51:54,209 - INFO - [slow][worker-1] Scraped 196/200, pausing 2.19s
+2026-03-22 14:51:57,244 - INFO - [slow][worker-1] Scraped 197/200, pausing 1.90s
+2026-03-22 14:52:00,060 - INFO - [slow][worker-1] Scraped 198/200, pausing 1.40s
+2026-03-22 14:52:02,563 - INFO - [slow][worker-1] Scraped 199/200, pausing 2.27s
+2026-03-22 14:52:05,760 - INFO - [slow][worker-1] Scraped 200/200, pausing 1.02s
+2026-03-22 14:52:07,000 - INFO - Sent batch of 4 leads (total_seen=114) for request 3019
+2026-03-22 14:52:07,167 - INFO - Sent batch of 6 leads (total_seen=86) for request 3020
+2026-03-22 14:52:08,411 - INFO - Completed request 3019 (total leads seen: 114)
+2026-03-22 14:52:08,550 - INFO - Completed request 3020 (total leads seen: 86)
+2026-03-22 14:52:10,216 - WARNING - GET retry 1/5 for https://scrapiq.leadtechx.com/api/campaign/dental%20wi%202/requests: HTTP 404: {"detail":"No pending requests found"}
+2026-03-22 14:52:12,067 - WARNING - GET retry 2/5 for https://scrapiq.leadtechx.com/api/campaign/dental%20wi%202/requests: HTTP 404: {"detail":"No pending requests found"}
+2026-03-22 14:52:15,840 - WARNING - GET retry 3/5 for https://scrapiq.leadtechx.com/api/campaign/dental%20wi%202/requests: HTTP 404: {"detail":"No pending requests found"}
+2026-03-22 14:52:23,121 - WARNING - GET retry 4/5 for https://scrapiq.leadtechx.com/api/campaign/dental%20wi%202/requests: HTTP 404: {"detail":"No pending requests found"}
+2026-03-22 14:52:30,837 - ERROR - GET failed for https://scrapiq.leadtechx.com/api/campaign/dental%20wi%202/requests: HTTP 404: {"detail":"No pending requests found"}
+2026-03-22 14:52:30,841 - INFO - No more requests; completing campaign.
+2026-03-22 14:52:30,841 - INFO - Skipping legacy complete_campaign(73) during maps stage; finalize stage handles completion.
+2026-03-22 14:52:30,998 - INFO - Stage complete acknowledged: run=8 stage=maps_scrape resp={'status': 'ok', 'run_id': 8, 'completed_stage': 'maps_scrape', 'next_stage': 'cleanup_contacts', 'pipeline_status': 'running'}
+2026-03-22 14:52:31,152 - INFO - Claimed pipeline run=8 campaign=73 stage=cleanup_contacts
+2026-03-22 14:52:31,464 - INFO - Cleanup response for campaign 73: {'campaign_id': 73, 'before_count': 200, 'after_count': 165, 'duplicates_removed': 35, 'flagged_invalid_domain_count': 9}
+2026-03-22 14:52:31,610 - INFO - Stage complete acknowledged: run=8 stage=cleanup_contacts resp={'status': 'ok', 'run_id': 8, 'completed_stage': 'cleanup_contacts', 'next_stage': 'email_fast', 'pipeline_status': 'running'}
+2026-03-22 14:52:31,772 - INFO - Claimed pipeline run=8 campaign=73 stage=email_fast
+2026-03-22 14:52:32,065 - INFO - Pipeline email_fast stage: campaign=73 scraper=scrapy max_batches=19 max_batches_facebook=0 email_policy=business_only
+2026-03-22 14:56:34,856 - INFO - Stage complete acknowledged: run=8 stage=email_fast resp={'status': 'ok', 'run_id': 8, 'completed_stage': 'email_fast', 'next_stage': 'email_fallback', 'pipeline_status': 'running'}
+2026-03-22 14:56:35,189 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=1 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:56:45,351 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=2 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:56:55,505 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=3 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:57:05,681 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=4 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:57:15,857 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=5 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:57:26,031 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=6 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:57:36,205 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=7 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:57:46,370 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=8 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:57:56,610 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=9 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:58:06,769 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=10 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:58:16,931 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=11 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:58:27,102 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=12 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:58:37,269 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=13 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:58:47,430 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=14 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:58:57,592 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=15 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:59:07,764 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=16 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:59:17,920 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=17 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:59:28,098 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=18 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:59:38,258 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=19 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:59:48,415 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=20 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 14:59:58,585 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=21 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:00:08,754 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=22 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:00:18,928 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=23 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:00:29,130 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=24 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:00:39,297 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=25 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:00:49,469 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=26 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:00:59,634 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=27 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:01:09,782 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=28 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:01:19,946 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=29 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:01:30,107 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=30 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:01:40,278 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=31 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:01:50,461 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=32 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:02:00,638 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=33 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:02:10,811 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=34 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:02:20,970 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=35 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:02:31,141 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=36 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:02:41,733 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=37 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:02:51,947 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=38 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:03:02,169 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=39 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:03:12,338 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=40 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:03:22,510 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=41 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:03:32,694 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=42 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:03:42,858 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=43 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:03:53,020 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=44 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:04:03,185 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=45 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:04:13,357 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=46 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:04:23,529 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=47 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:04:33,640 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=48 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:04:43,829 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=49 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:04:53,999 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=50 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:05:04,216 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=51 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:05:14,407 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=52 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:05:24,585 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=53 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:05:34,752 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=54 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:05:44,920 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=55 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:05:55,082 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=56 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:06:05,241 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=57 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:06:15,462 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=58 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:06:25,623 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=59 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:06:35,790 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=60 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:06:45,963 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=61 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:06:56,132 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=62 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:07:06,286 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=63 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:07:16,455 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=64 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:07:26,665 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=65 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:07:36,816 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=66 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:07:46,988 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=67 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:07:57,144 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=68 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:08:07,351 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=69 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:08:17,529 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=70 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:08:27,699 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=71 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:08:37,871 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=72 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:08:48,041 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=73 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:08:58,259 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=74 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:09:08,441 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=75 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:09:18,617 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=76 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:09:28,782 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=77 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:09:38,948 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=78 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:09:49,101 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=79 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:09:59,273 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=80 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:10:09,432 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=81 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:10:19,602 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=82 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:10:29,776 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=83 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:10:39,989 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=84 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:10:50,148 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=85 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:11:00,339 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=86 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:11:10,948 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=87 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:11:21,114 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=88 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:11:31,276 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=89 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:11:41,638 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=90 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:11:51,803 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=91 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:12:01,977 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=92 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:12:12,149 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=93 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:12:22,320 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=94 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:12:32,483 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=95 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:12:42,672 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=96 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:12:52,832 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=97 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:13:03,187 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=98 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:13:13,358 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=99 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:13:23,540 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=100 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:13:33,705 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=101 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:13:43,877 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=102 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:13:54,047 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=103 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:14:04,217 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=104 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:14:14,396 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=105 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:14:24,562 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=106 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:14:34,731 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=107 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:14:44,888 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=108 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:14:55,050 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=109 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:15:05,224 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=110 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:15:15,395 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=111 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:15:25,557 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=112 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:15:35,725 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=113 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:15:45,883 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=114 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:15:56,049 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=115 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:16:06,211 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=116 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:16:16,373 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=117 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:16:26,635 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=118 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:16:36,787 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=119 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:16:46,940 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=120 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:16:57,099 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=121 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:17:07,265 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=122 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:17:17,447 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=123 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:17:27,619 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=124 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:17:37,833 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=125 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:17:47,996 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=126 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:17:58,166 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=127 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:18:08,335 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=128 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:18:18,501 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=129 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:18:28,666 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=130 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:18:38,845 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=131 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:18:49,020 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=132 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:18:59,178 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=133 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:19:09,345 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=134 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:19:19,535 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=135 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:19:29,687 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=136 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:19:39,854 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=137 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:19:50,008 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=138 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:20:00,181 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=139 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:20:10,352 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=140 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:20:20,515 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=141 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:20:30,674 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=142 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:20:40,846 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=143 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:20:51,013 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=144 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:21:01,178 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=145 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:21:11,328 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=146 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:21:21,480 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=147 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:21:31,757 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=148 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:21:41,914 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=149 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:21:52,086 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=150 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:22:02,256 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=151 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:22:12,415 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=152 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:22:22,571 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=153 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:22:32,734 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=154 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:22:42,894 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=155 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:22:53,068 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=156 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:23:03,236 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=157 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:23:13,386 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=158 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:23:23,552 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=159 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:23:33,718 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=160 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:23:43,881 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=161 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:23:54,052 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=162 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:24:04,222 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=163 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:24:14,400 - INFO - No claimable run (reason=all_leased pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=164 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:24:24,722 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:24:24,722 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=165 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:24:34,887 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=166 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:24:45,045 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=167 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:24:55,361 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:24:55,362 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=168 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:25:05,509 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=169 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:25:15,666 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=170 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:25:25,960 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:25:25,960 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=171 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:25:36,107 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=172 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:25:46,268 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=173 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:25:56,573 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:25:56,574 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=174 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:26:06,727 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=175 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:26:16,891 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=176 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:26:27,195 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:26:27,195 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=177 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:26:37,356 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=178 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:26:47,520 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=179 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:26:57,808 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:26:57,809 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=180 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:27:07,960 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=181 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:27:18,112 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=182 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:27:28,403 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:27:28,403 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=183 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:27:38,556 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=184 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:27:48,725 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=185 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:27:59,015 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:27:59,016 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=186 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:28:09,181 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=187 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:28:19,341 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=188 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:28:29,641 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:28:29,641 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=189 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:28:39,806 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=190 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:28:49,963 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=191 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:29:00,284 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:29:00,284 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=192 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:29:10,468 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=193 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:29:20,651 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=194 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:29:30,989 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:29:30,998 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=195 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:29:41,179 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=196 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:29:51,342 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=197 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:30:01,744 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:30:01,744 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=198 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:30:11,904 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=199 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:30:22,064 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=200 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:30:32,357 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:30:32,357 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=201 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:30:42,520 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=202 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:30:52,683 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=203 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:31:02,988 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:31:02,988 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=204 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:31:13,139 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=205 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:31:23,298 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=206 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:31:33,622 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:31:33,623 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=207 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:31:43,793 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=208 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:31:53,963 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=209 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:32:04,305 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:32:04,305 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=210 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:32:14,464 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=211 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:32:24,628 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=212 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:32:34,932 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:32:34,932 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=213 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:32:45,262 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=214 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:32:55,417 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=215 keys=campaign_id,claimed,reason,run_id,stage).
+2026-03-22 15:33:05,717 - INFO - Auto-start check: no active campaigns found.
+2026-03-22 15:33:05,717 - INFO - No claimable run (reason=run_not_started pipeline_status=none current_stage=none claimed=False run_id=none campaign_id=none stage=none poll=216 keys=campaign_id,claimed,reason,run_id,stage).

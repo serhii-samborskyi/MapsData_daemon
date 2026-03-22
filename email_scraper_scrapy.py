@@ -162,8 +162,33 @@ def extract_emails_from_text(text: str) -> Set[str]:
     return extract_candidate_emails_from_text(text)
 
 
-def pick_best_email(domain: str, emails: Iterable[str]) -> str:
-    return pick_best_business_email(emails, domain, allow_public=True) or ""
+def _normalize_email_policy(value: str, default: str = "any_valid") -> str:
+    policy = str(value or "").strip().lower()
+    if policy in {"business_only", "business_or_public", "any_valid"}:
+        return policy
+    return default
+
+
+def _policy_flags(policy: str) -> tuple[bool, bool]:
+    normalized = _normalize_email_policy(policy)
+    if normalized == "business_only":
+        return False, False
+    if normalized == "business_or_public":
+        return True, False
+    return True, True
+
+
+def pick_best_email(domain: str, emails: Iterable[str], email_policy: str = "any_valid") -> str:
+    allow_public, allow_other_domains = _policy_flags(email_policy)
+    return (
+        pick_best_business_email(
+            emails,
+            domain,
+            allow_public=allow_public,
+            allow_other_domains=allow_other_domains,
+        )
+        or ""
+    )
 
 
 def priority_score(url_or_text: str) -> int:
@@ -213,6 +238,7 @@ class EmailSpider(scrapy.Spider):
         max_batches_facebook: int,
         facebook_engine: str,
         same_domain_only: bool,
+        email_policy: str,
     ) -> None:
         super().__init__()
         self.base_url = normalize_base_url(base_url)
@@ -226,6 +252,7 @@ class EmailSpider(scrapy.Spider):
         self.max_batches_facebook = int(max_batches_facebook or 0)
         self.facebook_engine = (facebook_engine or "playwright").strip().lower()
         self.same_domain_only = bool(same_domain_only)
+        self.email_policy = _normalize_email_policy(email_policy, default="any_valid")
         self.batch_count = 0
         self.pull_attempt_count = 0
         self._no_more_batches = False
@@ -391,7 +418,7 @@ class EmailSpider(scrapy.Spider):
             self._collect_facebook_links(response, state)
 
         emails = extract_emails_from_text(response.text or "")
-        best = pick_best_email(domain, emails)
+        best = pick_best_email(domain, emails, email_policy=self.email_policy)
         if best:
             if self._save_email(contact_id, best):
                 logger.info("FOUND %s -> %s", domain, best)
@@ -508,7 +535,7 @@ class EmailSpider(scrapy.Spider):
                     about_html = self.http.get_text(about_url)
                     if about_html:
                         candidates.update(extract_emails_from_text(about_html))
-        return pick_best_email(domain, candidates) if candidates else None
+        return pick_best_email(domain, candidates, email_policy=self.email_policy) if candidates else None
 
     def _get_playwright_browser(self):
         if self._pw_browser is not None:
@@ -635,6 +662,12 @@ def main() -> None:
     p.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
     p.add_argument("--facebook-engine", default="playwright", choices=["playwright", "scrapy"], help="Engine for Facebook fallback")
     p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
+    p.add_argument(
+        "--email-policy",
+        default="any_valid",
+        choices=["business_only", "business_or_public", "any_valid"],
+        help="How to choose final email: business_only, business_or_public, or any_valid (legacy).",
+    )
     args = p.parse_args()
     set_min_domain_letters(args.min_domain_letters)
 
@@ -644,6 +677,7 @@ def main() -> None:
     logger.info("Scrapy email scraper starting for campaign id=%s", campaign_id)
     if args.same_domain_only:
         logger.info("Same-domain-only crawling: ENABLED")
+    logger.info("Email selection policy: %s", args.email_policy)
     if args.facebook and args.max_batches_facebook > 0:
         logger.info(
             "Facebook fallback enabled for first %s batch(es) using engine=%s.",
@@ -683,6 +717,7 @@ def main() -> None:
         max_batches_facebook=args.max_batches_facebook,
         facebook_engine=args.facebook_engine,
         same_domain_only=args.same_domain_only,
+        email_policy=args.email_policy,
     )
     process.start()
 

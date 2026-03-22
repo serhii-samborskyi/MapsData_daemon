@@ -344,7 +344,12 @@ def _domain_relevance_score(email: str, business_domain: str) -> int:
     return 2
 
 
-def pick_best_business_email(candidates: Iterable[str], business_domain: str, allow_public: bool = True) -> Optional[str]:
+def pick_best_business_email(
+    candidates: Iterable[str],
+    business_domain: str,
+    allow_public: bool = True,
+    allow_other_domains: bool = True,
+) -> Optional[str]:
     valid = filter_valid_emails(candidates)
     if not valid:
         return None
@@ -365,7 +370,7 @@ def pick_best_business_email(candidates: Iterable[str], business_domain: str, al
 
     public_emails = [e for e in valid if e.split("@", 1)[1] in PUBLIC_PROVIDERS]
     others = [e for e in valid if e not in public_emails]
-    if others:
+    if allow_other_domains and others:
         others.sort(
             key=lambda e: (
                 _domain_relevance_score(e, business_host),

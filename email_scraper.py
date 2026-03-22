@@ -775,15 +775,43 @@ async def extract_emails(
     return result_emails
 
 
-def pick_best_facebook_email(candidates: Set[str], domain: str) -> Optional[str]:
-    selected = pick_best_business_email(candidates, domain, allow_public=True)
+def _normalize_email_policy(value: str, default: str = "any_valid") -> str:
+    policy = str(value or "").strip().lower()
+    if policy in {"business_only", "business_or_public", "any_valid"}:
+        return policy
+    return default
+
+
+def _policy_flags(policy: str) -> Tuple[bool, bool]:
+    normalized = _normalize_email_policy(policy)
+    if normalized == "business_only":
+        return False, False
+    if normalized == "business_or_public":
+        return True, False
+    return True, True
+
+
+def pick_best_facebook_email(candidates: Set[str], domain: str, email_policy: str = "any_valid") -> Optional[str]:
+    allow_public, allow_other_domains = _policy_flags(email_policy)
+    selected = pick_best_business_email(
+        candidates,
+        domain,
+        allow_public=allow_public,
+        allow_other_domains=allow_other_domains,
+    )
     if selected:
         logger.info(f"🎯 FACEBOOK SELECTION: selected {selected} for domain={domain}")
     return selected
 
 
-def pick_best_email(domain: str, candidates: Set[str], allow_public: bool = True) -> Optional[str]:
-    return pick_best_business_email(candidates, domain, allow_public=allow_public)
+def pick_best_email(domain: str, candidates: Set[str], email_policy: str = "any_valid") -> Optional[str]:
+    allow_public, allow_other_domains = _policy_flags(email_policy)
+    return pick_best_business_email(
+        candidates,
+        domain,
+        allow_public=allow_public,
+        allow_other_domains=allow_other_domains,
+    )
 
 
 # -----------------------------
@@ -935,8 +963,10 @@ async def scrape_and_update_immediate(
     facebook_engine: str = "playwright",
     same_domain_only: bool = True,
     facebook: bool = False,
+    email_policy: str = "any_valid",
 ) -> None:
     set_min_domain_letters(min_domain_letters)
+    email_policy = _normalize_email_policy(email_policy, default="any_valid")
     for attempt_insecure in (False, True):
         http = HttpClient(timeout=20.0, max_retries=5, backoff=2.0, insecure=attempt_insecure)
         try:
@@ -1144,7 +1174,11 @@ async def scrape_and_update_immediate(
                                                 pass
 
                                         if facebook_only_candidates:
-                                            best = pick_best_facebook_email(facebook_only_candidates, domain)
+                                            best = pick_best_facebook_email(
+                                                facebook_only_candidates,
+                                                domain,
+                                                email_policy=email_policy,
+                                            )
                                             if best:
                                                 elapsed = time.monotonic() - start_ts
                                                 print(f"[FACEBOOK SUCCESS] ({seq}/{len(contacts)}): {domain} -> {best} (from Facebook)", flush=True)
@@ -1220,7 +1254,7 @@ async def scrape_and_update_immediate(
                                         except Exception as e:
                                             logger.debug(f"FULL PASS error for {domain}: {e}")
 
-                                    best = pick_best_email(domain, candidates, allow_public=True)
+                                    best = pick_best_email(domain, candidates, email_policy=email_policy)
 
                                 elapsed = time.monotonic() - start_ts
                                 if not best:
@@ -1344,6 +1378,12 @@ def main():
     p.add_argument("--facebook", action="store_true", help="Check Facebook pages linked from website for additional emails")
     p.add_argument("--facebook-engine", default="playwright", choices=["playwright", "scrapy"], help="Engine for Facebook fallback")
     p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
+    p.add_argument(
+        "--email-policy",
+        default="any_valid",
+        choices=["business_only", "business_or_public", "any_valid"],
+        help="How to choose final email: business_only, business_or_public, or any_valid (legacy).",
+    )
     args = p.parse_args()
 
     logger.info(f"Enhanced Email Scraper starting with smart filtering...")
@@ -1353,6 +1393,7 @@ def main():
         logger.info(f"Facebook page scraping: ENABLED (engine={args.facebook_engine})")
     if args.same_domain_only:
         logger.info("Same-domain-only crawling: ENABLED")
+    logger.info("Email selection policy: %s", args.email_policy)
 
     asyncio.run(scrape_and_update_immediate(
         campaign=args.campaign,
@@ -1369,6 +1410,7 @@ def main():
         facebook_engine=args.facebook_engine,
         same_domain_only=args.same_domain_only,
         facebook=args.facebook,
+        email_policy=args.email_policy,
     ))
 
 

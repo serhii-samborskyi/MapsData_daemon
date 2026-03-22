@@ -194,6 +194,13 @@ def _coerce_float(value: Any, default: float = 0.0) -> float:
         return float(default)
 
 
+def _normalize_email_policy(value: Any, default: str) -> str:
+    policy = str(value or "").strip().lower()
+    if policy in {"business_only", "business_or_public", "any_valid"}:
+        return policy
+    return default
+
+
 def _estimate_batches(
     stats: Dict[str, Any],
     batch_size: int,
@@ -338,6 +345,7 @@ def _build_email_args(
     facebook: bool,
     facebook_engine: str,
     same_domain_only: bool,
+    email_policy: str,
 ) -> list[str]:
     args = [
         python_exe,
@@ -358,6 +366,8 @@ def _build_email_args(
         str(min_domain_letters),
         "--domain-timeout",
         str(domain_timeout_s),
+        "--email-policy",
+        str(email_policy),
     ]
     if max_batches is not None:
         args.extend(["--max-batches", str(max_batches)])
@@ -387,6 +397,7 @@ def _run_email_stage(
 
     if stage == "email_fast":
         scraper_key = str(pipeline_cfg.get("fast_scraper") or email_cfg.get("fast_scraper") or "scrapy").strip().lower()
+        email_policy = _normalize_email_policy(pipeline_cfg.get("fast_email_policy", "business_only"), "business_only")
         max_cap = _coerce_int(pipeline_cfg.get("fast_max_batches_cap", 0), 0)
         fast_multiplier = _coerce_float(pipeline_cfg.get("fast_batches_multiplier", 1.1), 1.1)
         max_batches = _estimate_batches(stats, batch, max_cap, multiplier=fast_multiplier)
@@ -398,6 +409,7 @@ def _run_email_stage(
         concurrency = max(1, _coerce_int(pipeline_cfg.get("fast_concurrency", email_cfg.get("concurrency", 3)), 3))
     else:
         scraper_key = str(pipeline_cfg.get("fallback_scraper") or email_cfg.get("fallback_scraper") or "playwright").strip().lower()
+        email_policy = _normalize_email_policy(pipeline_cfg.get("fallback_email_policy", "business_or_public"), "business_or_public")
         max_regular_cap = _coerce_int(pipeline_cfg.get("fallback_max_batches", 0), 0)
         max_fb_cap = _coerce_int(pipeline_cfg.get("fallback_max_batches_facebook", 0), 0)
         fallback_multiplier = _coerce_float(pipeline_cfg.get("fallback_batches_multiplier", 1.0), 1.0)
@@ -428,15 +440,17 @@ def _run_email_stage(
         facebook=facebook,
         facebook_engine=str(email_cfg.get("facebook_engine", "playwright") or "playwright"),
         same_domain_only=bool(email_cfg.get("same_domain_only", True)),
+        email_policy=email_policy,
     )
 
     logger.info(
-        "Pipeline %s stage: campaign=%s scraper=%s max_batches=%s max_batches_facebook=%s",
+        "Pipeline %s stage: campaign=%s scraper=%s max_batches=%s max_batches_facebook=%s email_policy=%s",
         stage,
         campaign_id,
         resolved_engine,
         max_batches,
         max_batches_facebook,
+        email_policy,
     )
 
     code = _run_subprocess_with_stop(args, cwd=ctx.base_dir, logger=logger, should_stop=should_stop)
