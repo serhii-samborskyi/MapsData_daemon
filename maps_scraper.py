@@ -305,10 +305,34 @@ async def extract_place_details(page) -> dict:
             const ratingMatch = ratingLabel.match(/([0-9]+(?:\\.[0-9]+)?)/);
             const rating = ratingMatch ? ratingMatch[1] : '';
 
-            const reviewNode = document.querySelector('button[aria-label*="reviews"], a[aria-label*="reviews"]');
-            const reviewText = reviewNode ? (reviewNode.getAttribute('aria-label') || text(reviewNode)) : '';
-            const reviewMatch = reviewText.match(/([\\d,]+)/);
-            const reviews = reviewMatch ? reviewMatch[1] : '';
+            const extractNumber = (value) => {
+                const src = (value || '').toString();
+                const match = src.match(/([\\d][\\d,.]*)/);
+                return match ? match[1] : '';
+            };
+
+            let reviews = '';
+            const reviewNodes = Array.from(
+                document.querySelectorAll('button[aria-label], a[aria-label], span[role="img"][aria-label], div[role="img"][aria-label]')
+            );
+            for (const node of reviewNodes) {
+                const label = (node.getAttribute('aria-label') || '').trim();
+                if (!/review/i.test(label)) continue;
+                reviews = extractNumber(label);
+                if (reviews) break;
+            }
+
+            if (!reviews) {
+                const reviewNode = document.querySelector('button[aria-label*="reviews"], a[aria-label*="reviews"]');
+                const reviewText = reviewNode ? (reviewNode.getAttribute('aria-label') || text(reviewNode)) : '';
+                reviews = extractNumber(reviewText);
+            }
+
+            if (!reviews && ratingNode) {
+                const ratingContainerText = text(ratingNode.parentElement);
+                const parenMatch = ratingContainerText.match(/\\(([\\d][\\d,.]*)\\)/);
+                reviews = parenMatch ? parenMatch[1] : '';
+            }
 
             const categoryNode =
                 document.querySelector('button[jsaction*="pane.rating.category"]') ||
@@ -1326,12 +1350,23 @@ def run_campaign_slow_dedup_and_yield_batches(
                     query = (request.req_text or "").strip()
                     if not query:
                         continue
-                    urls = await _collect_place_urls_for_query(
-                        page,
-                        query,
-                        pause_min_s=scroll_pause_low,
-                        pause_max_s=scroll_pause_high,
-                    )
+                    try:
+                        urls = await _collect_place_urls_for_query(
+                            page,
+                            query,
+                            pause_min_s=scroll_pause_low,
+                            pause_max_s=scroll_pause_high,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "[slow] Request %s (%d/%d) failed during URL collection; skipping request. query=%r error=%s",
+                            request.id,
+                            idx,
+                            len(requests),
+                            query,
+                            exc,
+                        )
+                        continue
                     added = 0
                     for url in urls:
                         if url in seen_urls:
