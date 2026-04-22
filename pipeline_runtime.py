@@ -55,9 +55,10 @@ class PipelineApiClient:
             self.logger.warning("Pipeline API %s %s failed: %s", method.upper(), path, exc)
             return {}
 
-    def claim(self, worker_id: str, actor: str, lease_seconds: int) -> Dict[str, Any]:
+    def claim(self, worker_id: str, machine_id: str, actor: str, lease_seconds: int) -> Dict[str, Any]:
         payload = {
             "worker_id": worker_id,
+            "machine_id": machine_id,
             "actor": actor,
             "lease_seconds": int(lease_seconds),
         }
@@ -77,24 +78,35 @@ class PipelineApiClient:
         }
         return self._request_json("POST", f"/api/campaign/{campaign_id}/pipeline/start", payload)
 
-    def heartbeat(self, run_id: str, worker_id: str, stage: str, lease_seconds: int) -> Dict[str, Any]:
+    def heartbeat(self, run_id: str, worker_id: str, machine_id: str, stage: str, lease_seconds: int) -> Dict[str, Any]:
         payload = {
             "worker_id": worker_id,
+            "machine_id": machine_id,
             "stage": stage,
             "lease_seconds": int(lease_seconds),
         }
         return self._request_json("POST", f"/api/pipeline/{run_id}/heartbeat", payload)
 
-    def stage_complete(self, run_id: str, worker_id: str, stage: str) -> Dict[str, Any]:
+    def stage_complete(self, run_id: str, worker_id: str, machine_id: str, stage: str) -> Dict[str, Any]:
         payload = {
             "worker_id": worker_id,
+            "machine_id": machine_id,
             "stage": stage,
         }
         return self._request_json("POST", f"/api/pipeline/{run_id}/stage-complete", payload)
 
-    def fail(self, run_id: str, worker_id: str, stage: str, error: str, error_payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def fail(
+        self,
+        run_id: str,
+        worker_id: str,
+        machine_id: str,
+        stage: str,
+        error: str,
+        error_payload: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         payload = {
             "worker_id": worker_id,
+            "machine_id": machine_id,
             "stage": stage,
             "error": error,
             "error_payload": error_payload or {},
@@ -244,12 +256,14 @@ def _run_subprocess_with_stop(
     return int(proc.returncode or 0)
 
 
-def _configure_maps_runtime(ctx: PipelineContext, logger: logging.Logger) -> None:
+def _configure_maps_runtime(ctx: PipelineContext, logger: logging.Logger, campaign_scrape_mode: str = "") -> None:
     import maps_scraper
 
     max_concurrent = _coerce_int(ctx.maps_cfg.get("max_concurrent", 1), 1)
     detail_workers = _coerce_int(ctx.maps_cfg.get("detail_workers", 1), 1)
-    scrape_mode = str(ctx.maps_cfg.get("scrape_mode", "fast"))
+    configured_mode = str(ctx.maps_cfg.get("scrape_mode", "fast"))
+    requested_mode = str(campaign_scrape_mode or "").strip().lower()
+    scrape_mode = requested_mode if requested_mode in {"fast", "slow"} else configured_mode
     show_browser = bool(ctx.maps_cfg.get("show_browser", False))
     slow_min = _coerce_float(ctx.maps_cfg.get("slow_place_pause_min_s", 0.8), 0.8)
     slow_max = _coerce_float(ctx.maps_cfg.get("slow_place_pause_max_s", 1.8), 1.8)
@@ -280,6 +294,7 @@ def _configure_maps_runtime(ctx: PipelineContext, logger: logging.Logger) -> Non
 def _run_maps_stage(
     campaign_id: str,
     campaign_name: str,
+    campaign_scrape_mode: str,
     ctx: PipelineContext,
     api: PipelineApiClient,
     logger: logging.Logger,
@@ -288,7 +303,7 @@ def _run_maps_stage(
     import maps_scraper
     from maps_scraper import Campaign, CampaignProcessor, HttpClient, LeadsApiClient
 
-    _configure_maps_runtime(ctx, logger)
+    _configure_maps_runtime(ctx, logger, campaign_scrape_mode=campaign_scrape_mode)
 
     if not campaign_name:
         campaign_name = api.get_active_campaign_name(ctx.maps_base_url, campaign_id)
@@ -479,6 +494,7 @@ def run_pipeline_worker(
 ) -> None:
     pipeline_cfg = ctx.pipeline_cfg if isinstance(ctx.pipeline_cfg, dict) else {}
     api = PipelineApiClient(pipeline_cfg.get("base_url") or ctx.email_base_url, logger)
+    machine_id = str(pipeline_cfg.get("machine_id") or "").strip() or default_machine_id()
     no_claim_counter = 0
     auto_start_enabled = bool(pipeline_cfg.get("auto_start_on_run_not_started", True))
     auto_start_cooldown_s = max(5.0, _coerce_float(pipeline_cfg.get("auto_start_cooldown_s", 30), 30.0))
@@ -491,8 +507,9 @@ def run_pipeline_worker(
         return s
 
     logger.info(
-        "Pipeline worker starting: worker_id=%s actor=%s lease_seconds=%s claim_interval_s=%s",
+        "Pipeline worker starting: worker_id=%s machine_id=%s actor=%s lease_seconds=%s claim_interval_s=%s",
         worker_id,
+        machine_id,
         actor,
         lease_seconds,
         claim_interval_s,
@@ -528,7 +545,7 @@ def run_pipeline_worker(
             )
 
     while not should_stop():
-        claim = api.claim(worker_id=worker_id, actor=actor, lease_seconds=lease_seconds)
+        claim = api.claim(worker_id=worker_id, machine_id=machine_id, actor=actor, lease_seconds=lease_seconds)
         run_obj = claim.get("run", {}) if isinstance(claim.get("run"), dict) else {}
         claim_run_id = (
             _clean_scalar(claim.get("run_id", ""))
@@ -570,7 +587,7 @@ def run_pipeline_worker(
         if not claimed:
             no_claim_counter += 1
             reason = str(claim.get("reason", "")).strip().lower()
-            if auto_start_enabled and reason == "run_not_started":
+            if auto_start_enabled and reason in {"run_not_started", "all_leased"}:
                 _auto_start_from_active()
             if claim:
                 # Emit every poll while idle so operator sees worker is alive and polling.
@@ -601,26 +618,50 @@ def run_pipeline_worker(
             or str(run_obj.get("campaign_name", "")).strip()
             or str(run_obj.get("name", "")).strip()
         )
+        maps_scrape_mode = (
+            _clean_scalar(claim.get("maps_scrape_mode", ""))
+            or _clean_scalar(run_obj.get("maps_scrape_mode", ""))
+            or "slow"
+        )
 
         if not run_id or not campaign_id or not stage:
             logger.error("Invalid claim payload: %s", claim)
             time.sleep(max(1.0, claim_interval_s))
             continue
 
-        logger.info("Claimed pipeline run=%s campaign=%s stage=%s", run_id, campaign_id, stage)
+        logger.info(
+            "Claimed pipeline run=%s campaign=%s stage=%s machine_id=%s maps_mode=%s",
+            run_id,
+            campaign_id,
+            stage,
+            machine_id,
+            maps_scrape_mode,
+        )
 
         beat = Heartbeater(
             interval_s=heartbeat_interval_s,
-            beat_fn=lambda: api.heartbeat(run_id=run_id, worker_id=worker_id, stage=stage, lease_seconds=lease_seconds),
+            beat_fn=lambda: api.heartbeat(
+                run_id=run_id,
+                worker_id=worker_id,
+                machine_id=machine_id,
+                stage=stage,
+                lease_seconds=lease_seconds,
+            ),
             logger=logger,
         )
         beat.start()
 
         try:
-            api.heartbeat(run_id=run_id, worker_id=worker_id, stage=stage, lease_seconds=lease_seconds)
+            api.heartbeat(
+                run_id=run_id,
+                worker_id=worker_id,
+                machine_id=machine_id,
+                stage=stage,
+                lease_seconds=lease_seconds,
+            )
 
             if stage == "maps_scrape":
-                _run_maps_stage(campaign_id, campaign_name, ctx, api, logger, should_stop)
+                _run_maps_stage(campaign_id, campaign_name, maps_scrape_mode, ctx, api, logger, should_stop)
             elif stage == "cleanup_contacts":
                 _run_cleanup_stage(campaign_id, api, logger)
             elif stage == "email_fast":
@@ -632,7 +673,7 @@ def run_pipeline_worker(
             else:
                 raise RuntimeError(f"Unsupported pipeline stage: {stage}")
 
-            resp = api.stage_complete(run_id=run_id, worker_id=worker_id, stage=stage)
+            resp = api.stage_complete(run_id=run_id, worker_id=worker_id, machine_id=machine_id, stage=stage)
             logger.info("Stage complete acknowledged: run=%s stage=%s resp=%s", run_id, stage, resp)
         except Exception as exc:
             tb = traceback.format_exc(limit=3)
@@ -640,6 +681,7 @@ def run_pipeline_worker(
             fail_resp = api.fail(
                 run_id=run_id,
                 worker_id=worker_id,
+                machine_id=machine_id,
                 stage=stage,
                 error=str(exc),
                 error_payload={"trace": tb},
@@ -649,6 +691,14 @@ def run_pipeline_worker(
             beat.stop()
 
     logger.info("Pipeline worker stopping")
+
+
+def default_machine_id() -> str:
+    env_machine_id = str(os.environ.get("PIPELINE_MACHINE_ID", "")).strip()
+    if env_machine_id:
+        return env_machine_id
+    host = socket.gethostname().split(".")[0]
+    return f"machine-{host}"
 
 
 def default_worker_id(prefix: str = "daemon") -> str:

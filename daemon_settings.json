@@ -54,6 +54,7 @@
     "fast_scraper": "scrapy",
     "heartbeat_interval_s": 30,
     "lease_seconds": 120,
+    "machine_id": "",
     "worker_id": ""
   },
   "queue_dir": "queue"
