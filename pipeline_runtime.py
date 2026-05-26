@@ -10,6 +10,7 @@ import subprocess
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
@@ -44,7 +45,22 @@ class PipelineApiClient:
             ctx = ssl._create_unverified_context() if self.insecure else None
             with urllib.request.urlopen(req, timeout=timeout_s or self.timeout_s, context=ctx) as resp:
                 body = resp.read().decode("utf-8", "ignore")
-            return json.loads(body) if body else {}
+                status_code = int(getattr(resp, "status", 200) or 200)
+            parsed = json.loads(body) if body else {}
+            if isinstance(parsed, dict):
+                parsed.setdefault("_ok", True)
+                parsed.setdefault("_status", status_code)
+                return parsed
+            return {"_ok": True, "_status": status_code, "data": parsed}
+        except urllib.error.HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8", "ignore")
+            except Exception:
+                body = ""
+            detail = body.strip() or str(exc)
+            self.logger.warning("Pipeline API %s %s failed: HTTP %s %s", method.upper(), path, exc.code, detail[:400])
+            return {"_ok": False, "_status": int(exc.code), "_error": detail}
         except Exception as exc:
             if "CERTIFICATE_VERIFY_FAILED" in str(exc) and not self.insecure:
                 self.insecure = True
@@ -53,7 +69,7 @@ class PipelineApiClient:
                 self.logger.warning("SSL verification failed; switching to insecure HTTPS for pipeline calls.")
                 self._insecure_logged = True
             self.logger.warning("Pipeline API %s %s failed: %s", method.upper(), path, exc)
-            return {}
+            return {"_ok": False, "_status": 0, "_error": str(exc)}
 
     def claim(self, worker_id: str, machine_id: str, actor: str, lease_seconds: int) -> Dict[str, Any]:
         payload = {
@@ -180,15 +196,15 @@ class PipelineContext:
 
 
 def _resolve_email_script(scraper: str, base_dir: str, logger: logging.Logger) -> tuple[str, str]:
-    engine = (scraper or "playwright").strip().lower()
+    engine = (scraper or "camoufox").strip().lower()
     script = "email_scraper.py"
     if engine == "scrapy":
         script = "email_scraper_scrapy.py"
     script_path = os.path.join(base_dir, script)
     if not os.path.exists(script_path):
-        logger.warning("Email scraper '%s' not found at %s; falling back to Playwright.", engine, script_path)
+        logger.warning("Email scraper '%s' not found at %s; falling back to Camoufox engine.", engine, script_path)
         script_path = os.path.join(base_dir, "email_scraper.py")
-        engine = "playwright"
+        engine = "camoufox"
     return script_path, engine
 
 
@@ -282,12 +298,14 @@ def _configure_maps_runtime(ctx: PipelineContext, logger: logging.Logger, campai
         maps_scraper.DEFAULT_SCROLL_PAUSE_MIN_S,
         maps_scraper.DEFAULT_SCROLL_PAUSE_MAX_S,
     ) = maps_scraper.normalize_scroll_pause_range(scroll_min, scroll_max)
+    maps_scraper.DEFAULT_PROXY_URL = maps_scraper.normalize_maps_proxy_url(ctx.maps_cfg.get("proxy_url", ""))
 
     logger.info(
-        "Maps runtime configured: mode=%s show_browser=%s workers=%s",
+        "Maps runtime configured: mode=%s show_browser=%s workers=%s proxy=%s",
         maps_scraper.DEFAULT_SCRAPE_MODE,
         maps_scraper.DEFAULT_SHOW_BROWSER,
         maps_scraper.DEFAULT_DETAIL_WORKERS,
+        "on" if maps_scraper.DEFAULT_PROXY_URL else "off",
     )
 
 
@@ -317,6 +335,9 @@ def _run_maps_stage(
                 campaign_id,
             )
 
+        def get_requests_for_campaign_name(self, campaign_name: str, include_inuse: bool = True):  # type: ignore[override]
+            return super().get_requests_for_campaign_name(campaign_name, include_inuse=include_inuse)
+
     maps_api = _PipelineMapsApiClient(ctx.maps_base_url, HttpClient())
     processor = CampaignProcessor(
         maps_api,
@@ -329,17 +350,32 @@ def _run_maps_stage(
         scroll_pause_min_s=maps_scraper.DEFAULT_SCROLL_PAUSE_MIN_S,
         scroll_pause_max_s=maps_scraper.DEFAULT_SCROLL_PAUSE_MAX_S,
         detail_workers=maps_scraper.DEFAULT_DETAIL_WORKERS,
+        proxy_url=maps_scraper.DEFAULT_PROXY_URL,
     )
 
     logger.info("Pipeline maps stage: processing campaign %s (%s)", campaign_id, campaign_name)
     if should_stop():
         raise RuntimeError("Stopping before maps stage")
-    processor.process_campaign(Campaign(id=str(campaign_id), name=str(campaign_name)))
+    watcher_done = threading.Event()
+
+    def _watch_stop() -> None:
+        while not watcher_done.wait(1.0):
+            if should_stop():
+                processor.stop()
+                return
+
+    watcher = threading.Thread(target=_watch_stop, name="maps-stage-stop-watcher", daemon=True)
+    watcher.start()
+    try:
+        processor.process_campaign(Campaign(id=str(campaign_id), name=str(campaign_name)))
+    finally:
+        watcher_done.set()
+        watcher.join(timeout=2.0)
 
 
 def _run_cleanup_stage(campaign_id: str, api: PipelineApiClient, logger: logging.Logger) -> None:
     resp = api.cleanup_contacts(campaign_id)
-    if not resp:
+    if not resp or not bool(resp.get("_ok", True)):
         raise RuntimeError("Cleanup endpoint returned empty response")
     logger.info("Cleanup response for campaign %s: %s", campaign_id, resp)
 
@@ -359,6 +395,7 @@ def _build_email_args(
     min_domain_letters: int,
     facebook: bool,
     facebook_engine: str,
+    facebook_proxy_url: str,
     same_domain_only: bool,
     email_policy: str,
 ) -> list[str]:
@@ -390,7 +427,9 @@ def _build_email_args(
         args.extend(["--max-batches-facebook", str(max_batches_facebook)])
     if facebook:
         args.append("--facebook")
-        args.extend(["--facebook-engine", str(facebook_engine or "playwright")])
+        args.extend(["--facebook-engine", str(facebook_engine or "camoufox")])
+        if str(facebook_proxy_url or "").strip():
+            args.extend(["--facebook-proxy", str(facebook_proxy_url).strip()])
     if same_domain_only:
         args.append("--same-domain-only")
     return args
@@ -423,7 +462,7 @@ def _run_email_stage(
         facebook = False
         concurrency = max(1, _coerce_int(pipeline_cfg.get("fast_concurrency", email_cfg.get("concurrency", 3)), 3))
     else:
-        scraper_key = str(pipeline_cfg.get("fallback_scraper") or email_cfg.get("fallback_scraper") or "playwright").strip().lower()
+        scraper_key = str(pipeline_cfg.get("fallback_scraper") or email_cfg.get("fallback_scraper") or "camoufox").strip().lower()
         email_policy = _normalize_email_policy(pipeline_cfg.get("fallback_email_policy", "business_or_public"), "business_or_public")
         max_regular_cap = _coerce_int(pipeline_cfg.get("fallback_max_batches", 0), 0)
         max_fb_cap = _coerce_int(pipeline_cfg.get("fallback_max_batches_facebook", 0), 0)
@@ -453,7 +492,8 @@ def _run_email_stage(
         links=max(1, _coerce_int(email_cfg.get("links", 5), 5)),
         min_domain_letters=max(1, _coerce_int(email_cfg.get("min_domain_letters", 2), 2)),
         facebook=facebook,
-        facebook_engine=str(email_cfg.get("facebook_engine", "playwright") or "playwright"),
+        facebook_engine=str(email_cfg.get("facebook_engine", "camoufox") or "camoufox"),
+        facebook_proxy_url=str(email_cfg.get("facebook_proxy_url", "") or ""),
         same_domain_only=bool(email_cfg.get("same_domain_only", True)),
         email_policy=email_policy,
     )
@@ -532,7 +572,7 @@ def run_pipeline_worker(
             if not campaign_id:
                 continue
             resp = api.start_pipeline(campaign_id=campaign_id, actor=actor, retry=False)
-            if not resp:
+            if not resp or not bool(resp.get("_ok", True)):
                 logger.warning("Auto-start pipeline failed for campaign=%s (empty response).", campaign_id)
                 continue
             logger.info(
@@ -630,50 +670,64 @@ def run_pipeline_worker(
             continue
 
         logger.info(
-            "Claimed pipeline run=%s campaign=%s stage=%s machine_id=%s maps_mode=%s",
+            "Claimed pipeline run=%s campaign=%s campaign_name=%s stage=%s machine_id=%s maps_mode=%s",
             run_id,
             campaign_id,
+            campaign_name or "-",
             stage,
             machine_id,
             maps_scrape_mode,
         )
 
-        beat = Heartbeater(
-            interval_s=heartbeat_interval_s,
-            beat_fn=lambda: api.heartbeat(
-                run_id=run_id,
-                worker_id=worker_id,
-                machine_id=machine_id,
-                stage=stage,
-                lease_seconds=lease_seconds,
-            ),
-            logger=logger,
-        )
-        beat.start()
+        lease_lost = threading.Event()
 
-        try:
-            api.heartbeat(
+        def _heartbeat_once() -> Dict[str, Any]:
+            response = api.heartbeat(
                 run_id=run_id,
                 worker_id=worker_id,
                 machine_id=machine_id,
                 stage=stage,
                 lease_seconds=lease_seconds,
             )
+            status_code = int(response.get("_status", 200) or 200) if isinstance(response, dict) else 0
+            if status_code == 409:
+                lease_lost.set()
+                raise RuntimeError(f"Pipeline lease lost for run={run_id} stage={stage}")
+            return response if isinstance(response, dict) else {}
+
+        stop_signal = lambda: should_stop() or lease_lost.is_set()
+
+        beat = Heartbeater(
+            interval_s=heartbeat_interval_s,
+            beat_fn=_heartbeat_once,
+            logger=logger,
+        )
+        beat.start()
+
+        try:
+            _heartbeat_once()
 
             if stage == "maps_scrape":
-                _run_maps_stage(campaign_id, campaign_name, maps_scrape_mode, ctx, api, logger, should_stop)
+                _run_maps_stage(campaign_id, campaign_name, maps_scrape_mode, ctx, api, logger, stop_signal)
             elif stage == "cleanup_contacts":
                 _run_cleanup_stage(campaign_id, api, logger)
             elif stage == "email_fast":
-                _run_email_stage(stage, campaign_id, ctx, api, logger, should_stop)
+                _run_email_stage(stage, campaign_id, ctx, api, logger, stop_signal)
             elif stage == "email_fallback":
-                _run_email_stage(stage, campaign_id, ctx, api, logger, should_stop)
+                _run_email_stage(stage, campaign_id, ctx, api, logger, stop_signal)
             elif stage == "finalize":
                 _run_finalize_stage(campaign_id, ctx, api, logger)
             else:
                 raise RuntimeError(f"Unsupported pipeline stage: {stage}")
 
+            if lease_lost.is_set():
+                raise RuntimeError(f"Pipeline lease lost before stage completion for run={run_id} stage={stage}")
+
             resp = api.stage_complete(run_id=run_id, worker_id=worker_id, machine_id=machine_id, stage=stage)
+            if not bool(resp.get("_ok", True)):
+                raise RuntimeError(f"Stage completion failed for run={run_id} stage={stage}: {resp}")
+            if int(resp.get("_status", 200) or 200) == 409:
+                raise RuntimeError(f"Stage completion rejected due lease conflict for run={run_id} stage={stage}")
             logger.info("Stage complete acknowledged: run=%s stage=%s resp=%s", run_id, stage, resp)
         except Exception as exc:
             tb = traceback.format_exc(limit=3)

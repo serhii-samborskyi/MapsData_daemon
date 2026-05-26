@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
@@ -125,7 +126,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.pipeline_heartbeat_interval.setRange(1, 3600)
         self.pipeline_fast_scraper = QtWidgets.QComboBox()
         self.pipeline_fast_scraper.addItem("Scrapy (fast)", "scrapy")
-        self.pipeline_fast_scraper.addItem("Playwright", "playwright")
+        self.pipeline_fast_scraper.addItem("Camoufox", "camoufox")
+        self.pipeline_fast_scraper.addItem("Playwright (legacy)", "playwright")
         self.pipeline_fast_concurrency = QtWidgets.QSpinBox()
         self.pipeline_fast_concurrency.setRange(1, 20)
         self.pipeline_fast_batches_multiplier = QtWidgets.QDoubleSpinBox()
@@ -139,8 +141,9 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.pipeline_fast_max_batches_cap = QtWidgets.QSpinBox()
         self.pipeline_fast_max_batches_cap.setRange(0, 10000)
         self.pipeline_fallback_scraper = QtWidgets.QComboBox()
-        self.pipeline_fallback_scraper.addItem("Playwright", "playwright")
+        self.pipeline_fallback_scraper.addItem("Camoufox", "camoufox")
         self.pipeline_fallback_scraper.addItem("Scrapy", "scrapy")
+        self.pipeline_fallback_scraper.addItem("Playwright (legacy)", "playwright")
         self.pipeline_fallback_concurrency = QtWidgets.QSpinBox()
         self.pipeline_fallback_concurrency.setRange(1, 20)
         self.pipeline_fallback_batches_multiplier = QtWidgets.QDoubleSpinBox()
@@ -203,6 +206,8 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.maps_scroll_pause_max = QtWidgets.QDoubleSpinBox()
         self.maps_scroll_pause_max.setRange(0.0, 30.0)
         self.maps_scroll_pause_max.setDecimals(1)
+        self.maps_proxy_url = QtWidgets.QLineEdit()
+        self.maps_proxy_url.setPlaceholderText("user:pass@host:port")
         self.maps_csv_dir = QtWidgets.QLineEdit()
         maps_form.addRow("Batch size", self.maps_batch_size)
         maps_form.addRow("Max concurrent", self.maps_max_concurrent)
@@ -213,13 +218,15 @@ class DaemonUI(QtWidgets.QMainWindow):
         maps_form.addRow("Slow pause max (s)", self.maps_slow_pause_max)
         maps_form.addRow("Scroll pause min (s)", self.maps_scroll_pause_min)
         maps_form.addRow("Scroll pause max (s)", self.maps_scroll_pause_max)
+        maps_form.addRow("Maps proxy URL", self.maps_proxy_url)
         maps_form.addRow("CSV output dir", self.maps_csv_dir)
 
         email_content = QtWidgets.QWidget()
         email_form = QtWidgets.QFormLayout(email_content)
         self.email_scraper_engine = QtWidgets.QComboBox()
-        self.email_scraper_engine.addItem("Playwright (more emails)", "playwright")
+        self.email_scraper_engine.addItem("Camoufox (recommended)", "camoufox")
         self.email_scraper_engine.addItem("Scrapy (faster)", "scrapy")
+        self.email_scraper_engine.addItem("Playwright (legacy)", "playwright")
         self.email_batch = QtWidgets.QSpinBox()
         self.email_batch.setRange(1, 200)
         self.email_concurrency = QtWidgets.QSpinBox()
@@ -240,8 +247,11 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_max_batches_facebook.setRange(0, 200)
         self.email_facebook = QtWidgets.QCheckBox("Enable Facebook scraping")
         self.email_facebook_engine = QtWidgets.QComboBox()
-        self.email_facebook_engine.addItem("Playwright", "playwright")
+        self.email_facebook_engine.addItem("Camoufox", "camoufox")
         self.email_facebook_engine.addItem("Scrapy (HTTP)", "scrapy")
+        self.email_facebook_engine.addItem("Playwright (legacy)", "playwright")
+        self.email_facebook_proxy_url = QtWidgets.QLineEdit()
+        self.email_facebook_proxy_url.setPlaceholderText("user:pass@host:port")
         self.email_same_domain_only = QtWidgets.QCheckBox("Scrape only within company domain")
         email_form.addRow("Scraper engine", self.email_scraper_engine)
         email_form.addRow("Batch", self.email_batch)
@@ -253,6 +263,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         email_form.addRow("Max batches per run (0 = unlimited)", self.email_max_batches)
         email_form.addRow("Max Facebook batches per run (0 = disabled)", self.email_max_batches_facebook)
         email_form.addRow("Facebook fallback engine", self.email_facebook_engine)
+        email_form.addRow("Facebook proxy URL", self.email_facebook_proxy_url)
         email_form.addRow("", self.email_facebook)
         email_form.addRow("", self.email_same_domain_only)
 
@@ -266,10 +277,16 @@ class DaemonUI(QtWidgets.QMainWindow):
         status_layout = QtWidgets.QFormLayout(status_group)
         self.maps_status = QtWidgets.QLabel("Stopped")
         self.email_status = QtWidgets.QLabel("Stopped")
+        self.maps_current_work = QtWidgets.QLabel("Stopped")
+        self.email_current_work = QtWidgets.QLabel("Stopped")
+        self.maps_current_work.setWordWrap(True)
+        self.email_current_work.setWordWrap(True)
         self.email_regular_found = QtWidgets.QLabel("0")
         self.email_facebook_found = QtWidgets.QLabel("0")
         status_layout.addRow("Maps daemon", self.maps_status)
         status_layout.addRow("Email daemon", self.email_status)
+        status_layout.addRow("Worker A current", self.maps_current_work)
+        status_layout.addRow("Worker B current", self.email_current_work)
         status_layout.addRow("Emails found (regular)", self.email_regular_found)
         status_layout.addRow("Emails found (Facebook)", self.email_facebook_found)
 
@@ -410,6 +427,7 @@ class DaemonUI(QtWidgets.QMainWindow):
     def _on_process_finished(self, name: str, code: int, status: QtCore.QProcess.ExitStatus) -> None:
         status_name = "NormalExit" if status == QtCore.QProcess.NormalExit else "CrashExit"
         self.log_view.appendPlainText(f"[ui] {name} exited: code={code}, status={status_name}")
+        self._set_current_work(name, "Stopped")
         self._update_status(name)
 
     def _append_log(self, name: str, proc: QtCore.QProcess) -> None:
@@ -420,6 +438,7 @@ class DaemonUI(QtWidgets.QMainWindow):
             self.log_view.appendPlainText(f"[{name}] {line}")
             if name in {"email", "maps"}:
                 self._track_email_found(line)
+                self._track_pipeline_activity(name, line)
 
     def _reset_email_counters(self) -> None:
         self._email_regular_found_count = 0
@@ -455,17 +474,75 @@ class DaemonUI(QtWidgets.QMainWindow):
             self._email_regular_found_count += 1
             self.email_regular_found.setText(str(self._email_regular_found_count))
 
+    @staticmethod
+    def _human_stage(stage: str) -> str:
+        return str(stage or "").strip().replace("_", " ").title()
+
+    def _set_current_work(self, name: str, text: str) -> None:
+        if name == "maps":
+            self.maps_current_work.setText(text)
+        elif name == "email":
+            self.email_current_work.setText(text)
+
+    def _track_pipeline_activity(self, name: str, line: str) -> None:
+        text = (line or "").strip()
+        if not text:
+            return
+
+        claim_named = re.search(
+            r"Claimed pipeline run=(\S+)\s+campaign=(\S+)\s+campaign_name=(.*?)\s+stage=(\S+)",
+            text,
+        )
+        if claim_named:
+            campaign_id = claim_named.group(2)
+            campaign_name = claim_named.group(3).strip()
+            stage = self._human_stage(claim_named.group(4))
+            display_name = campaign_name if campaign_name else f"Campaign {campaign_id}"
+            self._set_current_work(name, f"{display_name} (#{campaign_id}) · {stage}")
+            return
+
+        claim_basic = re.search(
+            r"Claimed pipeline run=(\S+)\s+campaign=(\S+)\s+stage=(\S+)",
+            text,
+        )
+        if claim_basic:
+            campaign_id = claim_basic.group(2)
+            stage = self._human_stage(claim_basic.group(3))
+            self._set_current_work(name, f"Campaign #{campaign_id} · {stage}")
+            return
+
+        if "No claimable run (" in text:
+            self._set_current_work(name, "Idle")
+            return
+
+        failed = re.search(r"Stage failed: run=\S+\s+campaign=(\S+)\s+stage=(\S+)", text)
+        if failed:
+            self._set_current_work(name, f"Campaign #{failed.group(1)} · Failed ({self._human_stage(failed.group(2))})")
+            return
+
+        if "Pipeline worker stopping" in text:
+            self._set_current_work(name, "Stopped")
+            return
+
     def _update_status(self, name: str) -> None:
         if name == "maps":
             running = self.maps_proc.state() != QtCore.QProcess.NotRunning
             self.maps_status.setText("Running" if running else "Stopped")
             self.btn_start_maps.setEnabled(not running)
             self.btn_stop_maps.setEnabled(running)
+            if running and self.maps_current_work.text() == "Stopped":
+                self.maps_current_work.setText("Idle")
+            if not running:
+                self.maps_current_work.setText("Stopped")
         elif name == "email":
             running = self.email_proc.state() != QtCore.QProcess.NotRunning
             self.email_status.setText("Running" if running else "Stopped")
             self.btn_start_email.setEnabled(not running)
             self.btn_stop_email.setEnabled(running)
+            if running and self.email_current_work.text() == "Stopped":
+                self.email_current_work.setText("Idle")
+            if not running:
+                self.email_current_work.setText("Stopped")
         self._update_mode_labels()
 
     def _update_mode_labels(self) -> None:
@@ -519,7 +596,7 @@ class DaemonUI(QtWidgets.QMainWindow):
             fast_policy_index = 0
         self.pipeline_fast_email_policy.setCurrentIndex(fast_policy_index)
         self.pipeline_fast_max_batches_cap.setValue(int(pipeline_cfg.get("fast_max_batches_cap", 0)))
-        fallback_engine = str(pipeline_cfg.get("fallback_scraper", "playwright")).lower().strip()
+        fallback_engine = str(pipeline_cfg.get("fallback_scraper", "camoufox")).lower().strip()
         fallback_engine_index = self.pipeline_fallback_scraper.findData(fallback_engine)
         if fallback_engine_index == -1:
             fallback_engine_index = 0
@@ -548,6 +625,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.maps_slow_pause_max.setValue(float(maps_cfg.get("slow_place_pause_max_s", 1.8)))
         self.maps_scroll_pause_min.setValue(float(maps_cfg.get("scroll_pause_min_s", 0.8)))
         self.maps_scroll_pause_max.setValue(float(maps_cfg.get("scroll_pause_max_s", 0.8)))
+        self.maps_proxy_url.setText(str(maps_cfg.get("proxy_url", "")))
         self.maps_csv_dir.setText(maps_cfg.get("csv_dir", ""))
 
         self.email_batch.setValue(int(email_cfg.get("batch", 10)))
@@ -560,12 +638,13 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.email_max_batches_facebook.setValue(int(email_cfg.get("max_batches_facebook", 0)))
         self.email_facebook.setChecked(bool(email_cfg.get("facebook", False)))
         self.email_same_domain_only.setChecked(bool(email_cfg.get("same_domain_only", True)))
-        facebook_engine = str(email_cfg.get("facebook_engine", "playwright")).lower().strip()
+        self.email_facebook_proxy_url.setText(str(email_cfg.get("facebook_proxy_url", "")))
+        facebook_engine = str(email_cfg.get("facebook_engine", "camoufox")).lower().strip()
         facebook_engine_index = self.email_facebook_engine.findData(facebook_engine)
         if facebook_engine_index == -1:
             facebook_engine_index = 0
         self.email_facebook_engine.setCurrentIndex(facebook_engine_index)
-        engine = str(email_cfg.get("scraper", "playwright")).lower().strip()
+        engine = str(email_cfg.get("scraper", "camoufox")).lower().strip()
         engine_index = self.email_scraper_engine.findData(engine)
         if engine_index == -1:
             engine_index = 0
@@ -598,7 +677,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         pipeline_cfg["fast_batches_multiplier"] = float(self.pipeline_fast_batches_multiplier.value())
         pipeline_cfg["fast_email_policy"] = str(self.pipeline_fast_email_policy.currentData() or "business_only")
         pipeline_cfg["fast_max_batches_cap"] = int(self.pipeline_fast_max_batches_cap.value())
-        pipeline_cfg["fallback_scraper"] = str(self.pipeline_fallback_scraper.currentData() or "playwright")
+        pipeline_cfg["fallback_scraper"] = str(self.pipeline_fallback_scraper.currentData() or "camoufox")
         pipeline_cfg["fallback_concurrency"] = int(self.pipeline_fallback_concurrency.value())
         pipeline_cfg["fallback_batches_multiplier"] = float(self.pipeline_fallback_batches_multiplier.value())
         pipeline_cfg["fallback_facebook_batches_multiplier"] = float(self.pipeline_fallback_fb_batches_multiplier.value())
@@ -623,6 +702,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["maps"]["slow_place_pause_max_s"] = slow_max
         cfg["maps"]["scroll_pause_min_s"] = scroll_min
         cfg["maps"]["scroll_pause_max_s"] = scroll_max
+        cfg["maps"]["proxy_url"] = self.maps_proxy_url.text().strip()
         cfg["maps"]["csv_dir"] = self.maps_csv_dir.text().strip()
 
         cfg["email"]["batch"] = int(self.email_batch.value())
@@ -634,9 +714,10 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["email"]["max_batches"] = int(self.email_max_batches.value())
         cfg["email"]["max_batches_facebook"] = int(self.email_max_batches_facebook.value())
         cfg["email"]["facebook"] = bool(self.email_facebook.isChecked())
-        cfg["email"]["facebook_engine"] = str(self.email_facebook_engine.currentData() or "playwright")
+        cfg["email"]["facebook_engine"] = str(self.email_facebook_engine.currentData() or "camoufox")
+        cfg["email"]["facebook_proxy_url"] = self.email_facebook_proxy_url.text().strip()
         cfg["email"]["same_domain_only"] = bool(self.email_same_domain_only.isChecked())
-        cfg["email"]["scraper"] = str(self.email_scraper_engine.currentData() or "playwright")
+        cfg["email"]["scraper"] = str(self.email_scraper_engine.currentData() or "camoufox")
         return cfg
 
     def _save_config(self) -> None:
@@ -654,6 +735,7 @@ class DaemonUI(QtWidgets.QMainWindow):
         if self.maps_proc.state() != QtCore.QProcess.NotRunning:
             return
         self._save_config()
+        self.maps_current_work.setText("Starting...")
         self.maps_proc.setWorkingDirectory(self.base_dir)
         mode_flag = self._daemon_mode_flag()
         self.maps_proc.start(
@@ -672,6 +754,7 @@ class DaemonUI(QtWidgets.QMainWindow):
             return
         self._reset_email_counters()
         self._save_config()
+        self.email_current_work.setText("Starting...")
         self.email_proc.setWorkingDirectory(self.base_dir)
         mode_flag = self._daemon_mode_flag()
         self.email_proc.start(

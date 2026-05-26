@@ -31,8 +31,8 @@ LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
 if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
     sys.path.insert(0, LOCAL_DEPS)
 
-from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
+from browser_backend import AsyncBrowserRuntime, backend_display_name, normalize_proxy_url
 from email_quality import (
     filter_valid_emails,
     is_allowed_domain as quality_is_allowed_domain,
@@ -519,6 +519,7 @@ async def extract_emails_from_facebook_http(
     http_client,
     facebook_url: str,
     timeout: float = 8.0,
+    facebook_proxy_url: str = "",
 ) -> Set[str]:
     if http_client is None:
         return set()
@@ -527,9 +528,14 @@ async def extract_emails_from_facebook_http(
     if not facebook_url.rstrip("/").endswith("/about"):
         targets.append(facebook_url.rstrip("/") + "/about")
 
+    proxy_url = normalize_proxy_url(facebook_proxy_url)
     for target in targets:
         try:
-            html = http_client.get_text(target, headers={"Accept": "text/html,application/xhtml+xml"})
+            html = http_client.get_text(
+                target,
+                headers={"Accept": "text/html,application/xhtml+xml"},
+                proxy_url=proxy_url,
+            )
         except Exception:
             html = ""
         if not html:
@@ -545,10 +551,16 @@ async def extract_emails_from_facebook_with_engine(
     facebook_url: str,
     timeout: float,
     facebook_engine: str,
+    facebook_proxy_url: str = "",
 ) -> Set[str]:
-    engine = (facebook_engine or "playwright").strip().lower()
+    engine = (facebook_engine or "camoufox").strip().lower()
     if engine == "scrapy":
-        return await extract_emails_from_facebook_http(http_client, facebook_url, timeout=timeout)
+        return await extract_emails_from_facebook_http(
+            http_client,
+            facebook_url,
+            timeout=timeout,
+            facebook_proxy_url=facebook_proxy_url,
+        )
     return await extract_emails_from_facebook(browser, facebook_url, timeout=timeout)
 
 
@@ -564,7 +576,8 @@ async def extract_emails(
     allow_third_party: bool = False,
     check_facebook: bool = False,
     http_client=None,
-    facebook_engine: str = "playwright",
+    facebook_engine: str = "camoufox",
+    facebook_proxy_url: str = "",
     same_domain_only: bool = True,
 ) -> Set[str]:
     """
@@ -754,6 +767,7 @@ async def extract_emails(
                             facebook_url=fb_url,
                             timeout=timeout,
                             facebook_engine=facebook_engine,
+                            facebook_proxy_url=facebook_proxy_url,
                         )
                         if fb_emails:
                             logger.info(f"✅ FACEBOOK SUCCESS: Found {len(fb_emails)} email(s) on Facebook page {fb_url}: {list(fb_emails)}")
@@ -833,13 +847,15 @@ class HttpClient:
         delay *= (0.75 + random.random() * 0.5)
         time.sleep(delay)
 
-    def get_text(self, url: str, headers: Optional[Dict[str, str]] = None) -> str:
+    def get_text(self, url: str, headers: Optional[Dict[str, str]] = None, proxy_url: str = "") -> str:
         headers = headers or {"Accept": "application/json"}
+        normalized_proxy = normalize_proxy_url(proxy_url)
+        proxies = {"http": normalized_proxy, "https": normalized_proxy} if normalized_proxy else None
         for attempt in range(self.max_retries):
             try:
                 if requests is not None:
                     r = requests.get(url, headers=headers, timeout=self.timeout, allow_redirects=True,
-                                     verify=(False if self.insecure else True))
+                                     verify=(False if self.insecure else True), proxies=proxies)
                     if r.status_code >= 400:
                         raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                     return r.text or ""
@@ -960,7 +976,8 @@ async def scrape_and_update_immediate(
     min_domain_letters: int,
     domain_timeout: float,
     kill_browser_on_timeout: bool,
-    facebook_engine: str = "playwright",
+    facebook_engine: str = "camoufox",
+    facebook_proxy_url: str = "",
     same_domain_only: bool = True,
     facebook: bool = False,
     email_policy: str = "any_valid",
@@ -1053,8 +1070,14 @@ async def scrape_and_update_immediate(
                     logger.info(f"Usable domains in batch: {len(contacts)}")
 
                     results: List[Any] = []
-                    async with async_playwright() as pw:
-                        browser = await pw.chromium.launch(headless=True)
+                    runtime = AsyncBrowserRuntime(
+                        headless=True,
+                        camoufox_options={"block_images": True},
+                        proxy_url=(facebook_proxy_url if facebook else ""),
+                    )
+                    browser = await runtime.launch()
+                    logger.info("Email browser backend: %s", backend_display_name(None))
+                    try:
                         browser_lock = asyncio.Lock()
                         sem = asyncio.Semaphore(phase_concurrency)
                         allow_restart = kill_browser_on_timeout and phase_concurrency <= 1
@@ -1063,11 +1086,7 @@ async def scrape_and_update_immediate(
                         async def restart_browser():
                             nonlocal browser
                             async with browser_lock:
-                                try:
-                                    await browser.close()
-                                except Exception:
-                                    pass
-                                browser = await pw.chromium.launch(headless=True)
+                                browser = await runtime.restart()
                                 logger.warning("Browser restarted after timeout.")
 
                         async def maybe_restart_browser():
@@ -1094,6 +1113,7 @@ async def scrape_and_update_immediate(
                                 check_facebook=check_facebook,
                                 http_client=http,
                                 facebook_engine=facebook_engine,
+                                facebook_proxy_url=facebook_proxy_url,
                                 same_domain_only=same_domain_only,
                             )
 
@@ -1157,6 +1177,7 @@ async def scrape_and_update_immediate(
                                                                 facebook_url=fb_url,
                                                                 timeout=timeout,
                                                                 facebook_engine=facebook_engine,
+                                                                facebook_proxy_url=facebook_proxy_url,
                                                             )
                                                             if fb_emails:
                                                                 logger.info(f"✅ FACEBOOK SUCCESS: Found {len(fb_emails)} email(s) on Facebook page {fb_url}: {list(fb_emails)}")
@@ -1279,11 +1300,8 @@ async def scrape_and_update_immediate(
                             *[scrape_one(i, c) for i, c in enumerate(contacts, 1)],
                             return_exceptions=True,
                         )
-
-                        try:
-                            await browser.close()
-                        except Exception:
-                            pass
+                    finally:
+                        await runtime.close()
 
                     unsaved = [r for r in results if isinstance(r, dict) and r.get("email")]
                     if unsaved:
@@ -1376,7 +1394,8 @@ def main():
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--no-kill-on-timeout", action="store_true", help="Don't restart browser on timeout")
     p.add_argument("--facebook", action="store_true", help="Check Facebook pages linked from website for additional emails")
-    p.add_argument("--facebook-engine", default="playwright", choices=["playwright", "scrapy"], help="Engine for Facebook fallback")
+    p.add_argument("--facebook-engine", default="camoufox", choices=["camoufox", "playwright", "scrapy"], help="Engine for Facebook fallback")
+    p.add_argument("--facebook-proxy", default="", help="Optional rotating proxy URL for Facebook fallback (user:pass@host:port)")
     p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
     p.add_argument(
         "--email-policy",
@@ -1391,6 +1410,8 @@ def main():
     logger.info(f"Public providers: {len(PUBLIC_PROVIDERS)} recognized providers")
     if args.facebook:
         logger.info(f"Facebook page scraping: ENABLED (engine={args.facebook_engine})")
+        if str(args.facebook_proxy or "").strip():
+            logger.info("Facebook proxy: ENABLED")
     if args.same_domain_only:
         logger.info("Same-domain-only crawling: ENABLED")
     logger.info("Email selection policy: %s", args.email_policy)
@@ -1408,6 +1429,7 @@ def main():
         max_batches_facebook=args.max_batches_facebook,
         kill_browser_on_timeout=not args.no_kill_on_timeout,
         facebook_engine=args.facebook_engine,
+        facebook_proxy_url=str(args.facebook_proxy or ""),
         same_domain_only=args.same_domain_only,
         facebook=args.facebook,
         email_policy=args.email_policy,

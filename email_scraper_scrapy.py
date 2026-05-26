@@ -28,14 +28,10 @@ try:
 except Exception:
     requests = None  # type: ignore
 
-try:
-    from playwright.sync_api import sync_playwright
-except Exception:
-    sync_playwright = None  # type: ignore
-
 import ssl
 from urllib.request import Request, urlopen
 
+from browser_backend import SyncBrowserRuntime, backend_display_name, normalize_proxy_url
 from email_quality import (
     extract_candidate_emails_from_text,
     normalize_domain,
@@ -71,8 +67,10 @@ class HttpClient:
     def _sleep(self, attempt: int) -> None:
         time.sleep(0.5 * (attempt + 1))
 
-    def get_text(self, url: str, headers: Optional[Dict[str, str]] = None) -> str:
+    def get_text(self, url: str, headers: Optional[Dict[str, str]] = None, proxy_url: str = "") -> str:
         req_headers = headers or {"Accept": "text/html,application/json"}
+        normalized_proxy = normalize_proxy_url(proxy_url)
+        proxies = {"http": normalized_proxy, "https": normalized_proxy} if normalized_proxy else None
         for attempt in range(self.max_retries):
             try:
                 if requests is not None:
@@ -82,6 +80,7 @@ class HttpClient:
                         timeout=self.timeout,
                         allow_redirects=True,
                         verify=(not self.insecure),
+                        proxies=proxies,
                     )
                     resp.raise_for_status()
                     return resp.text or ""
@@ -237,6 +236,7 @@ class EmailSpider(scrapy.Spider):
         facebook: bool,
         max_batches_facebook: int,
         facebook_engine: str,
+        facebook_proxy_url: str,
         same_domain_only: bool,
         email_policy: str,
     ) -> None:
@@ -250,7 +250,8 @@ class EmailSpider(scrapy.Spider):
         self.http = HttpClient(timeout=http_timeout, max_retries=http_max_retries)
         self.facebook = bool(facebook)
         self.max_batches_facebook = int(max_batches_facebook or 0)
-        self.facebook_engine = (facebook_engine or "playwright").strip().lower()
+        self.facebook_engine = (facebook_engine or "camoufox").strip().lower()
+        self.facebook_proxy_url = normalize_proxy_url(facebook_proxy_url)
         self.same_domain_only = bool(same_domain_only)
         self.email_policy = _normalize_email_policy(email_policy, default="any_valid")
         self.batch_count = 0
@@ -258,8 +259,8 @@ class EmailSpider(scrapy.Spider):
         self._no_more_batches = False
         self.contact_states: Dict[int, Dict] = {}
         self._saved_contacts: Set[int] = set()
-        self._pw_manager = None
-        self._pw_browser = None
+        self._browser_runtime = None
+        self._browser_instance = None
         self._playwright_failed = False
 
     @classmethod
@@ -522,53 +523,50 @@ class EmailSpider(scrapy.Spider):
         if not links:
             return None
         candidates: Set[str] = set()
-        engine = self.facebook_engine if self.facebook_engine in {"playwright", "scrapy"} else "playwright"
-        if engine == "playwright":
+        engine = self.facebook_engine if self.facebook_engine in {"playwright", "camoufox", "scrapy"} else "camoufox"
+        if engine in {"playwright", "camoufox"}:
             candidates.update(self._fetch_facebook_emails_playwright(links))
         else:
             for fb_url in list(links)[:2]:
-                html = self.http.get_text(fb_url)
+                html = self.http.get_text(fb_url, proxy_url=self.facebook_proxy_url)
                 if html:
                     candidates.update(extract_emails_from_text(html))
                 if not fb_url.endswith("/about"):
                     about_url = fb_url.rstrip("/") + "/about"
-                    about_html = self.http.get_text(about_url)
+                    about_html = self.http.get_text(about_url, proxy_url=self.facebook_proxy_url)
                     if about_html:
                         candidates.update(extract_emails_from_text(about_html))
         return pick_best_email(domain, candidates, email_policy=self.email_policy) if candidates else None
 
     def _get_playwright_browser(self):
-        if self._pw_browser is not None:
-            return self._pw_browser
+        if self._browser_instance is not None:
+            return self._browser_instance
         if self._playwright_failed:
             return None
-        if sync_playwright is None:
-            logger.warning("Playwright is not available for Scrapy Facebook fallback.")
-            self._playwright_failed = True
-            return None
         try:
-            self._pw_manager = sync_playwright().start()
-            self._pw_browser = self._pw_manager.chromium.launch(headless=True)
-            return self._pw_browser
+            if self._browser_runtime is None:
+                self._browser_runtime = SyncBrowserRuntime(
+                    headless=True,
+                    camoufox_options={"block_images": True},
+                    proxy_url=self.facebook_proxy_url,
+                )
+            self._browser_instance = self._browser_runtime.launch()
+            logger.info("Scrapy Facebook browser backend: %s", backend_display_name(None))
+            return self._browser_instance
         except Exception as exc:
-            logger.warning("Failed to start Playwright for Scrapy Facebook fallback: %s", exc)
+            logger.warning("Failed to start browser fallback for Scrapy Facebook stage: %s", exc)
             self._playwright_failed = True
             self._close_playwright_browser()
             return None
 
     def _close_playwright_browser(self) -> None:
-        if self._pw_browser is not None:
+        if self._browser_runtime is not None:
             try:
-                self._pw_browser.close()
+                self._browser_runtime.close()
             except Exception:
                 pass
-            self._pw_browser = None
-        if self._pw_manager is not None:
-            try:
-                self._pw_manager.stop()
-            except Exception:
-                pass
-            self._pw_manager = None
+        self._browser_runtime = None
+        self._browser_instance = None
 
     def _fetch_facebook_emails_playwright(self, links: Set[str]) -> Set[str]:
         browser = self._get_playwright_browser()
@@ -660,7 +658,8 @@ def main() -> None:
     p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
-    p.add_argument("--facebook-engine", default="playwright", choices=["playwright", "scrapy"], help="Engine for Facebook fallback")
+    p.add_argument("--facebook-engine", default="camoufox", choices=["camoufox", "playwright", "scrapy"], help="Engine for Facebook fallback")
+    p.add_argument("--facebook-proxy", default="", help="Optional rotating proxy URL for Facebook fallback (user:pass@host:port)")
     p.add_argument("--same-domain-only", action="store_true", help="Only follow links within the company domain")
     p.add_argument(
         "--email-policy",
@@ -684,6 +683,8 @@ def main() -> None:
             args.max_batches_facebook,
             args.facebook_engine,
         )
+        if str(args.facebook_proxy or "").strip():
+            logger.info("Facebook proxy: ENABLED")
     elif args.facebook:
         logger.info("Facebook checkbox enabled but max Facebook batches is 0; Facebook fallback is disabled.")
 
@@ -716,6 +717,7 @@ def main() -> None:
         facebook=args.facebook,
         max_batches_facebook=args.max_batches_facebook,
         facebook_engine=args.facebook_engine,
+        facebook_proxy_url=str(args.facebook_proxy or ""),
         same_domain_only=args.same_domain_only,
         email_policy=args.email_policy,
     )

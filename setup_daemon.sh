@@ -54,17 +54,18 @@ echo "==> Installing Python packages"
 TARGET_DIR="$SCRIPT_DIR/.deps"
 mkdir -p "$TARGET_DIR"
 if [ "$NO_UI" -eq 1 ]; then
-  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml scrapy
+  $PIP install --upgrade --target "$TARGET_DIR" camoufox playwright requests beautifulsoup4 lxml scrapy
 else
-  $PIP install --upgrade --target "$TARGET_DIR" playwright requests beautifulsoup4 lxml scrapy PySide6
+  $PIP install --upgrade --target "$TARGET_DIR" camoufox playwright requests beautifulsoup4 lxml scrapy PySide6
 fi
 
-echo "==> Installing Playwright browsers"
-PYTHONPATH="$TARGET_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m playwright install
+echo "==> Fetching Camoufox browser binaries"
+PYTHONPATH="$TARGET_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m camoufox fetch
 
 if [ "$WITH_DEPS" -eq 1 ] && command_exists apt-get; then
-  echo "==> Installing Playwright system deps (Linux)"
-  PYTHONPATH="$TARGET_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 -m playwright install-deps
+  echo "==> Installing runtime deps for daemon workers (Linux)"
+  sudo apt-get update
+  sudo apt-get install -y xvfb libnss3 libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxi6 libxtst6 libasound2t64 || true
 fi
 
 echo "==> Done"

@@ -95,6 +95,7 @@ def run_daemon(
     slow_place_pause_max_s: float,
     scroll_pause_min_s: float,
     scroll_pause_max_s: float,
+    proxy_url: str,
     csv_dir: str,
     log_path: str,
 ) -> None:
@@ -103,6 +104,8 @@ def run_daemon(
     logger.info("Maps scrape mode: %s", maps_scraper.normalize_scrape_mode(scrape_mode))
     logger.info("Maps show browser: %s", maps_scraper.normalize_show_browser(show_browser))
     logger.info("Maps detail workers: %d", maps_scraper.normalize_detail_workers(detail_workers))
+    if maps_scraper.normalize_maps_proxy_url(proxy_url):
+        logger.info("Maps proxy configured for browser runtime.")
 
     maps_scraper.MAX_CONCURRENT = max_concurrent
     maps_scraper.DEFAULT_DETAIL_WORKERS = maps_scraper.normalize_detail_workers(detail_workers)
@@ -116,6 +119,7 @@ def run_daemon(
         maps_scraper.DEFAULT_SCROLL_PAUSE_MIN_S,
         maps_scraper.DEFAULT_SCROLL_PAUSE_MAX_S,
     ) = maps_scraper.normalize_scroll_pause_range(scroll_pause_min_s, scroll_pause_max_s)
+    maps_scraper.DEFAULT_PROXY_URL = maps_scraper.normalize_maps_proxy_url(proxy_url)
     logger.info(
         "Slow mode place pause range: %.2fs..%.2fs",
         maps_scraper.DEFAULT_SLOW_PLACE_PAUSE_MIN_S,
@@ -139,6 +143,7 @@ def run_daemon(
         scroll_pause_min_s=maps_scraper.DEFAULT_SCROLL_PAUSE_MIN_S,
         scroll_pause_max_s=maps_scraper.DEFAULT_SCROLL_PAUSE_MAX_S,
         detail_workers=maps_scraper.DEFAULT_DETAIL_WORKERS,
+        proxy_url=maps_scraper.DEFAULT_PROXY_URL,
     )
     global CURRENT_PROCESSOR
     CURRENT_PROCESSOR = processor
@@ -230,6 +235,7 @@ def main() -> None:
     parser.add_argument("--slow-place-pause-max", type=float, default=None, help="Slow mode maximum pause between place scrapes (seconds)")
     parser.add_argument("--scroll-pause-min", type=float, default=None, help="Minimum pause between feed scrolls (seconds)")
     parser.add_argument("--scroll-pause-max", type=float, default=None, help="Maximum pause between feed scrolls (seconds)")
+    parser.add_argument("--proxy-url", default=None, help="Optional rotating proxy URL for maps browser (user:pass@host:port)")
     parser.add_argument("--csv-dir", default=None, help="Optional CSV output directory")
     parser.add_argument("--log-path", default=None, help="Log file path")
     args = parser.parse_args()
@@ -249,6 +255,7 @@ def main() -> None:
     slow_place_pause_max_s = args.slow_place_pause_max if args.slow_place_pause_max is not None else maps_cfg.get("slow_place_pause_max_s", 1.8)
     scroll_pause_min_s = args.scroll_pause_min if args.scroll_pause_min is not None else maps_cfg.get("scroll_pause_min_s", 0.8)
     scroll_pause_max_s = args.scroll_pause_max if args.scroll_pause_max is not None else maps_cfg.get("scroll_pause_max_s", 0.8)
+    proxy_url = args.proxy_url if args.proxy_url is not None else maps_cfg.get("proxy_url", "")
     csv_dir = args.csv_dir if args.csv_dir is not None else maps_cfg.get("csv_dir", "")
     log_path = args.log_path or cfg.get("logging", {}).get("maps_log", "")
     pipeline_mode = args.pipeline_mode
@@ -300,6 +307,7 @@ def main() -> None:
         slow_place_pause_max_s=slow_place_pause_max_s,
         scroll_pause_min_s=scroll_pause_min_s,
         scroll_pause_max_s=scroll_pause_max_s,
+        proxy_url=proxy_url,
         csv_dir=csv_dir,
         log_path=log_path,
     )

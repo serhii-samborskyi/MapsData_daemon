@@ -16,9 +16,9 @@ LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
 if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
     sys.path.insert(0, LOCAL_DEPS)
 
-from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from lxml import html
+from browser_backend import AsyncBrowserRuntime, backend_display_name, normalize_proxy_url
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -444,20 +444,24 @@ async def enrich_businesses_with_place_pages(page, businesses):
     return businesses
 
 async def scroll_google_maps(search_query: str, max_concurrent: int = 3):
-    async with async_playwright() as p:
+    runtime = AsyncBrowserRuntime(
+        headless=False,
+        chromium_args=[
+            '--disable-blink-features=AutomationControlled',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-images',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+        ],
+        camoufox_options={"block_images": True},
+        proxy_url=DEFAULT_PROXY_URL,
+    )
+    try:
+        browser = await runtime.launch()
+        logger.info("Maps browser backend: %s", backend_display_name(None))
         try:
-            browser = await p.chromium.launch(
-                headless=False,
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--disable-extensions',
-                    '--disable-plugins',
-                    '--disable-images',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding'
-                ]
-            )
             page = await browser.new_page(viewport={'width': 1280, 'height': 720})
 
             search_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}"
@@ -470,7 +474,6 @@ async def scroll_google_maps(search_query: str, max_concurrent: int = 3):
             if await feed_container.count() == 0:
                 logger.error("Feed container not found")
                 await page.screenshot(path="screenshot.png")
-                await browser.close()
                 return
 
             logger.info("Found feed container")
@@ -522,13 +525,14 @@ async def scroll_google_maps(search_query: str, max_concurrent: int = 3):
 
             await page.screenshot(path="screenshot.png")
             logger.info("Screenshot saved as screenshot.png")
-            await browser.close()
-            logger.info("Browser closed")
+            logger.info("Browser session completed")
 
         except Exception as e:
             logger.error(f"Error occurred: {e}")
             await page.screenshot(path="screenshot.png")
-            await browser.close()
+    finally:
+        await runtime.close()
+        logger.info("Browser closed")
 
 async def main():
     search_query = "locksmith kenosha"
@@ -573,6 +577,7 @@ DEFAULT_SLOW_PLACE_PAUSE_MAX_S = float(os.environ.get("MAPS_SLOW_PLACE_PAUSE_MAX
 DEFAULT_SCROLL_PAUSE_MIN_S = float(os.environ.get("MAPS_SCROLL_PAUSE_MIN_S", "0.8"))
 DEFAULT_SCROLL_PAUSE_MAX_S = float(os.environ.get("MAPS_SCROLL_PAUSE_MAX_S", "0.8"))
 DEFAULT_DETAIL_WORKERS = int(os.environ.get("MAPS_DETAIL_WORKERS", "1"))
+DEFAULT_PROXY_URL = normalize_proxy_url(os.environ.get("MAPS_PROXY_URL", ""))
 VALID_SCRAPE_MODES = {"fast", "slow"}
 
 
@@ -634,6 +639,12 @@ def normalize_detail_workers(value: Optional[Any]) -> int:
     except Exception:
         workers = int(DEFAULT_DETAIL_WORKERS)
     return max(1, workers)
+
+
+def normalize_maps_proxy_url(value: Optional[Any]) -> str:
+    if value is None:
+        return normalize_proxy_url(DEFAULT_PROXY_URL)
+    return normalize_proxy_url(str(value))
 
 try:
     import requests  # type: ignore
@@ -766,9 +777,10 @@ class LeadsApiClient:
                 out.append(Campaign(id=cid, name=name))
         return out
 
-    def get_requests_for_campaign_name(self, campaign_name: str) -> List[RequestItem]:
+    def get_requests_for_campaign_name(self, campaign_name: str, include_inuse: bool = False) -> List[RequestItem]:
         enc = urllib.parse.quote(campaign_name)
-        url = f"{self.base_url}/campaign/{enc}/requests"
+        suffix = "?include_inuse=true" if include_inuse else ""
+        url = f"{self.base_url}/campaign/{enc}/requests{suffix}"
         data = self.http.get_json(url)
         out: List[RequestItem] = []
         for r in (data.get("requests") or []):
@@ -931,6 +943,7 @@ class CampaignProcessor:
         scroll_pause_min_s: Optional[float] = None,
         scroll_pause_max_s: Optional[float] = None,
         detail_workers: Optional[int] = None,
+        proxy_url: Optional[str] = None,
     ):
         self.api = api
         self.batch_size = batch_size
@@ -946,6 +959,7 @@ class CampaignProcessor:
             scroll_pause_max_s,
         )
         self.detail_workers = normalize_detail_workers(detail_workers)
+        self.proxy_url = normalize_maps_proxy_url(proxy_url)
         self._stop = False
 
     def stop(self):
@@ -1066,6 +1080,7 @@ class CampaignProcessor:
                     show_browser=self.show_browser,
                     scroll_pause_min_s=self.scroll_pause_min_s,
                     scroll_pause_max_s=self.scroll_pause_max_s,
+                    proxy_url=self.proxy_url,
                 )
                 if not ok:
                     logger.warning(f"Scrape returned no data for request {request.id}")
@@ -1086,7 +1101,7 @@ class CampaignProcessor:
             self.detail_workers,
         )
         while not self._stop:
-            reqs = self.api.get_requests_for_campaign_name(campaign.name)
+            reqs = self.api.get_requests_for_campaign_name(campaign.name, include_inuse=True)
             if not reqs:
                 logger.info("No more requests; completing campaign.")
                 self.api.complete_campaign(campaign.id)
@@ -1130,12 +1145,22 @@ class CampaignProcessor:
                     scroll_pause_min_s=self.scroll_pause_min_s,
                     scroll_pause_max_s=self.scroll_pause_max_s,
                     detail_workers=self.detail_workers,
+                    proxy_url=self.proxy_url,
+                    should_stop=lambda: self._stop,
                 )
                 if not ok:
                     logger.warning("[slow] Campaign scrape returned no data.")
             except Exception as e:
                 logger.exception(f"[slow] Scrape error for campaign {campaign.id}: {e}")
             finally:
+                if self._stop:
+                    logger.warning(
+                        "[slow] Stop requested for campaign %s; keeping %d request(s) in current state for takeover.",
+                        campaign.id,
+                        len(pending),
+                    )
+                    time.sleep(1.0)
+                    continue
                 for request in pending:
                     self.api.set_request_status(request.id, "completed")
                     logger.info(
@@ -1157,6 +1182,7 @@ def run_all(
     scroll_pause_min_s: Optional[float] = None,
     scroll_pause_max_s: Optional[float] = None,
     detail_workers: Optional[int] = None,
+    proxy_url: Optional[str] = None,
 ) -> None:
     api = LeadsApiClient(DEFAULT_BASE_URL, HttpClient())
     processor = CampaignProcessor(
@@ -1170,6 +1196,7 @@ def run_all(
         scroll_pause_min_s=scroll_pause_min_s,
         scroll_pause_max_s=scroll_pause_max_s,
         detail_workers=detail_workers,
+        proxy_url=proxy_url,
     )
     if campaign_id and campaign_name:
         processor.process_campaign(Campaign(id=campaign_id, name=campaign_name))
@@ -1299,14 +1326,16 @@ def run_campaign_slow_dedup_and_yield_batches(
     scroll_pause_min_s: Optional[float] = None,
     scroll_pause_max_s: Optional[float] = None,
     detail_workers: Optional[int] = None,
+    proxy_url: Optional[str] = None,
+    should_stop: Optional[Callable[[], bool]] = None,
 ) -> bool:
     import asyncio
-    from playwright.async_api import async_playwright
 
     pause_low, pause_high = normalize_pause_range(pause_min_s, pause_max_s)
     scroll_pause_low, scroll_pause_high = normalize_scroll_pause_range(scroll_pause_min_s, scroll_pause_max_s)
     show = normalize_show_browser(show_browser)
     workers = normalize_detail_workers(detail_workers)
+    normalized_proxy = normalize_maps_proxy_url(proxy_url)
     logger.info(
         "Slow campaign scrape: %d requests, place pause %.2fs..%.2fs, scroll pause %.2fs..%.2fs, show_browser=%s, detail_workers=%d",
         len(requests),
@@ -1317,21 +1346,27 @@ def run_campaign_slow_dedup_and_yield_batches(
         show,
         workers,
     )
+    if normalized_proxy:
+        logger.info("Maps proxy enabled for slow mode browser runtime.")
 
     async def _run() -> bool:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=(not show),
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--disable-extensions',
-                    '--disable-plugins',
-                    '--disable-images',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding',
-                ],
-            )
+        runtime = AsyncBrowserRuntime(
+            headless=(not show),
+            chromium_args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+            ],
+            camoufox_options={"block_images": True},
+            proxy_url=normalized_proxy,
+        )
+        browser = await runtime.launch()
+        logger.info("Maps browser backend: %s", backend_display_name(None))
+        try:
             context = await browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -1347,6 +1382,9 @@ def run_campaign_slow_dedup_and_yield_batches(
                 ordered_targets: List[Tuple[str, str]] = []
 
                 for idx, request in enumerate(requests, 1):
+                    if callable(should_stop) and should_stop():
+                        logger.warning("[slow] Stop requested while collecting URLs; ending campaign scrape early.")
+                        break
                     query = (request.req_text or "").strip()
                     if not query:
                         continue
@@ -1408,6 +1446,9 @@ def run_campaign_slow_dedup_and_yield_batches(
                     worker_page = await context.new_page()
                     try:
                         while True:
+                            if callable(should_stop) and should_stop():
+                                logger.warning("[slow][worker-%d] Stop requested; exiting worker loop.", worker_id)
+                                break
                             async with target_iter_lock:
                                 try:
                                     idx, (place_url, request_id) = next(target_iter)
@@ -1463,7 +1504,8 @@ def run_campaign_slow_dedup_and_yield_batches(
                     await page.screenshot(path="screenshot.png")
                 except Exception:
                     pass
-                await browser.close()
+        finally:
+            await runtime.close()
 
     return asyncio.run(_run())
 
@@ -1476,13 +1518,14 @@ def run_scrape_and_yield_batches(
     show_browser: Optional[bool] = None,
     scroll_pause_min_s: Optional[float] = None,
     scroll_pause_max_s: Optional[float] = None,
+    proxy_url: Optional[str] = None,
 ) -> bool:
     import asyncio
-    from playwright.async_api import async_playwright
     import urllib.parse
 
     mode = normalize_scrape_mode(scrape_mode or DEFAULT_SCRAPE_MODE)
     show = normalize_show_browser(show_browser)
+    normalized_proxy = normalize_maps_proxy_url(proxy_url)
     scroll_pause_low, scroll_pause_high = normalize_scroll_pause_range(scroll_pause_min_s, scroll_pause_max_s)
     logger.info(
         "Maps scrape mode: %s | show_browser=%s | scroll pause range: %.2fs..%.2fs",
@@ -1491,12 +1534,27 @@ def run_scrape_and_yield_batches(
         scroll_pause_low,
         scroll_pause_high,
     )
+    if normalized_proxy:
+        logger.info("Maps proxy enabled for fast mode browser runtime.")
 
     async def _run() -> List[Dict[str, Any]]:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=(not show), args=[
-                '--disable-blink-features=AutomationControlled','--disable-extensions','--disable-plugins','--disable-images','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding'
-            ])
+        runtime = AsyncBrowserRuntime(
+            headless=(not show),
+            chromium_args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+            ],
+            camoufox_options={"block_images": True},
+            proxy_url=normalized_proxy,
+        )
+        browser = await runtime.launch()
+        logger.info("Maps browser backend: %s", backend_display_name(None))
+        try:
             context = await browser.new_context(user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -1530,13 +1588,12 @@ def run_scrape_and_yield_batches(
                     results = await enrich_businesses_with_place_pages(page, results)
                 try: await page.screenshot(path="screenshot.png")
                 except Exception: pass
-                await browser.close()
                 return results or []
             except Exception as e:
-                logger.error(f"[Adapter] Playwright error: {e}")
-                try: await browser.close()
-                except Exception: pass
+                logger.error(f"[Adapter] Browser error: {e}")
                 return []
+        finally:
+            await runtime.close()
 
     results: List[Dict[str, Any]] = asyncio.run(_run())
     if not results:

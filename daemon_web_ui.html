@@ -148,12 +148,12 @@
             <div class="field"><label>Claim interval (s)</label><input id="pipeline_claim_interval_s" type="number" min="1" max="3600"></div>
             <div class="field"><label>Lease seconds</label><input id="pipeline_lease_seconds" type="number" min="10" max="7200"></div>
             <div class="field"><label>Heartbeat interval (s)</label><input id="pipeline_heartbeat_interval_s" type="number" min="1" max="3600"></div>
-            <div class="field"><label>Fast stage scraper</label><select id="pipeline_fast_scraper"><option value="scrapy">Scrapy</option><option value="playwright">Playwright</option></select></div>
+            <div class="field"><label>Fast stage scraper</label><select id="pipeline_fast_scraper"><option value="scrapy">Scrapy</option><option value="camoufox">Camoufox</option><option value="playwright">Playwright (legacy)</option></select></div>
             <div class="field"><label>Fast concurrency</label><input id="pipeline_fast_concurrency" type="number" min="1" max="20"></div>
             <div class="field"><label>Fast batches multiplier</label><input id="pipeline_fast_batches_multiplier" type="number" step="0.05" min="0.1" max="3.0"></div>
             <div class="field"><label>Fast email policy</label><select id="pipeline_fast_email_policy"><option value="business_only">Business only</option><option value="business_or_public">Business or public</option><option value="any_valid">Any valid</option></select></div>
             <div class="field"><label>Fast max batches cap (0=auto)</label><input id="pipeline_fast_max_batches_cap" type="number" min="0" max="10000"></div>
-            <div class="field"><label>Fallback scraper</label><select id="pipeline_fallback_scraper"><option value="playwright">Playwright</option><option value="scrapy">Scrapy</option></select></div>
+            <div class="field"><label>Fallback scraper</label><select id="pipeline_fallback_scraper"><option value="camoufox">Camoufox</option><option value="scrapy">Scrapy</option><option value="playwright">Playwright (legacy)</option></select></div>
             <div class="field"><label>Fallback concurrency</label><input id="pipeline_fallback_concurrency" type="number" min="1" max="20"></div>
             <div class="field"><label>Fallback batches multiplier</label><input id="pipeline_fallback_batches_multiplier" type="number" step="0.05" min="0.1" max="3.0"></div>
             <div class="field"><label>Fallback FB multiplier</label><input id="pipeline_fallback_facebook_batches_multiplier" type="number" step="0.05" min="0.1" max="3.0"></div>
@@ -175,6 +175,7 @@
             <div class="field"><label>Slow pause max (s)</label><input id="maps_slow_place_pause_max_s" type="number" step="0.1" min="0" max="30"></div>
             <div class="field"><label>Scroll pause min (s)</label><input id="maps_scroll_pause_min_s" type="number" step="0.1" min="0" max="30"></div>
             <div class="field"><label>Scroll pause max (s)</label><input id="maps_scroll_pause_max_s" type="number" step="0.1" min="0" max="30"></div>
+            <div class="field"><label>Maps proxy URL</label><input id="maps_proxy_url" placeholder="user:pass@host:port"></div>
             <div class="field"><label>CSV output dir</label><input id="maps_csv_dir"></div>
           </div>
         </div>
@@ -182,7 +183,7 @@
         <div class="section">
           <h3>Email Worker</h3>
           <div class="fields">
-            <div class="field"><label>Scraper engine</label><select id="email_scraper"><option value="playwright">Playwright</option><option value="scrapy">Scrapy</option></select></div>
+            <div class="field"><label>Scraper engine</label><select id="email_scraper"><option value="camoufox">Camoufox</option><option value="scrapy">Scrapy</option><option value="playwright">Playwright (legacy)</option></select></div>
             <div class="field"><label>Batch</label><input id="email_batch" type="number" min="1" max="200"></div>
             <div class="field"><label>Concurrency</label><input id="email_concurrency" type="number" min="1" max="20"></div>
             <div class="field"><label>Timeout (s)</label><input id="email_timeout_s" type="number" step="0.1" min="1" max="120"></div>
@@ -191,7 +192,8 @@
             <div class="field"><label>Min domain letters</label><input id="email_min_domain_letters" type="number" min="1" max="10"></div>
             <div class="field"><label>Max batches (0=unlimited)</label><input id="email_max_batches" type="number" min="0" max="200"></div>
             <div class="field"><label>Max FB batches (0=disabled)</label><input id="email_max_batches_facebook" type="number" min="0" max="200"></div>
-            <div class="field"><label>Facebook fallback engine</label><select id="email_facebook_engine"><option value="playwright">Playwright</option><option value="scrapy">Scrapy</option></select></div>
+            <div class="field"><label>Facebook fallback engine</label><select id="email_facebook_engine"><option value="camoufox">Camoufox</option><option value="scrapy">Scrapy</option><option value="playwright">Playwright (legacy)</option></select></div>
+            <div class="field"><label>Facebook proxy URL</label><input id="email_facebook_proxy_url" placeholder="user:pass@host:port"></div>
             <div class="field check"><input id="email_facebook" type="checkbox"><label for="email_facebook">Enable Facebook scraping</label></div>
             <div class="field check"><input id="email_same_domain_only" type="checkbox"><label for="email_same_domain_only">Only same-domain links</label></div>
           </div>
@@ -268,6 +270,7 @@
       maps_slow_place_pause_max_s: 'maps_slow_place_pause_max_s',
       maps_scroll_pause_min_s: 'maps_scroll_pause_min_s',
       maps_scroll_pause_max_s: 'maps_scroll_pause_max_s',
+      maps_proxy_url: 'maps_proxy_url',
       maps_csv_dir: 'maps_csv_dir',
       email_scraper: 'email_scraper',
       email_batch: 'email_batch',
@@ -280,6 +283,7 @@
       email_max_batches_facebook: 'email_max_batches_facebook',
       email_facebook: 'email_facebook',
       email_facebook_engine: 'email_facebook_engine',
+      email_facebook_proxy_url: 'email_facebook_proxy_url',
       email_same_domain_only: 'email_same_domain_only',
     };
 
@@ -341,6 +345,7 @@
       setInput(ids.maps_slow_place_pause_max_s, m.slow_place_pause_max_s);
       setInput(ids.maps_scroll_pause_min_s, m.scroll_pause_min_s);
       setInput(ids.maps_scroll_pause_max_s, m.scroll_pause_max_s);
+      setInput(ids.maps_proxy_url, m.proxy_url);
       setInput(ids.maps_csv_dir, m.csv_dir);
 
       const e = cfg.email || {};
@@ -355,6 +360,7 @@
       setInput(ids.email_max_batches_facebook, e.max_batches_facebook);
       setInput(ids.email_facebook, e.facebook);
       setInput(ids.email_facebook_engine, e.facebook_engine);
+      setInput(ids.email_facebook_proxy_url, e.facebook_proxy_url);
       setInput(ids.email_same_domain_only, e.same_domain_only);
     }
 
@@ -396,6 +402,7 @@
           slow_place_pause_max_s: getInput(ids.maps_slow_place_pause_max_s),
           scroll_pause_min_s: getInput(ids.maps_scroll_pause_min_s),
           scroll_pause_max_s: getInput(ids.maps_scroll_pause_max_s),
+          proxy_url: getInput(ids.maps_proxy_url),
           csv_dir: getInput(ids.maps_csv_dir),
         },
         email: {
@@ -410,6 +417,7 @@
           max_batches_facebook: getInput(ids.email_max_batches_facebook),
           facebook: getInput(ids.email_facebook),
           facebook_engine: getInput(ids.email_facebook_engine),
+          facebook_proxy_url: getInput(ids.email_facebook_proxy_url),
           same_domain_only: getInput(ids.email_same_domain_only),
         },
       };

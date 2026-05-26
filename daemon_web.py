@@ -279,6 +279,7 @@ class DaemonWebController:
         scroll_min, scroll_max = _ensure_min_max(scroll_min, scroll_max)
         maps_cfg["scroll_pause_min_s"] = scroll_min
         maps_cfg["scroll_pause_max_s"] = scroll_max
+        maps_cfg["proxy_url"] = str(maps_input.get("proxy_url", maps_cfg.get("proxy_url", ""))).strip()
         maps_cfg["csv_dir"] = str(maps_input.get("csv_dir", maps_cfg.get("csv_dir", ""))).strip()
         current["maps"] = maps_cfg
 
@@ -293,11 +294,12 @@ class DaemonWebController:
         email_cfg["max_batches"] = _to_int(email_input.get("max_batches"), int(email_cfg.get("max_batches", 0)), 0, 200)
         email_cfg["max_batches_facebook"] = _to_int(email_input.get("max_batches_facebook"), int(email_cfg.get("max_batches_facebook", 0)), 0, 200)
         email_cfg["facebook"] = _to_bool(email_input.get("facebook"), bool(email_cfg.get("facebook", False)))
-        fb_engine = str(email_input.get("facebook_engine", email_cfg.get("facebook_engine", "playwright"))).strip().lower()
-        email_cfg["facebook_engine"] = fb_engine if fb_engine in {"playwright", "scrapy"} else "playwright"
+        fb_engine = str(email_input.get("facebook_engine", email_cfg.get("facebook_engine", "camoufox"))).strip().lower()
+        email_cfg["facebook_engine"] = fb_engine if fb_engine in {"camoufox", "playwright", "scrapy"} else "camoufox"
+        email_cfg["facebook_proxy_url"] = str(email_input.get("facebook_proxy_url", email_cfg.get("facebook_proxy_url", ""))).strip()
         email_cfg["same_domain_only"] = _to_bool(email_input.get("same_domain_only"), bool(email_cfg.get("same_domain_only", True)))
-        scraper = str(email_input.get("scraper", email_cfg.get("scraper", "playwright"))).strip().lower()
-        email_cfg["scraper"] = scraper if scraper in {"playwright", "scrapy"} else "playwright"
+        scraper = str(email_input.get("scraper", email_cfg.get("scraper", "camoufox"))).strip().lower()
+        email_cfg["scraper"] = scraper if scraper in {"camoufox", "playwright", "scrapy"} else "camoufox"
         current["email"] = email_cfg
 
         pipeline_cfg = dict(current.get("pipeline") or {})
@@ -310,15 +312,15 @@ class DaemonWebController:
         pipeline_cfg["lease_seconds"] = _to_int(pipeline_input.get("lease_seconds"), int(pipeline_cfg.get("lease_seconds", 120)), 10, 7200)
         pipeline_cfg["heartbeat_interval_s"] = _to_int(pipeline_input.get("heartbeat_interval_s"), int(pipeline_cfg.get("heartbeat_interval_s", 30)), 1, 3600)
         fast_scraper = str(pipeline_input.get("fast_scraper", pipeline_cfg.get("fast_scraper", "scrapy"))).strip().lower()
-        pipeline_cfg["fast_scraper"] = fast_scraper if fast_scraper in {"scrapy", "playwright"} else "scrapy"
+        pipeline_cfg["fast_scraper"] = fast_scraper if fast_scraper in {"scrapy", "camoufox", "playwright"} else "scrapy"
         pipeline_cfg["fast_concurrency"] = _to_int(pipeline_input.get("fast_concurrency"), int(pipeline_cfg.get("fast_concurrency", 3)), 1, 20)
         pipeline_cfg["fast_batches_multiplier"] = _to_float(pipeline_input.get("fast_batches_multiplier"), float(pipeline_cfg.get("fast_batches_multiplier", 1.1)), 0.1, 3.0)
         fast_policy = str(pipeline_input.get("fast_email_policy", pipeline_cfg.get("fast_email_policy", "business_only"))).strip().lower()
         pipeline_cfg["fast_email_policy"] = fast_policy if fast_policy in {"business_only", "business_or_public", "any_valid"} else "business_only"
         pipeline_cfg["fast_max_batches_cap"] = _to_int(pipeline_input.get("fast_max_batches_cap"), int(pipeline_cfg.get("fast_max_batches_cap", 0)), 0, 10000)
 
-        fallback_scraper = str(pipeline_input.get("fallback_scraper", pipeline_cfg.get("fallback_scraper", "playwright"))).strip().lower()
-        pipeline_cfg["fallback_scraper"] = fallback_scraper if fallback_scraper in {"scrapy", "playwright"} else "playwright"
+        fallback_scraper = str(pipeline_input.get("fallback_scraper", pipeline_cfg.get("fallback_scraper", "camoufox"))).strip().lower()
+        pipeline_cfg["fallback_scraper"] = fallback_scraper if fallback_scraper in {"scrapy", "camoufox", "playwright"} else "camoufox"
         pipeline_cfg["fallback_concurrency"] = _to_int(pipeline_input.get("fallback_concurrency"), int(pipeline_cfg.get("fallback_concurrency", 1)), 1, 20)
         pipeline_cfg["fallback_batches_multiplier"] = _to_float(pipeline_input.get("fallback_batches_multiplier"), float(pipeline_cfg.get("fallback_batches_multiplier", 1.0)), 0.1, 3.0)
         pipeline_cfg["fallback_facebook_batches_multiplier"] = _to_float(pipeline_input.get("fallback_facebook_batches_multiplier"), float(pipeline_cfg.get("fallback_facebook_batches_multiplier", 1.0)), 0.1, 3.0)
