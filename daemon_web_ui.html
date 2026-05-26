@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScrapIQ Daemon Control</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: rgba(16, 24, 48, 0.78);
+      --card-2: rgba(20, 32, 62, 0.92);
+      --text: #e8efff;
+      --muted: #a9b7d8;
+      --line: rgba(152, 178, 255, 0.22);
+      --primary: #52a5ff;
+      --primary-strong: #2c8aff;
+      --ok: #2dd4bf;
+      --warn: #f59e0b;
+      --danger: #fb7185;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Manrope", "Inter", system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(1200px 500px at 0% -10%, rgba(82,165,255,.25), transparent 60%),
+        radial-gradient(900px 450px at 100% 0%, rgba(45,212,191,.22), transparent 60%),
+        linear-gradient(180deg, #050913 0%, #0b1020 100%);
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    .topbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 18px; }
+    .title h1 { margin: 0; font-size: 30px; letter-spacing: .2px; }
+    .title p { margin: 4px 0 0; color: var(--muted); }
+    .pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); padding: 8px 12px; border-radius: 999px; font-size: 13px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 8px rgba(45,212,191,.15); }
+
+    .grid { display: grid; grid-template-columns: 1.3fr .9fr; gap: 16px; }
+    .card {
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 16px;
+      padding: 14px;
+      backdrop-filter: blur(8px);
+    }
+    .card h2 { margin: 2px 0 12px; font-size: 17px; }
+    .status-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .stat {
+      border: 1px solid var(--line);
+      background: var(--card-2);
+      border-radius: 12px;
+      padding: 10px;
+      min-height: 78px;
+    }
+    .stat label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); display: block; margin-bottom: 6px; }
+    .stat strong { font-size: 16px; display: block; line-height: 1.2; word-break: break-word; }
+    .ok { color: var(--ok); }
+    .danger { color: var(--danger); }
+
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 13px;
+      font-size: 13px;
+      color: var(--text);
+      background: rgba(255,255,255,.03);
+      cursor: pointer;
+    }
+    button.primary { background: linear-gradient(180deg, var(--primary), var(--primary-strong)); border: none; color: #fff; }
+    button.warn { background: rgba(245,158,11,.18); border-color: rgba(245,158,11,.35); }
+    button.danger { background: rgba(251,113,133,.18); border-color: rgba(251,113,133,.35); }
+    button:hover { transform: translateY(-1px); }
+
+    .section { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 14px; }
+    .section h3 { margin: 0 0 10px; font-size: 14px; color: #d4e2ff; }
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    input, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255,255,255,.02);
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .check { display: flex; align-items: center; gap: 8px; }
+    .check input { width: auto; }
+
+    .logs {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #080d19;
+      min-height: 420px;
+      max-height: 64vh;
+      overflow: auto;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.42;
+      white-space: pre-wrap;
+      color: #d3def6;
+    }
+    .muted { color: var(--muted); font-size: 12px; }
+
+    @media (max-width: 1080px) {
+      .grid { grid-template-columns: 1fr; }
+      .fields { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="title">
+        <h1>ScrapIQ Daemon Control</h1>
+        <p>Run maps + email workers over LAN with live status and logs.</p>
+      </div>
+      <div class="pill"><span class="dot"></span><span id="refreshStatus">Live refresh every 2s</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Settings</h2>
+
+        <div class="section">
+          <h3>General</h3>
+          <div class="fields">
+            <div class="field"><label>Maps base URL</label><input id="maps_base_url"></div>
+            <div class="field"><label>Email base URL</label><input id="email_base_url"></div>
+            <div class="field"><label>Queue dir</label><input id="queue_dir"></div>
+            <div class="field"><label>Maps poll interval (s)</label><input id="maps_poll_interval_s" type="number" min="5" max="3600"></div>
+            <div class="field"><label>Email poll interval (s)</label><input id="email_poll_interval_s" type="number" min="5" max="3600"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Pipeline</h3>
+          <div class="fields">
+            <div class="field check"><input id="pipeline_enabled" type="checkbox"><label for="pipeline_enabled">Enable pipeline mode</label></div>
+            <div class="field"><label>Pipeline base URL</label><input id="pipeline_base_url"></div>
+            <div class="field"><label>Actor</label><input id="pipeline_actor"></div>
+            <div class="field"><label>Worker ID override</label><input id="pipeline_worker_id"></div>
+            <div class="field"><label>Claim interval (s)</label><input id="pipeline_claim_interval_s" type="number" min="1" max="3600"></div>
+            <div class="field"><label>Lease seconds</label><input id="pipeline_lease_seconds" type="number" min="10" max="7200"></div>
+            <div class="field"><label>Heartbeat interval (s)</label><input id="pipeline_heartbeat_interval_s" type="number" min="1" max="3600"></div>
+            <div class="field"><label>Fast stage scraper</label><select id="pipeline_fast_scraper"><option value="scrapy">Scrapy</option><option value="playwright">Playwright</option></select></div>
+            <div class="field"><label>Fast concurrency</label><input id="pipeline_fast_concurrency" type="number" min="1" max="20"></div>
+            <div class="field"><label>Fast batches multiplier</label><input id="pipeline_fast_batches_multiplier" type="number" step="0.05" min="0.1" max="3.0"></div>
+            <div class="field"><label>Fast email policy</label><select id="pipeline_fast_email_policy"><option value="business_only">Business only</option><option value="business_or_public">Business or public</option><option value="any_valid">Any valid</option></select></div>
+            <div class="field"><label>Fast max batches cap (0=auto)</label><input id="pipeline_fast_max_batches_cap" type="number" min="0" max="10000"></div>
+            <div class="field"><label>Fallback scraper</label><select id="pipeline_fallback_scraper"><option value="playwright">Playwright</option><option value="scrapy">Scrapy</option></select></div>
+            <div class="field"><label>Fallback concurrency</label><input id="pipeline_fallback_concurrency" type="number" min="1" max="20"></div>
+            <div class="field"><label>Fallback batches multiplier</label><input id="pipeline_fallback_batches_multiplier" type="number" step="0.05" min="0.1" max="3.0"></div>
+            <div class="field"><label>Fallback FB multiplier</label><input id="pipeline_fallback_facebook_batches_multiplier" type="number" step="0.05" min="0.1" max="3.0"></div>
+            <div class="field"><label>Fallback email policy</label><select id="pipeline_fallback_email_policy"><option value="business_only">Business only</option><option value="business_or_public">Business or public</option><option value="any_valid">Any valid</option></select></div>
+            <div class="field"><label>Fallback max batches (0=no cap)</label><input id="pipeline_fallback_max_batches" type="number" min="0" max="10000"></div>
+            <div class="field"><label>Fallback FB max (0=no cap)</label><input id="pipeline_fallback_max_batches_facebook" type="number" min="0" max="10000"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Maps Worker</h3>
+          <div class="fields">
+            <div class="field"><label>Batch size</label><input id="maps_batch_size" type="number" min="1" max="500"></div>
+            <div class="field"><label>Max concurrent</label><input id="maps_max_concurrent" type="number" min="1" max="20"></div>
+            <div class="field"><label>Detail workers</label><input id="maps_detail_workers" type="number" min="1" max="20"></div>
+            <div class="field"><label>Scrape mode</label><select id="maps_scrape_mode"><option value="fast">Fast</option><option value="slow">Slow</option></select></div>
+            <div class="field check"><input id="maps_show_browser" type="checkbox"><label for="maps_show_browser">Show browser window</label></div>
+            <div class="field"><label>Slow pause min (s)</label><input id="maps_slow_place_pause_min_s" type="number" step="0.1" min="0" max="30"></div>
+            <div class="field"><label>Slow pause max (s)</label><input id="maps_slow_place_pause_max_s" type="number" step="0.1" min="0" max="30"></div>
+            <div class="field"><label>Scroll pause min (s)</label><input id="maps_scroll_pause_min_s" type="number" step="0.1" min="0" max="30"></div>
+            <div class="field"><label>Scroll pause max (s)</label><input id="maps_scroll_pause_max_s" type="number" step="0.1" min="0" max="30"></div>
+            <div class="field"><label>CSV output dir</label><input id="maps_csv_dir"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Email Worker</h3>
+          <div class="fields">
+            <div class="field"><label>Scraper engine</label><select id="email_scraper"><option value="playwright">Playwright</option><option value="scrapy">Scrapy</option></select></div>
+            <div class="field"><label>Batch</label><input id="email_batch" type="number" min="1" max="200"></div>
+            <div class="field"><label>Concurrency</label><input id="email_concurrency" type="number" min="1" max="20"></div>
+            <div class="field"><label>Timeout (s)</label><input id="email_timeout_s" type="number" step="0.1" min="1" max="120"></div>
+            <div class="field"><label>Domain timeout (s)</label><input id="email_domain_timeout_s" type="number" step="0.1" min="5" max="300"></div>
+            <div class="field"><label>Links per domain</label><input id="email_links" type="number" min="0" max="20"></div>
+            <div class="field"><label>Min domain letters</label><input id="email_min_domain_letters" type="number" min="1" max="10"></div>
+            <div class="field"><label>Max batches (0=unlimited)</label><input id="email_max_batches" type="number" min="0" max="200"></div>
+            <div class="field"><label>Max FB batches (0=disabled)</label><input id="email_max_batches_facebook" type="number" min="0" max="200"></div>
+            <div class="field"><label>Facebook fallback engine</label><select id="email_facebook_engine"><option value="playwright">Playwright</option><option value="scrapy">Scrapy</option></select></div>
+            <div class="field check"><input id="email_facebook" type="checkbox"><label for="email_facebook">Enable Facebook scraping</label></div>
+            <div class="field check"><input id="email_same_domain_only" type="checkbox"><label for="email_same_domain_only">Only same-domain links</label></div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="primary" id="saveBtn">Save Settings</button>
+          <button id="reloadBtn">Reload Settings</button>
+          <button class="warn" id="clearLogBtn">Clear Logs</button>
+          <span class="muted" id="saveStatus"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Status + Control</h2>
+        <div class="status-grid">
+          <div class="stat"><label>Maps daemon</label><strong id="maps_status">Stopped</strong></div>
+          <div class="stat"><label>Email daemon</label><strong id="email_status">Stopped</strong></div>
+          <div class="stat"><label>Worker A current</label><strong id="maps_current_work">Stopped</strong></div>
+          <div class="stat"><label>Worker B current</label><strong id="email_current_work">Stopped</strong></div>
+          <div class="stat"><label>Emails found (regular)</label><strong id="email_regular_found">0</strong></div>
+          <div class="stat"><label>Emails found (Facebook)</label><strong id="email_facebook_found">0</strong></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="primary" id="startMapsBtn">Start Worker A</button>
+          <button class="danger" id="stopMapsBtn">Stop Worker A</button>
+          <button class="primary" id="startEmailBtn">Start Worker B</button>
+          <button class="danger" id="stopEmailBtn">Stop Worker B</button>
+          <button class="primary" id="startBothBtn">Start 2 Workers</button>
+          <button class="danger" id="stopBothBtn">Stop 2 Workers</button>
+        </div>
+
+        <div class="section">
+          <h3>Live Logs</h3>
+          <div class="logs" id="logs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ids = {
+      maps_base_url: 'maps_base_url',
+      email_base_url: 'email_base_url',
+      queue_dir: 'queue_dir',
+      maps_poll_interval_s: 'maps_poll_interval_s',
+      email_poll_interval_s: 'email_poll_interval_s',
+      pipeline_enabled: 'pipeline_enabled',
+      pipeline_base_url: 'pipeline_base_url',
+      pipeline_actor: 'pipeline_actor',
+      pipeline_worker_id: 'pipeline_worker_id',
+      pipeline_claim_interval_s: 'pipeline_claim_interval_s',
+      pipeline_lease_seconds: 'pipeline_lease_seconds',
+      pipeline_heartbeat_interval_s: 'pipeline_heartbeat_interval_s',
+      pipeline_fast_scraper: 'pipeline_fast_scraper',
+      pipeline_fast_concurrency: 'pipeline_fast_concurrency',
+      pipeline_fast_batches_multiplier: 'pipeline_fast_batches_multiplier',
+      pipeline_fast_email_policy: 'pipeline_fast_email_policy',
+      pipeline_fast_max_batches_cap: 'pipeline_fast_max_batches_cap',
+      pipeline_fallback_scraper: 'pipeline_fallback_scraper',
+      pipeline_fallback_concurrency: 'pipeline_fallback_concurrency',
+      pipeline_fallback_batches_multiplier: 'pipeline_fallback_batches_multiplier',
+      pipeline_fallback_facebook_batches_multiplier: 'pipeline_fallback_facebook_batches_multiplier',
+      pipeline_fallback_email_policy: 'pipeline_fallback_email_policy',
+      pipeline_fallback_max_batches: 'pipeline_fallback_max_batches',
+      pipeline_fallback_max_batches_facebook: 'pipeline_fallback_max_batches_facebook',
+      maps_batch_size: 'maps_batch_size',
+      maps_max_concurrent: 'maps_max_concurrent',
+      maps_detail_workers: 'maps_detail_workers',
+      maps_scrape_mode: 'maps_scrape_mode',
+      maps_show_browser: 'maps_show_browser',
+      maps_slow_place_pause_min_s: 'maps_slow_place_pause_min_s',
+      maps_slow_place_pause_max_s: 'maps_slow_place_pause_max_s',
+      maps_scroll_pause_min_s: 'maps_scroll_pause_min_s',
+      maps_scroll_pause_max_s: 'maps_scroll_pause_max_s',
+      maps_csv_dir: 'maps_csv_dir',
+      email_scraper: 'email_scraper',
+      email_batch: 'email_batch',
+      email_concurrency: 'email_concurrency',
+      email_timeout_s: 'email_timeout_s',
+      email_domain_timeout_s: 'email_domain_timeout_s',
+      email_links: 'email_links',
+      email_min_domain_letters: 'email_min_domain_letters',
+      email_max_batches: 'email_max_batches',
+      email_max_batches_facebook: 'email_max_batches_facebook',
+      email_facebook: 'email_facebook',
+      email_facebook_engine: 'email_facebook_engine',
+      email_same_domain_only: 'email_same_domain_only',
+    };
+
+    let lastLogsHash = '';
+
+    function setInput(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') {
+        el.checked = !!value;
+      } else {
+        el.value = value ?? '';
+      }
+    }
+
+    function getInput(id) {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      if (el.type === 'checkbox') return !!el.checked;
+      if (el.type === 'number') return el.value === '' ? null : Number(el.value);
+      return el.value;
+    }
+
+    function hydrateConfig(cfg) {
+      setInput(ids.maps_base_url, cfg.maps_base_url);
+      setInput(ids.email_base_url, cfg.email_base_url);
+      setInput(ids.queue_dir, cfg.queue_dir);
+      setInput(ids.maps_poll_interval_s, cfg.maps_poll_interval_s);
+      setInput(ids.email_poll_interval_s, cfg.email_poll_interval_s);
+
+      const p = cfg.pipeline || {};
+      setInput(ids.pipeline_enabled, p.enabled);
+      setInput(ids.pipeline_base_url, p.base_url);
+      setInput(ids.pipeline_actor, p.actor);
+      setInput(ids.pipeline_worker_id, p.worker_id);
+      setInput(ids.pipeline_claim_interval_s, p.claim_interval_s);
+      setInput(ids.pipeline_lease_seconds, p.lease_seconds);
+      setInput(ids.pipeline_heartbeat_interval_s, p.heartbeat_interval_s);
+      setInput(ids.pipeline_fast_scraper, p.fast_scraper);
+      setInput(ids.pipeline_fast_concurrency, p.fast_concurrency);
+      setInput(ids.pipeline_fast_batches_multiplier, p.fast_batches_multiplier);
+      setInput(ids.pipeline_fast_email_policy, p.fast_email_policy);
+      setInput(ids.pipeline_fast_max_batches_cap, p.fast_max_batches_cap);
+      setInput(ids.pipeline_fallback_scraper, p.fallback_scraper);
+      setInput(ids.pipeline_fallback_concurrency, p.fallback_concurrency);
+      setInput(ids.pipeline_fallback_batches_multiplier, p.fallback_batches_multiplier);
+      setInput(ids.pipeline_fallback_facebook_batches_multiplier, p.fallback_facebook_batches_multiplier);
+      setInput(ids.pipeline_fallback_email_policy, p.fallback_email_policy);
+      setInput(ids.pipeline_fallback_max_batches, p.fallback_max_batches);
+      setInput(ids.pipeline_fallback_max_batches_facebook, p.fallback_max_batches_facebook);
+
+      const m = cfg.maps || {};
+      setInput(ids.maps_batch_size, m.batch_size);
+      setInput(ids.maps_max_concurrent, m.max_concurrent);
+      setInput(ids.maps_detail_workers, m.detail_workers);
+      setInput(ids.maps_scrape_mode, m.scrape_mode);
+      setInput(ids.maps_show_browser, m.show_browser);
+      setInput(ids.maps_slow_place_pause_min_s, m.slow_place_pause_min_s);
+      setInput(ids.maps_slow_place_pause_max_s, m.slow_place_pause_max_s);
+      setInput(ids.maps_scroll_pause_min_s, m.scroll_pause_min_s);
+      setInput(ids.maps_scroll_pause_max_s, m.scroll_pause_max_s);
+      setInput(ids.maps_csv_dir, m.csv_dir);
+
+      const e = cfg.email || {};
+      setInput(ids.email_scraper, e.scraper);
+      setInput(ids.email_batch, e.batch);
+      setInput(ids.email_concurrency, e.concurrency);
+      setInput(ids.email_timeout_s, e.timeout_s);
+      setInput(ids.email_domain_timeout_s, e.domain_timeout_s);
+      setInput(ids.email_links, e.links);
+      setInput(ids.email_min_domain_letters, e.min_domain_letters);
+      setInput(ids.email_max_batches, e.max_batches);
+      setInput(ids.email_max_batches_facebook, e.max_batches_facebook);
+      setInput(ids.email_facebook, e.facebook);
+      setInput(ids.email_facebook_engine, e.facebook_engine);
+      setInput(ids.email_same_domain_only, e.same_domain_only);
+    }
+
+    function collectConfig() {
+      return {
+        maps_base_url: getInput(ids.maps_base_url),
+        email_base_url: getInput(ids.email_base_url),
+        queue_dir: getInput(ids.queue_dir),
+        maps_poll_interval_s: getInput(ids.maps_poll_interval_s),
+        email_poll_interval_s: getInput(ids.email_poll_interval_s),
+        pipeline: {
+          enabled: getInput(ids.pipeline_enabled),
+          base_url: getInput(ids.pipeline_base_url),
+          actor: getInput(ids.pipeline_actor),
+          worker_id: getInput(ids.pipeline_worker_id),
+          claim_interval_s: getInput(ids.pipeline_claim_interval_s),
+          lease_seconds: getInput(ids.pipeline_lease_seconds),
+          heartbeat_interval_s: getInput(ids.pipeline_heartbeat_interval_s),
+          fast_scraper: getInput(ids.pipeline_fast_scraper),
+          fast_concurrency: getInput(ids.pipeline_fast_concurrency),
+          fast_batches_multiplier: getInput(ids.pipeline_fast_batches_multiplier),
+          fast_email_policy: getInput(ids.pipeline_fast_email_policy),
+          fast_max_batches_cap: getInput(ids.pipeline_fast_max_batches_cap),
+          fallback_scraper: getInput(ids.pipeline_fallback_scraper),
+          fallback_concurrency: getInput(ids.pipeline_fallback_concurrency),
+          fallback_batches_multiplier: getInput(ids.pipeline_fallback_batches_multiplier),
+          fallback_facebook_batches_multiplier: getInput(ids.pipeline_fallback_facebook_batches_multiplier),
+          fallback_email_policy: getInput(ids.pipeline_fallback_email_policy),
+          fallback_max_batches: getInput(ids.pipeline_fallback_max_batches),
+          fallback_max_batches_facebook: getInput(ids.pipeline_fallback_max_batches_facebook),
+        },
+        maps: {
+          batch_size: getInput(ids.maps_batch_size),
+          max_concurrent: getInput(ids.maps_max_concurrent),
+          detail_workers: getInput(ids.maps_detail_workers),
+          scrape_mode: getInput(ids.maps_scrape_mode),
+          show_browser: getInput(ids.maps_show_browser),
+          slow_place_pause_min_s: getInput(ids.maps_slow_place_pause_min_s),
+          slow_place_pause_max_s: getInput(ids.maps_slow_place_pause_max_s),
+          scroll_pause_min_s: getInput(ids.maps_scroll_pause_min_s),
+          scroll_pause_max_s: getInput(ids.maps_scroll_pause_max_s),
+          csv_dir: getInput(ids.maps_csv_dir),
+        },
+        email: {
+          scraper: getInput(ids.email_scraper),
+          batch: getInput(ids.email_batch),
+          concurrency: getInput(ids.email_concurrency),
+          timeout_s: getInput(ids.email_timeout_s),
+          domain_timeout_s: getInput(ids.email_domain_timeout_s),
+          links: getInput(ids.email_links),
+          min_domain_letters: getInput(ids.email_min_domain_letters),
+          max_batches: getInput(ids.email_max_batches),
+          max_batches_facebook: getInput(ids.email_max_batches_facebook),
+          facebook: getInput(ids.email_facebook),
+          facebook_engine: getInput(ids.email_facebook_engine),
+          same_domain_only: getInput(ids.email_same_domain_only),
+        },
+      };
+    }
+
+    function renderStatus(status) {
+      const mapsRunning = !!status.maps_running;
+      const emailRunning = !!status.email_running;
+      document.getElementById('maps_status').textContent = status.maps_status || (mapsRunning ? 'Running' : 'Stopped');
+      document.getElementById('email_status').textContent = status.email_status || (emailRunning ? 'Running' : 'Stopped');
+      document.getElementById('maps_status').className = mapsRunning ? 'ok' : 'danger';
+      document.getElementById('email_status').className = emailRunning ? 'ok' : 'danger';
+      document.getElementById('maps_current_work').textContent = status.maps_current_work || 'Stopped';
+      document.getElementById('email_current_work').textContent = status.email_current_work || 'Stopped';
+      document.getElementById('email_regular_found').textContent = String(status.email_regular_found ?? 0);
+      document.getElementById('email_facebook_found').textContent = String(status.email_facebook_found ?? 0);
+    }
+
+    function renderLogs(lines) {
+      const text = (lines || []).join('\n');
+      const hash = String(text.length) + ':' + text.slice(-80);
+      if (hash === lastLogsHash) return;
+      lastLogsHash = hash;
+      const box = document.getElementById('logs');
+      const stickToBottom = (box.scrollTop + box.clientHeight) >= (box.scrollHeight - 20);
+      box.textContent = text;
+      if (stickToBottom) box.scrollTop = box.scrollHeight;
+    }
+
+    async function refreshState() {
+      try {
+        const resp = await fetch('/api/state?log_limit=700');
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.error || 'Failed state load');
+        if (data.config) hydrateConfig(data.config);
+        renderStatus(data.status || {});
+        renderLogs(data.logs || []);
+        document.getElementById('refreshStatus').textContent = 'Live refresh every 2s';
+      } catch (err) {
+        document.getElementById('refreshStatus').textContent = 'Disconnected, retrying...';
+      }
+    }
+
+    async function postJson(url, payload = {}) {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || data.ok === false) {
+        throw new Error(data.error || `HTTP ${resp.status}`);
+      }
+      return data;
+    }
+
+    async function doAction(url) {
+      try {
+        await postJson(url);
+      } catch (err) {
+        alert(err.message || 'Action failed');
+      } finally {
+        refreshState();
+      }
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const status = document.getElementById('saveStatus');
+      status.textContent = 'Saving...';
+      try {
+        await postJson('/api/config/save', collectConfig());
+        status.textContent = 'Saved';
+      } catch (err) {
+        status.textContent = 'Save failed';
+        alert(err.message || 'Save failed');
+      }
+      setTimeout(() => { status.textContent = ''; }, 1800);
+      refreshState();
+    });
+
+    document.getElementById('reloadBtn').addEventListener('click', () => doAction('/api/config/reload'));
+    document.getElementById('clearLogBtn').addEventListener('click', () => doAction('/api/logs/clear'));
+    document.getElementById('startMapsBtn').addEventListener('click', () => doAction('/api/start/maps'));
+    document.getElementById('stopMapsBtn').addEventListener('click', () => doAction('/api/stop/maps'));
+    document.getElementById('startEmailBtn').addEventListener('click', () => doAction('/api/start/email'));
+    document.getElementById('stopEmailBtn').addEventListener('click', () => doAction('/api/stop/email'));
+    document.getElementById('startBothBtn').addEventListener('click', () => doAction('/api/start/both'));
+    document.getElementById('stopBothBtn').addEventListener('click', () => doAction('/api/stop/both'));
+
+    refreshState();
+    setInterval(refreshState, 2000);
+  </script>
+</body>
+</html>
