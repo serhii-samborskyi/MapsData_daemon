@@ -554,6 +554,7 @@ import ssl
 import urllib.request
 import urllib.error
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Callable, Set, Tuple
 
@@ -944,6 +945,7 @@ class CampaignProcessor:
         scroll_pause_max_s: Optional[float] = None,
         detail_workers: Optional[int] = None,
         proxy_url: Optional[str] = None,
+        request_workers: Optional[int] = None,
     ):
         self.api = api
         self.batch_size = batch_size
@@ -960,6 +962,12 @@ class CampaignProcessor:
         )
         self.detail_workers = normalize_detail_workers(detail_workers)
         self.proxy_url = normalize_maps_proxy_url(proxy_url)
+        if request_workers is None:
+            request_workers = MAX_CONCURRENT
+        try:
+            self.request_workers = max(1, int(request_workers))
+        except Exception:
+            self.request_workers = max(1, int(MAX_CONCURRENT))
         self._stop = False
 
     def stop(self):
@@ -1036,6 +1044,129 @@ class CampaignProcessor:
             return
         self._process_campaign_fast(campaign)
 
+    def _request_workers_for_pending(self, pending_count: int) -> int:
+        if pending_count <= 0:
+            return 1
+        return max(1, min(self.request_workers, pending_count))
+
+    def _process_single_request_fast(self, campaign: Campaign, request: RequestItem) -> None:
+        logger.info(f"[fast] Processing request {request.id} | query='{request.req_text}'")
+        total_seen = 0
+        dedupe_keys: Set[str] = set()
+        stage_failed = False
+
+        def batch_callback(batch: List[Dict[str, Any]]):
+            nonlocal total_seen, dedupe_keys
+            if not batch:
+                return
+            cleaned: List[Dict[str, Any]] = []
+            for lead in batch:
+                key = (lead.get("url", ""), lead.get("companyName", ""), lead.get("address", ""))
+                if key in dedupe_keys:
+                    continue
+                dedupe_keys.add(key)
+                cleaned.append(lead)
+            if not cleaned:
+                return
+            total_seen += len(cleaned)
+            for i in range(0, len(cleaned), self.batch_size):
+                sub = cleaned[i : i + self.batch_size]
+                self._on_batch(campaign.id, request.id, sub, total_seen)
+
+        try:
+            ok = run_scrape_and_yield_batches(
+                request.req_text,
+                self.batch_size,
+                batch_callback,
+                scrape_mode=self.scrape_mode,
+                show_browser=self.show_browser,
+                scroll_pause_min_s=self.scroll_pause_min_s,
+                scroll_pause_max_s=self.scroll_pause_max_s,
+                proxy_url=self.proxy_url,
+            )
+            if not ok:
+                logger.warning(f"[fast] Scrape returned no data for request {request.id}")
+        except Exception as e:
+            stage_failed = True
+            logger.exception(f"[fast] Scrape error for request {request.id}: {e}")
+        finally:
+            if self._stop:
+                logger.warning(
+                    "[fast] Stop requested while request %s was running; keeping request in current state for takeover.",
+                    request.id,
+                )
+                return
+            if stage_failed:
+                logger.warning(
+                    "[fast] Request %s stays in current state after scrape failure (API does not accept 'pending').",
+                    request.id,
+                )
+            else:
+                self.api.set_request_status(request.id, "completed")
+                logger.info(f"[fast] Completed request {request.id} (total leads seen: {total_seen})")
+            time.sleep(1.0)
+        if stage_failed:
+            raise RuntimeError(f"Maps scraping failed for request {request.id}")
+
+    def _process_single_request_slow(self, campaign: Campaign, request: RequestItem) -> None:
+        logger.info(f"[slow] Processing request {request.id} | query='{request.req_text}'")
+        totals_by_request: Dict[str, int] = {request.id: 0}
+
+        def on_batch_for_request(request_id: str, batch: List[Dict[str, Any]]) -> None:
+            if not batch:
+                return
+            totals_by_request[request_id] = totals_by_request.get(request_id, 0) + len(batch)
+            self._on_batch(campaign.id, request_id, batch, totals_by_request[request_id])
+
+        stage_failed = False
+        stage_error: Optional[Exception] = None
+        try:
+            ok = run_campaign_slow_dedup_and_yield_batches(
+                [request],
+                self.batch_size,
+                on_batch_for_request,
+                show_browser=self.show_browser,
+                pause_min_s=self.slow_place_pause_min_s,
+                pause_max_s=self.slow_place_pause_max_s,
+                scroll_pause_min_s=self.scroll_pause_min_s,
+                scroll_pause_max_s=self.scroll_pause_max_s,
+                detail_workers=self.detail_workers,
+                proxy_url=self.proxy_url,
+                should_stop=lambda: self._stop,
+            )
+            if not ok:
+                logger.warning("[slow] Request %s scrape returned no data.", request.id)
+        except Exception as e:
+            stage_failed = True
+            stage_error = e
+            logger.exception(f"[slow] Scrape error for request {request.id}: {e}")
+        finally:
+            if self._stop:
+                logger.warning(
+                    "[slow] Stop requested while request %s was running; keeping request in current state for takeover.",
+                    request.id,
+                )
+                return
+            if stage_failed:
+                logger.warning(
+                    "[slow] Request %s stays in current state after scrape failure (API does not accept 'pending').",
+                    request.id,
+                )
+                time.sleep(1.0)
+                return
+            current_total = totals_by_request.get(request.id, 0)
+            self.api.set_request_status(request.id, "completed")
+            logger.info(
+                "[slow] Completed request %s (total leads seen: %d)",
+                request.id,
+                current_total,
+            )
+            time.sleep(1.0)
+        if stage_failed:
+            raise RuntimeError(
+                f"[slow] Campaign scrape failed for campaign {campaign.id}, request {request.id}: {stage_error}"
+            ) from stage_error
+
     def _process_campaign_fast(self, campaign: Campaign) -> None:
         while not self._stop:
             reqs = self.api.get_requests_for_campaign_name(campaign.name)
@@ -1043,53 +1174,52 @@ class CampaignProcessor:
                 logger.info("No more requests; completing campaign.")
                 self.api.complete_campaign(campaign.id)
                 break
-            request = reqs[0]
-            if not request.req_text:
-                logger.warning(f"Empty req_text for request {request.id}; marking completed.")
-                self.api.set_request_status(request.id, "completed")
+            pending: List[RequestItem] = []
+            for request in reqs:
+                if not request.req_text:
+                    logger.warning(f"Empty req_text for request {request.id}; marking completed.")
+                    self.api.set_request_status(request.id, "completed")
+                    continue
+                pending.append(request)
+
+            if not pending:
+                time.sleep(0.8)
                 continue
-            logger.info(f"Processing request {request.id} | query='{request.req_text}'")
-            self.api.set_request_status(request.id, "inuse")
-            total_seen = 0
-            dedupe_keys: Set[str] = set()
 
-            def batch_callback(batch: List[Dict[str, Any]]):
-                nonlocal total_seen, dedupe_keys
-                if not batch:
-                    return
-                cleaned: List[Dict[str, Any]] = []
-                for lead in batch:
-                    key = (lead.get("url",""), lead.get("companyName",""), lead.get("address",""))
-                    if key in dedupe_keys:
-                        continue
-                    dedupe_keys.add(key)
-                    cleaned.append(lead)
-                if not cleaned:
-                    return
-                total_seen += len(cleaned)
-                for i in range(0, len(cleaned), self.batch_size):
-                    sub = cleaned[i : i + self.batch_size]
-                    self._on_batch(campaign.id, request.id, sub, total_seen)
+            worker_count = self._request_workers_for_pending(len(pending))
+            selected = pending[:worker_count]
+            logger.info(
+                "[fast] Request-level parallelism: workers=%d, selected_requests=%d, total_pending=%d",
+                worker_count,
+                len(selected),
+                len(pending),
+            )
+            for request in selected:
+                self.api.set_request_status(request.id, "inuse")
 
-            try:
-                ok = run_scrape_and_yield_batches(
-                    request.req_text,
-                    self.batch_size,
-                    batch_callback,
-                    scrape_mode=self.scrape_mode,
-                    show_browser=self.show_browser,
-                    scroll_pause_min_s=self.scroll_pause_min_s,
-                    scroll_pause_max_s=self.scroll_pause_max_s,
-                    proxy_url=self.proxy_url,
-                )
-                if not ok:
-                    logger.warning(f"Scrape returned no data for request {request.id}")
-            except Exception as e:
-                logger.exception(f"Scrape error for request {request.id}: {e}")
-            finally:
-                self.api.set_request_status(request.id, "completed")
-                logger.info(f"Completed request {request.id} (total leads seen: {total_seen})")
-                time.sleep(1.5)
+            errors: List[Exception] = []
+            if worker_count == 1:
+                request = selected[0]
+                try:
+                    self._process_single_request_fast(campaign, request)
+                except Exception as exc:
+                    errors.append(exc)
+            else:
+                with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="maps-fast-req") as pool:
+                    fut_to_req = {
+                        pool.submit(self._process_single_request_fast, campaign, request): request
+                        for request in selected
+                    }
+                    for fut in as_completed(fut_to_req):
+                        request = fut_to_req[fut]
+                        try:
+                            fut.result()
+                        except Exception as exc:
+                            logger.error("[fast] Request %s failed: %s", request.id, exc)
+                            errors.append(exc)
+
+            if errors:
+                raise RuntimeError(f"[fast] Campaign scrape failed for campaign {campaign.id}: {errors[0]}")
 
     def _process_campaign_slow(self, campaign: Campaign) -> None:
         logger.info(
@@ -1119,56 +1249,49 @@ class CampaignProcessor:
                 time.sleep(1.0)
                 continue
 
+            worker_count = self._request_workers_for_pending(len(pending))
+            selected = pending[:worker_count]
             logger.info(
-                "[slow] Processing %d requests together to dedupe place URLs before detail scraping.",
+                "[slow] Request-level parallelism: workers=%d, selected_requests=%d, total_pending=%d, detail_workers_per_request=%d",
+                worker_count,
+                len(selected),
                 len(pending),
+                self.detail_workers,
             )
-            for request in pending:
+            for request in selected:
                 self.api.set_request_status(request.id, "inuse")
 
-            totals_by_request: Dict[str, int] = {request.id: 0 for request in pending}
+            errors: List[Exception] = []
+            if worker_count == 1:
+                request = selected[0]
+                try:
+                    self._process_single_request_slow(campaign, request)
+                except Exception as exc:
+                    errors.append(exc)
+            else:
+                with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="maps-slow-req") as pool:
+                    fut_to_req = {
+                        pool.submit(self._process_single_request_slow, campaign, request): request
+                        for request in selected
+                    }
+                    for fut in as_completed(fut_to_req):
+                        request = fut_to_req[fut]
+                        try:
+                            fut.result()
+                        except Exception as exc:
+                            logger.error("[slow] Request %s failed: %s", request.id, exc)
+                            errors.append(exc)
 
-            def on_batch_for_request(request_id: str, batch: List[Dict[str, Any]]) -> None:
-                if not batch:
-                    return
-                totals_by_request[request_id] = totals_by_request.get(request_id, 0) + len(batch)
-                self._on_batch(campaign.id, request_id, batch, totals_by_request[request_id])
-
-            try:
-                ok = run_campaign_slow_dedup_and_yield_batches(
-                    pending,
-                    self.batch_size,
-                    on_batch_for_request,
-                    show_browser=self.show_browser,
-                    pause_min_s=self.slow_place_pause_min_s,
-                    pause_max_s=self.slow_place_pause_max_s,
-                    scroll_pause_min_s=self.scroll_pause_min_s,
-                    scroll_pause_max_s=self.scroll_pause_max_s,
-                    detail_workers=self.detail_workers,
-                    proxy_url=self.proxy_url,
-                    should_stop=lambda: self._stop,
+            if self._stop:
+                logger.warning(
+                    "[slow] Stop requested for campaign %s; keeping active requests in current state for takeover.",
+                    campaign.id,
                 )
-                if not ok:
-                    logger.warning("[slow] Campaign scrape returned no data.")
-            except Exception as e:
-                logger.exception(f"[slow] Scrape error for campaign {campaign.id}: {e}")
-            finally:
-                if self._stop:
-                    logger.warning(
-                        "[slow] Stop requested for campaign %s; keeping %d request(s) in current state for takeover.",
-                        campaign.id,
-                        len(pending),
-                    )
-                    time.sleep(1.0)
-                    continue
-                for request in pending:
-                    self.api.set_request_status(request.id, "completed")
-                    logger.info(
-                        "Completed request %s (total leads seen: %d)",
-                        request.id,
-                        totals_by_request.get(request.id, 0),
-                    )
-                time.sleep(1.5)
+                time.sleep(1.0)
+                continue
+
+            if errors:
+                raise RuntimeError(f"[slow] Campaign scrape failed for campaign {campaign.id}: {errors[0]}")
 
 
 def run_all(

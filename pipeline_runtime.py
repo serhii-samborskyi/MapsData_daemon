@@ -393,6 +393,7 @@ def _build_email_args(
     domain_timeout_s: float,
     links: int,
     min_domain_letters: int,
+    show_browser: bool,
     facebook: bool,
     facebook_engine: str,
     facebook_proxy_url: str,
@@ -425,6 +426,8 @@ def _build_email_args(
         args.extend(["--max-batches", str(max_batches)])
     if max_batches_facebook is not None:
         args.extend(["--max-batches-facebook", str(max_batches_facebook)])
+    if show_browser:
+        args.append("--show-browser")
     if facebook:
         args.append("--facebook")
         args.extend(["--facebook-engine", str(facebook_engine or "camoufox")])
@@ -491,6 +494,7 @@ def _run_email_stage(
         domain_timeout_s=_coerce_float(email_cfg.get("domain_timeout_s", 60.0), 60.0),
         links=max(1, _coerce_int(email_cfg.get("links", 5), 5)),
         min_domain_letters=max(1, _coerce_int(email_cfg.get("min_domain_letters", 2), 2)),
+        show_browser=bool(email_cfg.get("show_browser", False)),
         facebook=facebook,
         facebook_engine=str(email_cfg.get("facebook_engine", "camoufox") or "camoufox"),
         facebook_proxy_url=str(email_cfg.get("facebook_proxy_url", "") or ""),

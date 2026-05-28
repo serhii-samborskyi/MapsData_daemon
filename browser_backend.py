@@ -21,6 +21,11 @@ except Exception:
     Camoufox = None  # type: ignore
 
 try:
+    from camoufox.exceptions import NotInstalledGeoIPExtra
+except Exception:
+    NotInstalledGeoIPExtra = None  # type: ignore
+
+try:
     from playwright.async_api import async_playwright
 except Exception:
     async_playwright = None  # type: ignore
@@ -32,6 +37,13 @@ except Exception:
 
 
 DEFAULT_BACKEND = os.environ.get("DAEMON_BROWSER_BACKEND", "camoufox")
+
+
+def _warn(msg: str) -> None:
+    try:
+        print(f"[browser_backend] {msg}", file=sys.stderr, flush=True)
+    except Exception:
+        pass
 
 
 def normalize_browser_backend(value: Optional[str]) -> str:
@@ -110,15 +122,38 @@ class AsyncBrowserRuntime:
         await self.close()
         if self.backend == "camoufox":
             if AsyncCamoufox is None:
-                raise RuntimeError("Camoufox is not available. Run setup_daemon.sh to install .deps.")
-            options = {"headless": self.headless}
-            options.update(self.camoufox_options)
-            proxy = to_playwright_proxy(self.proxy_url)
-            if proxy:
-                options["proxy"] = proxy
-            self._camoufox_cm = AsyncCamoufox(**options)
-            self.browser = await self._camoufox_cm.__aenter__()
-            return self.browser
+                if async_playwright is None:
+                    raise RuntimeError("Camoufox is not available. Run setup_daemon.sh to install .deps.")
+                _warn("Camoufox module not available, falling back to Playwright Chromium.")
+                self.backend = "chromium"
+            else:
+                options = {"headless": self.headless}
+                options.update(self.camoufox_options)
+                if self.proxy_url and "geoip" not in options:
+                    options["geoip"] = True
+                proxy = to_playwright_proxy(self.proxy_url)
+                if proxy:
+                    options["proxy"] = proxy
+                try:
+                    self._camoufox_cm = AsyncCamoufox(**options)
+                    self.browser = await self._camoufox_cm.__aenter__()
+                    return self.browser
+                except Exception as exc:
+                    needs_geoip_fallback = (
+                        bool(options.get("geoip"))
+                        and (
+                            (NotInstalledGeoIPExtra is not None and isinstance(exc, NotInstalledGeoIPExtra))
+                            or ("geoip extra" in str(exc).lower())
+                            or ("notinstalledgeoipextra" in str(exc).lower())
+                        )
+                    )
+                    if needs_geoip_fallback:
+                        _warn("Camoufox geoip extra missing; retrying with geoip disabled.")
+                        options["geoip"] = False
+                        self._camoufox_cm = AsyncCamoufox(**options)
+                        self.browser = await self._camoufox_cm.__aenter__()
+                        return self.browser
+                    raise
 
         if async_playwright is None:
             raise RuntimeError("Playwright is not available. Run setup_daemon.sh to install .deps.")
@@ -185,15 +220,38 @@ class SyncBrowserRuntime:
         self.close()
         if self.backend == "camoufox":
             if Camoufox is None:
-                raise RuntimeError("Camoufox is not available. Run setup_daemon.sh to install .deps.")
-            options = {"headless": self.headless}
-            options.update(self.camoufox_options)
-            proxy = to_playwright_proxy(self.proxy_url)
-            if proxy:
-                options["proxy"] = proxy
-            self._camoufox_cm = Camoufox(**options)
-            self.browser = self._camoufox_cm.__enter__()
-            return self.browser
+                if sync_playwright is None:
+                    raise RuntimeError("Camoufox is not available. Run setup_daemon.sh to install .deps.")
+                _warn("Camoufox module not available, falling back to Playwright Chromium.")
+                self.backend = "chromium"
+            else:
+                options = {"headless": self.headless}
+                options.update(self.camoufox_options)
+                if self.proxy_url and "geoip" not in options:
+                    options["geoip"] = True
+                proxy = to_playwright_proxy(self.proxy_url)
+                if proxy:
+                    options["proxy"] = proxy
+                try:
+                    self._camoufox_cm = Camoufox(**options)
+                    self.browser = self._camoufox_cm.__enter__()
+                    return self.browser
+                except Exception as exc:
+                    needs_geoip_fallback = (
+                        bool(options.get("geoip"))
+                        and (
+                            (NotInstalledGeoIPExtra is not None and isinstance(exc, NotInstalledGeoIPExtra))
+                            or ("geoip extra" in str(exc).lower())
+                            or ("notinstalledgeoipextra" in str(exc).lower())
+                        )
+                    )
+                    if needs_geoip_fallback:
+                        _warn("Camoufox geoip extra missing; retrying with geoip disabled.")
+                        options["geoip"] = False
+                        self._camoufox_cm = Camoufox(**options)
+                        self.browser = self._camoufox_cm.__enter__()
+                        return self.browser
+                    raise
 
         if sync_playwright is None:
             raise RuntimeError("Playwright is not available. Run setup_daemon.sh to install .deps.")

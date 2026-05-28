@@ -6,6 +6,7 @@ import json
 import os
 import re
 import signal
+import shutil
 import subprocess
 import sys
 import threading
@@ -13,6 +14,18 @@ import time
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
+from urllib.parse import quote, urlparse
+from urllib.request import Request, ProxyHandler, build_opener, urlopen
+
+try:
+    import requests  # type: ignore
+except Exception:
+    requests = None  # type: ignore
+
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None  # type: ignore
 
 from daemon_config import load_config, save_config
 
@@ -60,6 +73,27 @@ def _ensure_min_max(min_value: float, max_value: float) -> tuple[float, float]:
     return min_value, max_value
 
 
+def _normalize_proxy_url(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = f"http://{raw}"
+    try:
+        parsed = urlparse(raw)
+    except Exception:
+        return ""
+    if not parsed.hostname or not parsed.port:
+        return ""
+    host = parsed.hostname
+    port = parsed.port
+    username = parsed.username or ""
+    password = parsed.password or ""
+    if username and password:
+        return f"http://{quote(username, safe='')}:{quote(password, safe='')}@{host}:{port}"
+    return f"http://{host}:{port}"
+
+
 class DaemonWebController:
     def __init__(self, config_path: str) -> None:
         self.base_dir = ROOT_DIR
@@ -74,6 +108,12 @@ class DaemonWebController:
         self.email_current_work = "Stopped"
         self.email_regular_found = 0
         self.email_facebook_found = 0
+        self._cpu_percent_last = 0.0
+        if psutil is not None:
+            try:
+                psutil.cpu_percent(interval=None)
+            except Exception:
+                pass
 
         self.log_lines = deque(maxlen=MAX_LOG_LINES)
         self._append_log("ui", f"Web UI booted. config={self.config_path}")
@@ -294,6 +334,7 @@ class DaemonWebController:
         email_cfg["max_batches"] = _to_int(email_input.get("max_batches"), int(email_cfg.get("max_batches", 0)), 0, 200)
         email_cfg["max_batches_facebook"] = _to_int(email_input.get("max_batches_facebook"), int(email_cfg.get("max_batches_facebook", 0)), 0, 200)
         email_cfg["facebook"] = _to_bool(email_input.get("facebook"), bool(email_cfg.get("facebook", False)))
+        email_cfg["show_browser"] = _to_bool(email_input.get("show_browser"), bool(email_cfg.get("show_browser", False)))
         fb_engine = str(email_input.get("facebook_engine", email_cfg.get("facebook_engine", "camoufox"))).strip().lower()
         email_cfg["facebook_engine"] = fb_engine if fb_engine in {"camoufox", "playwright", "scrapy"} else "camoufox"
         email_cfg["facebook_proxy_url"] = str(email_input.get("facebook_proxy_url", email_cfg.get("facebook_proxy_url", ""))).strip()
@@ -352,14 +393,191 @@ class DaemonWebController:
             self._append_log("ui", "Log cleared")
             return {"ok": True}
 
+    def _safe_process_count(self) -> int:
+        if psutil is not None:
+            try:
+                return len(psutil.pids())
+            except Exception:
+                pass
+        try:
+            out = subprocess.check_output(["ps", "-A", "-o", "pid="], text=True, timeout=2)
+            return len([line for line in out.splitlines() if line.strip()])
+        except Exception:
+            return 0
+
+    def _safe_queue_count(self) -> int:
+        try:
+            queue_dir = str(self.config.get("queue_dir", "queue") or "queue").strip() or "queue"
+            queue_path = queue_dir if os.path.isabs(queue_dir) else os.path.join(self.base_dir, queue_dir)
+            if not os.path.isdir(queue_path):
+                return 0
+            count = 0
+            for name in os.listdir(queue_path):
+                if name.startswith("."):
+                    continue
+                full = os.path.join(queue_path, name)
+                if os.path.isfile(full):
+                    count += 1
+            return count
+        except Exception:
+            return 0
+
+    def _safe_gpu_stats(self) -> Dict[str, Any]:
+        try:
+            cmd = [
+                "nvidia-smi",
+                "--query-gpu=utilization.gpu,memory.used,memory.total",
+                "--format=csv,noheader,nounits",
+            ]
+            out = subprocess.check_output(cmd, text=True, timeout=2).strip()
+            if not out:
+                raise RuntimeError("empty nvidia-smi output")
+            rows = [line.strip() for line in out.splitlines() if line.strip()]
+            utils = []
+            used = []
+            total = []
+            for row in rows:
+                parts = [p.strip() for p in row.split(",")]
+                if len(parts) < 3:
+                    continue
+                try:
+                    utils.append(float(parts[0]))
+                    used.append(float(parts[1]))
+                    total.append(float(parts[2]))
+                except Exception:
+                    continue
+            if not utils or not total:
+                raise RuntimeError("no parseable gpu rows")
+            gpu_percent = sum(utils) / len(utils)
+            mem_used = sum(used)
+            mem_total = sum(total)
+            mem_percent = (mem_used / mem_total * 100.0) if mem_total > 0 else 0.0
+            return {
+                "available": True,
+                "percent": round(gpu_percent, 1),
+                "mem_percent": round(mem_percent, 1),
+                "mem_used_mib": round(mem_used, 1),
+                "mem_total_mib": round(mem_total, 1),
+            }
+        except Exception:
+            return {
+                "available": False,
+                "percent": 0.0,
+                "mem_percent": 0.0,
+                "mem_used_mib": 0.0,
+                "mem_total_mib": 0.0,
+            }
+
+    def collect_system_stats(self) -> Dict[str, Any]:
+        cpu_percent = 0.0
+        cpu_cores = os.cpu_count() or 0
+        ram_percent = 0.0
+        ram_used = 0
+        ram_total = 0
+        rss = 0
+
+        if psutil is not None:
+            try:
+                cpu_percent = float(psutil.cpu_percent(interval=None))
+            except Exception:
+                cpu_percent = self._cpu_percent_last
+            self._cpu_percent_last = cpu_percent
+            try:
+                cpu_cores = int(psutil.cpu_count(logical=True) or cpu_cores)
+            except Exception:
+                pass
+            try:
+                vm = psutil.virtual_memory()
+                ram_percent = float(vm.percent)
+                ram_used = int(vm.used)
+                ram_total = int(vm.total)
+            except Exception:
+                pass
+            try:
+                rss = int(psutil.Process(os.getpid()).memory_info().rss)
+            except Exception:
+                pass
+        else:
+            self._cpu_percent_last = cpu_percent
+
+        try:
+            disk = shutil.disk_usage("/")
+            disk_total = int(disk.total)
+            disk_used = int(disk.used)
+            disk_percent = (disk_used / disk_total * 100.0) if disk_total > 0 else 0.0
+        except Exception:
+            disk_total = 0
+            disk_used = 0
+            disk_percent = 0.0
+
+        return {
+            "processes": {
+                "count": self._safe_process_count(),
+                "queued": self._safe_queue_count(),
+            },
+            "cpu": {
+                "percent": round(cpu_percent, 1),
+                "cores": int(cpu_cores),
+            },
+            "ram": {
+                "percent": round(ram_percent, 1),
+                "used_bytes": int(ram_used),
+                "total_bytes": int(ram_total),
+                "rss_bytes": int(rss),
+            },
+            "gpu": self._safe_gpu_stats(),
+            "disk": {
+                "percent": round(disk_percent, 1),
+                "used_bytes": int(disk_used),
+                "total_bytes": int(disk_total),
+            },
+        }
+
+    def test_proxy(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        target = str(payload.get("target", "proxy")).strip().lower() or "proxy"
+        proxy_input = str(payload.get("proxy_url", "")).strip()
+        proxy_url = _normalize_proxy_url(proxy_input)
+        if not proxy_url:
+            return {"ok": False, "error": "invalid_proxy", "detail": "Proxy URL is empty or invalid.", "target": target}
+
+        ipify_url = "https://api.ipify.org?format=json"
+        try:
+            if requests is not None:
+                resp = requests.get(
+                    ipify_url,
+                    timeout=20,
+                    proxies={"http": proxy_url, "https": proxy_url},
+                    headers={"Accept": "application/json", "User-Agent": "ScrapIQ-DaemonWeb/1.0"},
+                )
+                resp.raise_for_status()
+                data = resp.json() if resp.text else {}
+                ip = str(data.get("ip", "")).strip()
+                if not ip:
+                    return {"ok": False, "error": "ip_missing", "detail": f"Unexpected response: {resp.text[:200]}", "target": target}
+                return {"ok": True, "target": target, "ip": ip}
+
+            opener = build_opener(ProxyHandler({"http": proxy_url, "https": proxy_url}))
+            req = Request(ipify_url, headers={"Accept": "application/json", "User-Agent": "ScrapIQ-DaemonWeb/1.0"})
+            with opener.open(req, timeout=20) as raw:
+                body = raw.read().decode("utf-8", errors="ignore")
+            data = json.loads(body) if body else {}
+            ip = str(data.get("ip", "")).strip()
+            if not ip:
+                return {"ok": False, "error": "ip_missing", "detail": f"Unexpected response: {body[:200]}", "target": target}
+            return {"ok": True, "target": target, "ip": ip}
+        except Exception as exc:
+            return {"ok": False, "error": "proxy_test_failed", "detail": str(exc), "target": target}
+
     def get_state(self, log_limit: int = 300) -> Dict[str, Any]:
         with self.lock:
             maps_running = self.maps_proc is not None and self.maps_proc.poll() is None
             email_running = self.email_proc is not None and self.email_proc.poll() is None
             tail = list(self.log_lines)[-max(1, min(log_limit, MAX_LOG_LINES)):]
+            system = self.collect_system_stats()
             return {
                 "ok": True,
                 "config": self.config,
+                "system": system,
                 "status": {
                     "maps_running": maps_running,
                     "email_running": email_running,
@@ -488,6 +706,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/stop/both":
             self._send_json(CONTROLLER.stop_both())
+            return
+
+        if self.path == "/api/proxy/test":
+            self._send_json(CONTROLLER.test_proxy(payload))
             return
 
         self._send_json({"ok": False, "error": "not_found"}, 404)

@@ -197,6 +197,7 @@ def _run_email_scraper(
     domain_timeout_s: float,
     links: int,
     min_domain_letters: int,
+    show_browser: bool,
     facebook: bool,
     facebook_engine: str,
     facebook_proxy_url: str,
@@ -227,6 +228,8 @@ def _run_email_scraper(
         args.extend(["--max-batches", str(max_batches)])
     if max_batches_facebook is not None:
         args.extend(["--max-batches-facebook", str(max_batches_facebook)])
+    if show_browser:
+        args.append("--show-browser")
     if facebook:
         args.append("--facebook")
         args.extend(["--facebook-engine", str(facebook_engine or "camoufox")])
@@ -255,6 +258,7 @@ def run_daemon(
     domain_timeout_s: float,
     links: int,
     min_domain_letters: int,
+    show_browser: bool,
     facebook: bool,
     facebook_engine: str,
     facebook_proxy_url: str,
@@ -265,9 +269,10 @@ def run_daemon(
     logger = _setup_logging(log_path)
     logger.info("Email daemon starting")
     logger.info(
-        "Email settings: max_batches=%s, max_batches_facebook=%s, facebook=%s, facebook_engine=%s, facebook_proxy=%s",
+        "Email settings: max_batches=%s, max_batches_facebook=%s, show_browser=%s, facebook=%s, facebook_engine=%s, facebook_proxy=%s",
         max_batches,
         max_batches_facebook,
+        show_browser,
         facebook,
         facebook_engine,
         "on" if str(facebook_proxy_url or "").strip() else "off",
@@ -333,6 +338,7 @@ def run_daemon(
                 domain_timeout_s=domain_timeout_s,
                 links=links,
                 min_domain_letters=min_domain_letters,
+                show_browser=show_browser,
                 facebook=facebook,
                 facebook_engine=facebook_engine,
                 facebook_proxy_url=facebook_proxy_url,
@@ -410,6 +416,8 @@ def main() -> None:
     parser.add_argument("--min-domain-letters", type=int, default=None, help="Minimum letters in email root domain")
     parser.add_argument("--max-batches", type=int, default=None, help="Max batches per campaign run (0 = unlimited)")
     parser.add_argument("--max-batches-facebook", type=int, default=None, help="Max Facebook batches per run (0 = disabled)")
+    parser.add_argument("--show-browser", dest="show_browser", action="store_const", const=True, default=None, help="Show browser window while scraping emails")
+    parser.add_argument("--hide-browser", dest="show_browser", action="store_const", const=False, help="Run email scraping headless")
     parser.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
     parser.add_argument("--facebook-engine", default=None, help="Facebook fallback engine (camoufox/playwright/scrapy)")
     parser.add_argument("--facebook-proxy", default=None, help="Optional rotating proxy URL for Facebook fallback (user:pass@host:port)")
@@ -440,6 +448,7 @@ def main() -> None:
         if args.max_batches_facebook is not None
         else email_cfg.get("max_batches_facebook", 0)
     )
+    show_browser = args.show_browser if args.show_browser is not None else email_cfg.get("show_browser", False)
     facebook = args.facebook or bool(email_cfg.get("facebook", False))
     facebook_engine = (args.facebook_engine or email_cfg.get("facebook_engine", "camoufox")).strip().lower()
     facebook_proxy_url = str(args.facebook_proxy if args.facebook_proxy is not None else email_cfg.get("facebook_proxy_url", "")).strip()
@@ -494,6 +503,7 @@ def main() -> None:
         domain_timeout_s=domain_timeout_s,
         links=links,
         min_domain_letters=min_domain_letters,
+        show_browser=show_browser,
         facebook=facebook,
         facebook_engine=facebook_engine,
         facebook_proxy_url=facebook_proxy_url,

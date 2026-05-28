@@ -9,6 +9,7 @@ HOST="0.0.0.0"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PID_FILE="$SCRIPT_DIR/logs/daemon_web.pid"
 LOG_FILE="$SCRIPT_DIR/logs/daemon_web.log"
+FOREGROUND=0
 
 mkdir -p "$SCRIPT_DIR/logs"
 
@@ -27,6 +28,10 @@ stop_running() {
 
   # Cleanup any leftover process bound to the same daemon web script/port.
   pkill -f "daemon_web.py --host ${HOST} --port ${PORT}" 2>/dev/null || true
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -ti :"${PORT}" | xargs -r kill -9 2>/dev/null || true
+  fi
 }
 
 get_lan_ip() {
@@ -53,13 +58,29 @@ get_lan_ip() {
   printf '%s' "$ip"
 }
 
-if [[ "${1:-}" == "--stop" ]]; then
+for arg in "$@"; do
+  case "$arg" in
+    --stop) MODE_STOP=1 ;;
+    --foreground) FOREGROUND=1 ;;
+  esac
+done
+
+if [[ "${MODE_STOP:-0}" == "1" ]]; then
   stop_running
   echo "Daemon Web UI stopped (port ${PORT})."
   exit 0
 fi
 
 stop_running
+
+LAN_IP="$(get_lan_ip)"
+echo "Local URL: http://127.0.0.1:${PORT}"
+echo "LAN URL:   http://${LAN_IP}:${PORT}"
+
+if [[ "$FOREGROUND" -eq 1 ]]; then
+  echo "Starting Daemon Web UI in foreground on port ${PORT}..."
+  exec "$PYTHON_BIN" daemon_web.py --host "$HOST" --port "$PORT" --config "$SCRIPT_DIR/daemon_settings.json"
+fi
 
 echo "Starting Daemon Web UI on port ${PORT}..."
 nohup "$PYTHON_BIN" daemon_web.py --host "$HOST" --port "$PORT" --config "$SCRIPT_DIR/daemon_settings.json" >> "$LOG_FILE" 2>&1 &
@@ -69,7 +90,6 @@ echo "$NEW_PID" > "$PID_FILE"
 # Wait briefly for startup and verify health endpoint.
 for _ in {1..20}; do
   if curl -fsS "http://127.0.0.1:${PORT}/api/state?log_limit=1" >/dev/null 2>&1; then
-    LAN_IP="$(get_lan_ip)"
     echo "Daemon Web UI started."
     echo "Local URL: http://127.0.0.1:${PORT}"
     echo "LAN URL:   http://${LAN_IP}:${PORT}"

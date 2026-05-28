@@ -233,6 +233,7 @@ class EmailSpider(scrapy.Spider):
         domain_timeout: float,
         http_timeout: float,
         http_max_retries: int,
+        show_browser: bool,
         facebook: bool,
         max_batches_facebook: int,
         facebook_engine: str,
@@ -248,6 +249,7 @@ class EmailSpider(scrapy.Spider):
         self.links = int(links)
         self.domain_timeout = float(domain_timeout)
         self.http = HttpClient(timeout=http_timeout, max_retries=http_max_retries)
+        self.show_browser = bool(show_browser)
         self.facebook = bool(facebook)
         self.max_batches_facebook = int(max_batches_facebook or 0)
         self.facebook_engine = (facebook_engine or "camoufox").strip().lower()
@@ -546,8 +548,8 @@ class EmailSpider(scrapy.Spider):
         try:
             if self._browser_runtime is None:
                 self._browser_runtime = SyncBrowserRuntime(
-                    headless=True,
-                    camoufox_options={"block_images": True},
+                    headless=(not self.show_browser),
+                    camoufox_options={"block_images": False},
                     proxy_url=self.facebook_proxy_url,
                 )
             self._browser_instance = self._browser_runtime.launch()
@@ -657,6 +659,9 @@ def main() -> None:
     p.add_argument("--domain-timeout", type=float, default=60.0, help="Total timeout per domain")
     p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
+    p.add_argument("--show-browser", dest="show_browser", action="store_true", help="Show browser window while scraping emails")
+    p.add_argument("--hide-browser", dest="show_browser", action="store_false", help="Run email scraping headless")
+    p.set_defaults(show_browser=False)
     p.add_argument("--facebook", action="store_true", help="Enable Facebook page scraping")
     p.add_argument("--facebook-engine", default="camoufox", choices=["camoufox", "playwright", "scrapy"], help="Engine for Facebook fallback")
     p.add_argument("--facebook-proxy", default="", help="Optional rotating proxy URL for Facebook fallback (user:pass@host:port)")
@@ -674,6 +679,7 @@ def main() -> None:
     http = HttpClient(timeout=20.0, max_retries=5)
     campaign_id = resolve_campaign_id(http, base_url, args.campaign)
     logger.info("Scrapy email scraper starting for campaign id=%s", campaign_id)
+    logger.info("Email browser visibility: %s", "headed" if args.show_browser else "headless")
     if args.same_domain_only:
         logger.info("Same-domain-only crawling: ENABLED")
     logger.info("Email selection policy: %s", args.email_policy)
@@ -714,6 +720,7 @@ def main() -> None:
         domain_timeout=args.domain_timeout,
         http_timeout=20.0,
         http_max_retries=5,
+        show_browser=bool(args.show_browser),
         facebook=args.facebook,
         max_batches_facebook=args.max_batches_facebook,
         facebook_engine=args.facebook_engine,

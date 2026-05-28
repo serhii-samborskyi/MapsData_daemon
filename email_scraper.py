@@ -976,6 +976,7 @@ async def scrape_and_update_immediate(
     min_domain_letters: int,
     domain_timeout: float,
     kill_browser_on_timeout: bool,
+    show_browser: bool = False,
     facebook_engine: str = "camoufox",
     facebook_proxy_url: str = "",
     same_domain_only: bool = True,
@@ -1071,8 +1072,8 @@ async def scrape_and_update_immediate(
 
                     results: List[Any] = []
                     runtime = AsyncBrowserRuntime(
-                        headless=True,
-                        camoufox_options={"block_images": True},
+                        headless=(not bool(show_browser)),
+                        camoufox_options={"block_images": False},
                         proxy_url=(facebook_proxy_url if facebook else ""),
                     )
                     browser = await runtime.launch()
@@ -1393,6 +1394,9 @@ def main():
     p.add_argument("--max-batches", type=int, default=0, help="Max batches per run (0 = unlimited)")
     p.add_argument("--max-batches-facebook", type=int, default=0, help="Max Facebook batches per run (0 = disabled)")
     p.add_argument("--no-kill-on-timeout", action="store_true", help="Don't restart browser on timeout")
+    p.add_argument("--show-browser", dest="show_browser", action="store_true", help="Show browser window while scraping emails")
+    p.add_argument("--hide-browser", dest="show_browser", action="store_false", help="Run email scraping headless")
+    p.set_defaults(show_browser=False)
     p.add_argument("--facebook", action="store_true", help="Check Facebook pages linked from website for additional emails")
     p.add_argument("--facebook-engine", default="camoufox", choices=["camoufox", "playwright", "scrapy"], help="Engine for Facebook fallback")
     p.add_argument("--facebook-proxy", default="", help="Optional rotating proxy URL for Facebook fallback (user:pass@host:port)")
@@ -1408,6 +1412,7 @@ def main():
     logger.info(f"Enhanced Email Scraper starting with smart filtering...")
     logger.info(f"Target paths: {len(TARGET_PATHS)} paths with priority scoring")
     logger.info(f"Public providers: {len(PUBLIC_PROVIDERS)} recognized providers")
+    logger.info("Email browser visibility: %s", "headed" if args.show_browser else "headless")
     if args.facebook:
         logger.info(f"Facebook page scraping: ENABLED (engine={args.facebook_engine})")
         if str(args.facebook_proxy or "").strip():
@@ -1428,6 +1433,7 @@ def main():
         max_batches=args.max_batches,
         max_batches_facebook=args.max_batches_facebook,
         kill_browser_on_timeout=not args.no_kill_on_timeout,
+        show_browser=bool(args.show_browser),
         facebook_engine=args.facebook_engine,
         facebook_proxy_url=str(args.facebook_proxy or ""),
         same_domain_only=args.same_domain_only,

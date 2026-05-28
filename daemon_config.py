@@ -32,6 +32,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "domain_timeout_s": 60.0,
         "links": 5,
         "facebook": False,
+        "show_browser": False,
         "facebook_engine": "camoufox",
         "facebook_proxy_url": "",
         "max_batches": 0,
