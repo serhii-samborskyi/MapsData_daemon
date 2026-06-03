@@ -231,6 +231,12 @@ class DaemonWebController:
             self.config = load_config(self.config_path)
             mode_flag = self._daemon_mode_flag()
             args = [sys.executable, script_name, "--config", self.config_path, mode_flag]
+            maps_cfg = self.config.get("maps", {}) if isinstance(self.config.get("maps"), dict) else {}
+            email_cfg = self.config.get("email", {}) if isinstance(self.config.get("email"), dict) else {}
+            if name == "maps":
+                args.append("--show-browser" if bool(maps_cfg.get("show_browser", False)) else "--hide-browser")
+            else:
+                args.append("--show-browser" if bool(email_cfg.get("show_browser", False)) else "--hide-browser")
             proc = subprocess.Popen(
                 args,
                 cwd=self.base_dir,
@@ -251,6 +257,14 @@ class DaemonWebController:
 
             threading.Thread(target=self._read_stream, args=(name, proc), daemon=True).start()
             threading.Thread(target=self._watch_process, args=(name, proc), daemon=True).start()
+            self._append_log(
+                "ui",
+                (
+                    f"Effective settings for {name}: "
+                    f"maps_show_browser={bool(maps_cfg.get('show_browser', False))} "
+                    f"email_show_browser={bool(email_cfg.get('show_browser', False))}"
+                ),
+            )
             self._append_log("ui", f"Started {name}: {' '.join(args)}")
             return {"ok": True, "status": "started"}
 

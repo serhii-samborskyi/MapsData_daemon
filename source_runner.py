@@ -122,6 +122,7 @@ async def _navigate_results(page, config: dict, stop_signal: Callable[[], bool])
     pause_min_ms = max(1, int(nav.get("pause_min_ms") or 800))
     pause_max_ms = max(pause_min_ms, int(nav.get("pause_max_ms") or pause_min_ms))
     scroll_container_xpath = str(nav.get("scroll_container_xpath") or "").strip()
+    all_the_way_down_scrolls = bool(nav.get("all_the_way_down_scrolls", False))
     fast = config.get("fast") if isinstance(config.get("fast"), dict) else {}
     block_xpath = str(fast.get("block_xpath") or "").strip()
 
@@ -136,23 +137,34 @@ async def _navigate_results(page, config: dict, stop_signal: Callable[[], bool])
 
     async def safe_scroll(xpath: str = "") -> None:
         await page.evaluate(
-            r"""(xpath) => {
+            r"""({xpath, allTheWayDown}) => {
                 const scrollWindow = () => {
                     const root = document.scrollingElement || document.documentElement || document.body;
                     if (!root) return false;
-                    window.scrollBy(0, root.scrollHeight || window.innerHeight || 1200);
+                    const distance = root.scrollHeight || window.innerHeight || 1200;
+                    if (allTheWayDown) {
+                        window.scrollTo(0, distance);
+                        root.scrollTop = distance;
+                    } else {
+                        window.scrollBy(0, distance);
+                    }
                     return true;
                 };
                 if (xpath) {
                     const node = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
                     if (node) {
-                        node.scrollBy(0, node.scrollHeight || node.clientHeight || 1200);
+                        const distance = node.scrollHeight || node.clientHeight || 1200;
+                        if (allTheWayDown) {
+                            node.scrollTop = distance;
+                        } else {
+                            node.scrollBy(0, distance);
+                        }
                         return true;
                     }
                 }
                 return scrollWindow();
             }""",
-            xpath,
+            {"xpath": xpath, "allTheWayDown": all_the_way_down_scrolls},
         )
 
     if nav_type == "pagination":
@@ -301,6 +313,12 @@ async def _scrape_request(
         chromium_args=["--disable-blink-features=AutomationControlled", "--disable-extensions"],
         camoufox_options={"block_images": False},
         proxy_url=normalize_proxy_url(proxy_url),
+    )
+    logger.info(
+        "[source] Browser launch: show_browser=%s headless=%s proxy=%s",
+        bool(show_browser),
+        not bool(show_browser),
+        "on" if normalize_proxy_url(proxy_url) else "off",
     )
     browser = await runtime.launch()
     try:

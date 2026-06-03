@@ -191,6 +191,12 @@ def run_pipeline_daemon(
     maps_cfg = cfg.get("maps", {})
     email_cfg = cfg.get("email", {})
     pipeline_cfg = cfg.get("pipeline", {})
+    logger.info(
+        "Maps pipeline config: maps_show_browser=%s maps_mode=%s maps_proxy=%s",
+        bool(maps_cfg.get("show_browser", False)) if isinstance(maps_cfg, dict) else False,
+        str(maps_cfg.get("scrape_mode", "fast")) if isinstance(maps_cfg, dict) else "fast",
+        "on" if (isinstance(maps_cfg, dict) and str(maps_cfg.get("proxy_url", "") or "").strip()) else "off",
+    )
     ctx = PipelineContext(
         maps_base_url=str(cfg.get("maps_base_url", "")).strip(),
         email_base_url=str(cfg.get("email_base_url", "")).strip(),
@@ -261,6 +267,8 @@ def main() -> None:
     pipeline_mode = args.pipeline_mode
     if pipeline_mode is None:
         pipeline_mode = bool(pipeline_cfg.get("enabled", True))
+    if isinstance(maps_cfg, dict) and args.show_browser is not None:
+        maps_cfg["show_browser"] = bool(args.show_browser)
     actor = args.actor or str(pipeline_cfg.get("actor", "daemon")).strip() or "daemon"
     worker_id = args.worker_id or str(pipeline_cfg.get("worker_id", "")).strip() or default_worker_id("maps")
     claim_interval_s = (

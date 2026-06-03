@@ -374,6 +374,13 @@ def run_pipeline_daemon(
     maps_cfg = cfg.get("maps", {})
     email_cfg = cfg.get("email", {})
     pipeline_cfg = cfg.get("pipeline", {})
+    logger.info(
+        "Email pipeline config: email_show_browser=%s maps_show_browser=%s email_proxy=%s maps_proxy=%s",
+        bool(email_cfg.get("show_browser", False)) if isinstance(email_cfg, dict) else False,
+        bool(maps_cfg.get("show_browser", False)) if isinstance(maps_cfg, dict) else False,
+        "on" if (isinstance(email_cfg, dict) and str(email_cfg.get("facebook_proxy_url", "") or "").strip()) else "off",
+        "on" if (isinstance(maps_cfg, dict) and str(maps_cfg.get("proxy_url", "") or "").strip()) else "off",
+    )
     ctx = PipelineContext(
         maps_base_url=str(cfg.get("maps_base_url", "")).strip(),
         email_base_url=str(cfg.get("email_base_url", "")).strip(),
@@ -458,6 +465,8 @@ def main() -> None:
     pipeline_mode = args.pipeline_mode
     if pipeline_mode is None:
         pipeline_mode = bool(pipeline_cfg.get("enabled", True))
+    if isinstance(email_cfg, dict) and args.show_browser is not None:
+        email_cfg["show_browser"] = bool(args.show_browser)
     actor = args.actor or str(pipeline_cfg.get("actor", "daemon")).strip() or "daemon"
     worker_id = args.worker_id or str(pipeline_cfg.get("worker_id", "")).strip() or default_worker_id("email")
     claim_interval_s = (
