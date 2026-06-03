@@ -216,12 +216,15 @@ async def _navigate_results(page, config: dict, stop_signal: Callable[[], bool])
 async def _extract_fields(page, fields: List[dict], root_handle, page_url: str) -> Dict[str, Any]:
     contact: Dict[str, Any] = {}
     source_data: Dict[str, Any] = {}
+    missing_required: List[str] = []
     for field in fields:
         xpath = str(field.get("xpath") or "").strip()
         values = await _xpath_values(page, xpath, root_handle=root_handle)
         value = _clean(" ".join(values))
         value = _apply_regex(value, str(field.get("regex") or "").strip())
         if not value:
+            if bool(field.get("required")):
+                missing_required.append(str(field.get("label") or field.get("target_field") or xpath))
             continue
         target_type = str(field.get("target_type") or "core").lower()
         target_field = str(field.get("target_field") or "").strip().lower()
@@ -232,11 +235,35 @@ async def _extract_fields(page, fields: List[dict], root_handle, page_url: str) 
 
     if source_data:
         contact["source_data"] = source_data
+    if missing_required:
+        contact["__missing_required"] = missing_required
     if "domain" in contact:
         contact["domain"] = _absolute_url(page_url, contact["domain"])
     if "www" in contact:
         contact["www"] = _absolute_url(page_url, contact["www"])
     return contact
+
+
+async def _page_diagnostics(page) -> str:
+    try:
+        data = await page.evaluate(
+            r"""() => ({
+                url: location.href,
+                title: document.title || '',
+                readyState: document.readyState || '',
+                bodyText: (document.body && document.body.innerText || '').slice(0, 250),
+                htmlLength: document.documentElement ? document.documentElement.outerHTML.length : 0
+            })"""
+        )
+    except Exception as exc:
+        return f"diagnostics_unavailable={exc}"
+    if not isinstance(data, dict):
+        return "diagnostics_unavailable=bad_result"
+    return (
+        f"url={data.get('url')!r} title={data.get('title')!r} "
+        f"readyState={data.get('readyState')!r} htmlLength={data.get('htmlLength')} "
+        f"bodyText={data.get('bodyText')!r}"
+    )
 
 
 def _normalize_contact(contact: Dict[str, Any], campaign_id: str, request_id: str) -> Dict[str, Any]:
@@ -293,9 +320,24 @@ async def _scrape_request(
         except Exception as exc:
             raise RuntimeError(f"Page DOM not ready for scraping after navigation: {page.url}") from exc
         await page.wait_for_timeout(1200)
+        if block_xpath:
+            try:
+                await page.wait_for_selector(f"xpath={block_xpath}", timeout=30000)
+            except Exception:
+                logger.warning(
+                    "[source] Initial block XPath did not appear within 30s for request %s. xpath=%r %s",
+                    request.id,
+                    block_xpath,
+                    await _page_diagnostics(page),
+                )
         await _navigate_results(page, config, stop_signal)
         blocks = await _query_nodes(page, block_xpath)
         logger.info("[source] Request %s collected %d blocks", request.id, len(blocks))
+        if not blocks:
+            raise RuntimeError(
+                f"Generic source found 0 result blocks for request {request.id}; "
+                f"check block XPath or page access. block_xpath={block_xpath!r} {await _page_diagnostics(page)}"
+            )
 
         seen: Set[str] = set()
         batch: List[Dict[str, Any]] = []
@@ -308,6 +350,14 @@ async def _scrape_request(
             if stop_signal():
                 break
             contact = await _extract_fields(page, fast_fields, block, page.url)
+            missing_required = contact.pop("__missing_required", [])
+            if missing_required:
+                logger.debug(
+                    "[source] Skipping block for request %s; missing required fields: %s",
+                    request.id,
+                    ", ".join(missing_required),
+                )
+                continue
             if slow_enabled:
                 detail_values = await _xpath_values(page, detail_url_xpath, root_handle=block)
                 detail_url = _absolute_url(page.url, detail_values[0] if detail_values else "")
@@ -321,6 +371,7 @@ async def _scrape_request(
                             except Exception:
                                 pass
                         detail_contact = await _extract_fields(detail_page, slow_fields, None, detail_page.url)
+                        detail_contact.pop("__missing_required", None)
                         if detail_contact.get("source_data") and contact.get("source_data"):
                             merged = dict(contact.get("source_data") or {})
                             merged.update(detail_contact.get("source_data") or {})
@@ -342,6 +393,11 @@ async def _scrape_request(
         if batch:
             if not api.send_contacts(batch):
                 raise RuntimeError(f"Failed sending generic source final batch for request {request.id}")
+        if total <= 0:
+            raise RuntimeError(
+                f"Generic source produced 0 contacts for request {request.id}; "
+                "check required fields and field XPath mappings."
+            )
         return total
     finally:
         await runtime.close()
@@ -387,6 +443,8 @@ def run_generic_source_campaign(
         def run_one(item: RequestItem) -> None:
             try:
                 total = asyncio.run(_scrape_request(source, item, campaign_id, batch_size, api, scrape_mode, show_browser, proxy_url, should_stop))
+                if total <= 0:
+                    raise RuntimeError(f"Generic source produced 0 contacts for request {item.id}")
                 if not should_stop():
                     api.set_request_status(item.id, "completed")
                 logger.info("[source] Completed request %s with %d contacts", item.id, total)
