@@ -134,6 +134,27 @@ async def _navigate_results(page, config: dict, stop_signal: Callable[[], bool])
         except Exception:
             return 0
 
+    async def safe_scroll(xpath: str = "") -> None:
+        await page.evaluate(
+            r"""(xpath) => {
+                const scrollWindow = () => {
+                    const root = document.scrollingElement || document.documentElement || document.body;
+                    if (!root) return false;
+                    window.scrollBy(0, root.scrollHeight || window.innerHeight || 1200);
+                    return true;
+                };
+                if (xpath) {
+                    const node = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                    if (node) {
+                        node.scrollBy(0, node.scrollHeight || node.clientHeight || 1200);
+                        return true;
+                    }
+                }
+                return scrollWindow();
+            }""",
+            xpath,
+        )
+
     if nav_type == "pagination":
         next_xpath = str(nav.get("next_button_xpath") or "").strip()
         for _ in range(max_pages):
@@ -181,16 +202,9 @@ async def _navigate_results(page, config: dict, stop_signal: Callable[[], bool])
         if stop_signal():
             return
         if scroll_container_xpath:
-            await page.evaluate(
-                """(xpath) => {
-                    const node = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-                    if (node) node.scrollBy(0, node.scrollHeight || 1200);
-                    else window.scrollBy(0, document.body.scrollHeight || 1200);
-                }""",
-                scroll_container_xpath,
-            )
+            await safe_scroll(scroll_container_xpath)
         else:
-            await page.evaluate("window.scrollBy(0, document.body.scrollHeight || 1200)")
+            await safe_scroll("")
         await pause()
         count = await block_count()
         stable = stable + 1 if count <= last else 0
@@ -267,6 +281,17 @@ async def _scrape_request(
         page = await context.new_page()
         logger.info("[source] Opening %s", url)
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=15000)
+        except Exception:
+            pass
+        try:
+            await page.wait_for_function(
+                "() => document.body || document.documentElement",
+                timeout=20000,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Page DOM not ready for scraping after navigation: {page.url}") from exc
         await page.wait_for_timeout(1200)
         await _navigate_results(page, config, stop_signal)
         blocks = await _query_nodes(page, block_xpath)
