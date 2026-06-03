@@ -136,6 +136,9 @@ class PipelineApiClient:
     def get_stats(self, campaign_id: str) -> Dict[str, Any]:
         return self._request_json("GET", f"/api/campaign/{campaign_id}/stats")
 
+    def get_campaign_source_template(self, campaign_id: str) -> Dict[str, Any]:
+        return self._request_json("GET", f"/api/campaign/{campaign_id}/source-template")
+
     def get_active_campaign_name(self, maps_base_url: str, campaign_id: str) -> str:
         base = (maps_base_url or "").strip().rstrip("/")
         if not base:
@@ -327,6 +330,33 @@ def _run_maps_stage(
         campaign_name = api.get_active_campaign_name(ctx.maps_base_url, campaign_id)
     if not campaign_name:
         campaign_name = str(campaign_id)
+
+    source_payload = api.get_campaign_source_template(campaign_id)
+    if source_payload and bool(source_payload.get("_ok", True)):
+        source = source_payload.get("source") if isinstance(source_payload.get("source"), dict) else {}
+        source_type = str(source.get("source_type") or "").strip().lower()
+        if source_type and source_type != "builtin_google_maps":
+            from source_runner import run_generic_source_campaign
+
+            logger.info(
+                "Pipeline maps stage: using generic source id=%s name=%s for campaign %s",
+                source.get("id"),
+                source.get("name"),
+                campaign_id,
+            )
+            run_generic_source_campaign(
+                source=source,
+                campaign_id=str(campaign_id),
+                campaign_name=str(campaign_name),
+                base_url=ctx.maps_base_url,
+                batch_size=_coerce_int(ctx.maps_cfg.get("batch_size", 20), 20),
+                request_workers=_coerce_int(ctx.maps_cfg.get("max_concurrent", 1), 1),
+                show_browser=maps_scraper.DEFAULT_SHOW_BROWSER,
+                proxy_url=maps_scraper.DEFAULT_PROXY_URL,
+                scrape_mode=maps_scraper.DEFAULT_SCRAPE_MODE,
+                should_stop=should_stop,
+            )
+            return
 
     class _PipelineMapsApiClient(LeadsApiClient):
         def complete_campaign(self, campaign_id: str) -> None:  # type: ignore[override]
