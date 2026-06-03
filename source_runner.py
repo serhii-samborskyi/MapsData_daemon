@@ -136,6 +136,49 @@ async def _navigate_results(page, config: dict, stop_signal: Callable[[], bool])
             return 0
 
     async def safe_scroll(xpath: str = "") -> None:
+        if all_the_way_down_scrolls:
+            max_micro_steps = random.randint(8, 18)
+            for _ in range(max_micro_steps):
+                if stop_signal():
+                    return
+                state = await page.evaluate(
+                    r"""({xpath, multiplier}) => {
+                        const pageRoot = document.scrollingElement || document.documentElement || document.body;
+                        let target = pageRoot;
+                        let isWindow = true;
+                        if (xpath) {
+                            const node = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                            if (node) {
+                                target = node;
+                                isWindow = false;
+                            }
+                        }
+                        if (!target) return {done: true, moved: false};
+                        const clientHeight = isWindow ? (window.innerHeight || target.clientHeight || 800) : (target.clientHeight || 800);
+                        const scrollHeight = target.scrollHeight || clientHeight;
+                        const before = isWindow ? (window.scrollY || target.scrollTop || 0) : (target.scrollTop || 0);
+                        const step = Math.max(220, Math.floor(clientHeight * multiplier));
+                        if (isWindow) {
+                            window.scrollBy(0, step);
+                        } else {
+                            target.scrollBy(0, step);
+                        }
+                        const after = isWindow ? (window.scrollY || target.scrollTop || 0) : (target.scrollTop || 0);
+                        const done = (after + clientHeight + 24) >= scrollHeight || after === before;
+                        return {done, moved: after !== before, top: after, scrollHeight, clientHeight};
+                    }""",
+                    {
+                        "xpath": xpath,
+                        "multiplier": random.uniform(0.45, 0.95),
+                    },
+                )
+                await page.wait_for_timeout(random.randint(180, 520))
+                if isinstance(state, dict) and state.get("done"):
+                    await page.wait_for_timeout(random.randint(650, 1600))
+                    return
+            await page.wait_for_timeout(random.randint(900, 1800))
+            return
+
         await page.evaluate(
             r"""({xpath, allTheWayDown}) => {
                 const scrollWindow = () => {
