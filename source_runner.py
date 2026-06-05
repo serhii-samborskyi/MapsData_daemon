@@ -48,6 +48,18 @@ def _apply_regex(value: str, pattern: str) -> str:
     return _clean(match.group(0))
 
 
+def _field_label(field: dict) -> str:
+    return str(field.get("label") or field.get("target_field") or field.get("xpath") or "field")
+
+
+def _contact_keys(contact: Dict[str, Any]) -> List[str]:
+    keys = [key for key, value in contact.items() if key != "__missing_required" and _clean(value)]
+    source_data = contact.get("source_data")
+    if isinstance(source_data, dict):
+        keys.extend([f"source_data.{key}" for key, value in source_data.items() if _clean(value)])
+    return sorted(set(keys))
+
+
 def _absolute_url(base_url: str, value: str) -> str:
     raw = _clean(value)
     if not raw:
@@ -107,6 +119,71 @@ async def _xpath_values(page, xpath: str, root_handle=None) -> List[str]:
     """
     values = await page.evaluate(script, {"xpath": xpath, "root": root_handle})
     return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
+
+
+async def _xpath_content_values(page, xpath: str, root_handle=None) -> List[str]:
+    if not xpath:
+        return []
+    script = r"""
+    ({xpath, root}) => {
+        const context = root || document;
+        const result = document.evaluate(xpath, context, null, XPathResult.ANY_TYPE, null);
+        const out = [];
+        const pushNode = (node) => {
+            if (!node) return;
+            if (node.nodeType === Node.ATTRIBUTE_NODE) out.push(node.value || '');
+            else if (node.nodeType === Node.TEXT_NODE) out.push(node.textContent || '');
+            else out.push((node.innerText || node.textContent || '').trim());
+        };
+        switch (result.resultType) {
+            case XPathResult.STRING_TYPE:
+                out.push(result.stringValue || '');
+                break;
+            case XPathResult.NUMBER_TYPE:
+                out.push(String(result.numberValue));
+                break;
+            case XPathResult.BOOLEAN_TYPE:
+                out.push(String(result.booleanValue));
+                break;
+            case XPathResult.UNORDERED_NODE_ITERATOR_TYPE:
+            case XPathResult.ORDERED_NODE_ITERATOR_TYPE: {
+                let node = result.iterateNext();
+                while (node) {
+                    pushNode(node);
+                    node = result.iterateNext();
+                }
+                break;
+            }
+            case XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE:
+            case XPathResult.ORDERED_NODE_SNAPSHOT_TYPE:
+                for (let i = 0; i < result.snapshotLength; i++) pushNode(result.snapshotItem(i));
+                break;
+            case XPathResult.ANY_UNORDERED_NODE_TYPE:
+            case XPathResult.FIRST_ORDERED_NODE_TYPE:
+                pushNode(result.singleNodeValue);
+                break;
+        }
+        return out.map(v => String(v || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    }
+    """
+    values = await page.evaluate(script, {"xpath": xpath, "root": root_handle})
+    return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
+
+
+async def _extract_field_value(page, field: dict, root_handle=None) -> str:
+    xpath = str(field.get("xpath") or "").strip()
+    regex = str(field.get("regex") or "").strip()
+    run_within_content = bool(field.get("run_regex_within_xpath_content", False))
+    if run_within_content and regex:
+        content_values = await _xpath_content_values(page, xpath, root_handle=root_handle)
+        for raw_value in content_values:
+            value = _apply_regex(_clean(raw_value), regex)
+            if value:
+                return value
+        return _apply_regex(_clean(" ".join(content_values)), regex)
+    values = await _xpath_values(page, xpath, root_handle=root_handle)
+    value = _clean(" ".join(values))
+    return _apply_regex(value, regex)
 
 
 async def _query_nodes(page, xpath: str):
@@ -274,9 +351,7 @@ async def _extract_fields(page, fields: List[dict], root_handle, page_url: str) 
     missing_required: List[str] = []
     for field in fields:
         xpath = str(field.get("xpath") or "").strip()
-        values = await _xpath_values(page, xpath, root_handle=root_handle)
-        value = _clean(" ".join(values))
-        value = _apply_regex(value, str(field.get("regex") or "").strip())
+        value = await _extract_field_value(page, field, root_handle=root_handle)
         if not value:
             if bool(field.get("required")):
                 missing_required.append(str(field.get("label") or field.get("target_field") or xpath))
@@ -297,6 +372,30 @@ async def _extract_fields(page, fields: List[dict], root_handle, page_url: str) 
     if "www" in contact:
         contact["www"] = _absolute_url(page_url, contact["www"])
     return contact
+
+
+async def _field_debug_summary(page, fields: List[dict], root_handle=None) -> str:
+    parts: List[str] = []
+    for field in fields:
+        label = _field_label(field)
+        xpath = str(field.get("xpath") or "").strip()
+        if not xpath:
+            parts.append(f"{label}=empty_xpath")
+            continue
+        try:
+            use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
+            values = await (_xpath_content_values(page, xpath, root_handle=root_handle) if use_content else _xpath_values(page, xpath, root_handle=root_handle))
+            raw = _clean(" ".join(values))
+            value = await _extract_field_value(page, field, root_handle=root_handle)
+            if value:
+                parts.append(f"{label}=ok{'(content_regex)' if use_content else ''}")
+            elif raw:
+                parts.append(f"{label}=regex_empty(raw_len={len(raw)})")
+            else:
+                parts.append(f"{label}=xpath_empty")
+        except Exception as exc:
+            parts.append(f"{label}=error({type(exc).__name__}: {str(exc)[:120]})")
+    return "; ".join(parts) if parts else "no_fields_configured"
 
 
 async def _page_diagnostics(page) -> str:
@@ -403,16 +502,37 @@ async def _scrape_request(
         seen: Set[str] = set()
         batch: List[Dict[str, Any]] = []
         total = 0
+        skipped_duplicates = 0
+        skipped_missing_required = 0
+        slow_detail_attempted = 0
+        slow_detail_opened = 0
+        slow_detail_url_missing = 0
+        slow_detail_wait_timeout = 0
+        slow_detail_field_empty = 0
+        slow_detail_errors = 0
         detail_url_xpath = str(slow.get("detail_url_xpath") or "").strip()
         wait_xpath = str(slow.get("wait_xpath") or "").strip()
         slow_fields = slow.get("fields") if isinstance(slow.get("fields"), list) else []
+        if slow_enabled:
+            logger.info(
+                "[source][slow] Enabled for request %s: detail_url_xpath=%r wait_xpath=%r fields=%d",
+                request.id,
+                detail_url_xpath,
+                wait_xpath,
+                len(slow_fields),
+            )
+            if not detail_url_xpath:
+                logger.warning("[source][slow] Request %s has slow mode enabled but detail_url_xpath is empty.", request.id)
+            if not slow_fields:
+                logger.warning("[source][slow] Request %s has slow mode enabled but no detail fields configured.", request.id)
 
-        for block in blocks:
+        for block_index, block in enumerate(blocks, start=1):
             if stop_signal():
                 break
             contact = await _extract_fields(page, fast_fields, block, page.url)
             missing_required = contact.pop("__missing_required", [])
             if missing_required:
+                skipped_missing_required += 1
                 logger.debug(
                     "[source] Skipping block for request %s; missing required fields: %s",
                     request.id,
@@ -420,29 +540,109 @@ async def _scrape_request(
                 )
                 continue
             if slow_enabled:
-                detail_values = await _xpath_values(page, detail_url_xpath, root_handle=block)
-                detail_url = _absolute_url(page.url, detail_values[0] if detail_values else "")
-                if detail_url:
-                    detail_page = await context.new_page()
-                    try:
-                        await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)
-                        if wait_xpath:
+                slow_detail_attempted += 1
+                try:
+                    detail_values = await _xpath_values(page, detail_url_xpath, root_handle=block)
+                    detail_url = _absolute_url(page.url, detail_values[0] if detail_values else "")
+                    if not detail_url:
+                        slow_detail_url_missing += 1
+                        logger.warning(
+                            "[source][slow] Request %s block=%d no detail URL. detail_url_xpath=%r extracted_values=%d fast_fields=%s",
+                            request.id,
+                            block_index,
+                            detail_url_xpath,
+                            len(detail_values),
+                            await _field_debug_summary(page, fast_fields, root_handle=block),
+                        )
+                    else:
+                        detail_page = await context.new_page()
+                        try:
+                            logger.info("[source][slow] Request %s block=%d opening detail URL: %s", request.id, block_index, detail_url)
+                            await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)
+                            slow_detail_opened += 1
                             try:
-                                await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
-                            except Exception:
-                                pass
-                        detail_contact = await _extract_fields(detail_page, slow_fields, None, detail_page.url)
-                        detail_contact.pop("__missing_required", None)
-                        if detail_contact.get("source_data") and contact.get("source_data"):
-                            merged = dict(contact.get("source_data") or {})
-                            merged.update(detail_contact.get("source_data") or {})
-                            detail_contact["source_data"] = merged
-                        contact.update(detail_contact)
-                    finally:
-                        await detail_page.close()
+                                await detail_page.wait_for_load_state("domcontentloaded", timeout=15000)
+                            except Exception as exc:
+                                logger.warning(
+                                    "[source][slow] Request %s block=%d load-state wait warning: %s",
+                                    request.id,
+                                    block_index,
+                                    str(exc)[:180],
+                                )
+                            try:
+                                await detail_page.wait_for_function(
+                                    "() => document.body || document.documentElement",
+                                    timeout=15000,
+                                )
+                            except Exception as exc:
+                                logger.warning(
+                                    "[source][slow] Request %s block=%d DOM wait timeout. %s error=%s",
+                                    request.id,
+                                    block_index,
+                                    await _page_diagnostics(detail_page),
+                                    str(exc)[:180],
+                                )
+                            if wait_xpath:
+                                try:
+                                    await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
+                                    logger.info("[source][slow] Request %s block=%d wait XPath matched.", request.id, block_index)
+                                except Exception as exc:
+                                    slow_detail_wait_timeout += 1
+                                    logger.warning(
+                                        "[source][slow] Request %s block=%d wait XPath did not match within timeout. wait_xpath=%r %s error=%s",
+                                        request.id,
+                                        block_index,
+                                        wait_xpath,
+                                        await _page_diagnostics(detail_page),
+                                        str(exc)[:180],
+                                    )
+                            detail_contact = await _extract_fields(detail_page, slow_fields, None, detail_page.url)
+                            detail_contact.pop("__missing_required", None)
+                            detail_keys = _contact_keys(detail_contact)
+                            if detail_keys:
+                                logger.info(
+                                    "[source][slow] Request %s block=%d extracted detail fields: %s",
+                                    request.id,
+                                    block_index,
+                                    ", ".join(detail_keys),
+                                )
+                            else:
+                                slow_detail_field_empty += 1
+                                logger.warning(
+                                    "[source][slow] Request %s block=%d detail fields empty. %s fields=%s",
+                                    request.id,
+                                    block_index,
+                                    await _page_diagnostics(detail_page),
+                                    await _field_debug_summary(detail_page, slow_fields),
+                                )
+                            if detail_contact.get("source_data") and contact.get("source_data"):
+                                merged = dict(contact.get("source_data") or {})
+                                merged.update(detail_contact.get("source_data") or {})
+                                detail_contact["source_data"] = merged
+                            contact.update(detail_contact)
+                        except Exception as exc:
+                            slow_detail_errors += 1
+                            logger.exception(
+                                "[source][slow] Request %s block=%d detail scrape error for url=%s: %s",
+                                request.id,
+                                block_index,
+                                detail_url,
+                                exc,
+                            )
+                        finally:
+                            await detail_page.close()
+                except Exception as exc:
+                    slow_detail_errors += 1
+                    logger.exception(
+                        "[source][slow] Request %s block=%d detail URL/extraction error: %s",
+                        request.id,
+                        block_index,
+                        exc,
+                    )
             normalized = _normalize_contact(contact, campaign_id, request.id)
             dedupe_key = "|".join(str(normalized.get(k, "")).lower() for k in ("business_name", "domain", "phone", "address"))
             if dedupe_key in seen:
+                skipped_duplicates += 1
                 continue
             seen.add(dedupe_key)
             batch.append(normalized)
@@ -459,6 +659,20 @@ async def _scrape_request(
                 f"Generic source produced 0 contacts for request {request.id}; "
                 "check required fields and field XPath mappings."
             )
+        logger.info(
+            "[source] Request %s summary: blocks=%d sent=%d skipped_duplicates=%d skipped_missing_required=%d slow_attempted=%d slow_opened=%d slow_missing_url=%d slow_wait_timeout=%d slow_empty_fields=%d slow_errors=%d",
+            request.id,
+            len(blocks),
+            total,
+            skipped_duplicates,
+            skipped_missing_required,
+            slow_detail_attempted,
+            slow_detail_opened,
+            slow_detail_url_missing,
+            slow_detail_wait_timeout,
+            slow_detail_field_empty,
+            slow_detail_errors,
+        )
         return total
     finally:
         await runtime.close()
