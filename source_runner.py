@@ -804,12 +804,20 @@ async def debug_source_template(
     max_detail_pages: int = 3,
     detail_hold_seconds: float = 0.0,
     log: Optional[Callable[[str], None]] = None,
+    progress: Optional[Callable[[Dict[str, Any]], None]] = None,
     stop_signal: Optional[Callable[[], bool]] = None,
 ) -> Dict[str, Any]:
     def emit(message: str) -> None:
         if log:
             log(message)
         logger.info("[source-debug] %s", message)
+
+    def emit_progress(event: Dict[str, Any]) -> None:
+        if progress:
+            try:
+                progress(dict(event))
+            except Exception:
+                pass
 
     def stopped() -> bool:
         return bool(stop_signal and stop_signal())
@@ -891,6 +899,7 @@ async def debug_source_template(
         blocks = await _query_nodes(page, block_xpath)
         result["block_count"] = len(blocks)
         emit(f"Collected {len(blocks)} blocks with block XPath.")
+        emit_progress({"type": "blocks_collected", "block_count": len(blocks)})
 
         try:
             import base64
@@ -922,6 +931,7 @@ async def debug_source_template(
                     "email_candidates": field_meta.get("email_candidates", {}),
                 })
             result["fast_samples"].append(sample)
+            emit_progress({"type": "fast_block", "block_index": block_index, "sample": sample})
 
             if slow_enabled and len(result["detail_samples"]) < max(0, int(max_detail_pages or 0)):
                 detail_lookup_xpath = _block_scoped_xpath(detail_url_xpath) if detail_url_within_block else detail_url_xpath
@@ -946,9 +956,11 @@ async def debug_source_template(
                     "fields": [],
                     "error": "",
                 }
+                emit_progress({"type": "detail_start", "block_index": block_index, "detail": dict(detail_sample)})
                 if not detail_url:
                     detail_sample["error"] = "No detail URL from XPath or fast-field fallback."
                     emit(f"Block {block_index}: no detail URL. effective_xpath={detail_lookup_xpath!r} scope={detail_sample['scope']}")
+                    emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
                 else:
                     emit(f"Block {block_index}: opening detail URL {detail_url}")
                     detail_page = await context.new_page()
@@ -960,6 +972,7 @@ async def debug_source_template(
                             f"Block {block_index}: detail loaded title={detail_sample['title']!r} "
                             f"url={detail_sample['final_url']}"
                         )
+                        emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
                         try:
                             await detail_page.wait_for_function("() => document.body || document.documentElement", timeout=15000)
                             detail_sample["diagnostics"] = await _page_diagnostics(detail_page)
@@ -968,6 +981,7 @@ async def debug_source_template(
                             detail_sample["error"] = f"Detail DOM wait warning: {exc}"
                             detail_sample["diagnostics"] = await _page_diagnostics(detail_page)
                             emit(f"Block {block_index}: detail DOM wait warning: {exc}. {detail_sample['diagnostics']}")
+                        emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
                         if wait_xpath:
                             try:
                                 await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
@@ -977,6 +991,7 @@ async def debug_source_template(
                                 detail_sample["wait_xpath_matched"] = False
                                 detail_sample["error"] = f"Wait XPath did not match: {exc}"
                                 emit(f"Block {block_index}: wait XPath did not match: {wait_xpath}; {exc}")
+                            emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
                         for field in slow_fields:
                             label = _field_label(field)
                             xpath = str(field.get("xpath") or "").strip()
@@ -999,9 +1014,11 @@ async def debug_source_template(
                             )
                             if field_meta.get("email_candidates"):
                                 emit(f"Block {block_index}: field {label!r} email_candidates={field_meta.get('email_candidates')}")
+                            emit_progress({"type": "detail_field", "block_index": block_index, "detail": dict(detail_sample)})
                     except Exception as exc:
                         detail_sample["error"] = str(exc)
                         emit(f"Block {block_index}: detail error {exc}")
+                        emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
                     finally:
                         hold_ms = max(0, int(float(detail_hold_seconds or 0) * 1000))
                         if hold_ms:
@@ -1010,6 +1027,7 @@ async def debug_source_template(
                         await detail_page.close()
                         emit(f"Block {block_index}: detail page closed.")
                 result["detail_samples"].append(detail_sample)
+                emit_progress({"type": "detail_complete", "block_index": block_index, "detail": detail_sample})
 
         result["ok"] = True
         emit("Debug run completed.")

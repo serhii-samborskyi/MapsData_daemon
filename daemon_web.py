@@ -601,6 +601,7 @@ class DaemonWebController:
             "created_at": time.time(),
             "updated_at": time.time(),
             "logs": [],
+            "events": [],
             "result": None,
             "error": "",
         }
@@ -620,6 +621,19 @@ class DaemonWebController:
                 current.setdefault("logs", []).append(line)
                 current["updated_at"] = time.time()
 
+        def append_event(event: Dict[str, Any]) -> None:
+            event_payload = dict(event or {})
+            event_payload["time"] = time.strftime("%H:%M:%S")
+            with self.lock:
+                current = self.debug_runs.get(run_id)
+                if not current:
+                    return
+                events = current.setdefault("events", [])
+                events.append(event_payload)
+                if len(events) > 500:
+                    del events[: len(events) - 500]
+                current["updated_at"] = time.time()
+
         def worker() -> None:
             try:
                 from source_runner import debug_source_template
@@ -636,6 +650,7 @@ class DaemonWebController:
                     max_detail_pages=_to_int(payload.get("max_detail_pages"), 3, 0, 20),
                     detail_hold_seconds=_to_float(payload.get("detail_hold_seconds"), 0.0, 0.0, 120.0),
                     log=append_log,
+                    progress=append_event,
                 ))
                 with self.lock:
                     current = self.debug_runs.get(run_id)
@@ -662,6 +677,7 @@ class DaemonWebController:
                 return {"ok": False, "error": "debug_run_not_found"}
             payload = dict(run)
             payload["logs"] = list(run.get("logs") or [])
+            payload["events"] = list(run.get("events") or [])
             return payload
 
     def get_state(self, log_limit: int = 300) -> Dict[str, Any]:
