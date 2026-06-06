@@ -67,6 +67,44 @@ def _absolute_url(base_url: str, value: str) -> str:
     return urllib.parse.urljoin(base_url, raw)
 
 
+def _looks_like_url(value: Any) -> bool:
+    raw = _clean(value)
+    if not raw:
+        return False
+    if raw.startswith(("http://", "https://", "//", "/")):
+        return True
+    return bool(re.match(r"^[a-z0-9.-]+\.[a-z]{2,}(/|$)", raw, flags=re.I))
+
+
+def _fallback_detail_url_from_contact(contact: Dict[str, Any], page_url: str) -> tuple[str, str]:
+    candidates = [
+        ("facebook", contact.get("facebook")),
+        ("fb_link", contact.get("fb_link")),
+        ("profile_url", contact.get("profile_url")),
+        ("url", contact.get("url")),
+        ("website", contact.get("website")),
+        ("domain", contact.get("domain")),
+        ("www", contact.get("www")),
+    ]
+    source_data = contact.get("source_data")
+    if isinstance(source_data, dict):
+        for key in ("facebook", "fb_link", "profile_url", "url", "website", "domain", "www"):
+            candidates.append((f"source_data.{key}", source_data.get(key)))
+    for label, value in candidates:
+        if _looks_like_url(value):
+            return _absolute_url(page_url, str(value)), label
+    return "", ""
+
+
+def _block_scoped_xpath(xpath: str) -> str:
+    value = str(xpath or "").strip()
+    if value.startswith(".//") or value.startswith("./"):
+        return value
+    if value.startswith("//"):
+        return f".{value}"
+    return value
+
+
 async def _xpath_values(page, xpath: str, root_handle=None) -> List[str]:
     if not xpath:
         return []
@@ -511,13 +549,15 @@ async def _scrape_request(
         slow_detail_field_empty = 0
         slow_detail_errors = 0
         detail_url_xpath = str(slow.get("detail_url_xpath") or "").strip()
+        detail_url_within_block = bool(slow.get("detail_url_within_block", True))
         wait_xpath = str(slow.get("wait_xpath") or "").strip()
         slow_fields = slow.get("fields") if isinstance(slow.get("fields"), list) else []
         if slow_enabled:
             logger.info(
-                "[source][slow] Enabled for request %s: detail_url_xpath=%r wait_xpath=%r fields=%d",
+                "[source][slow] Enabled for request %s: detail_url_xpath=%r detail_url_scope=%s wait_xpath=%r fields=%d",
                 request.id,
                 detail_url_xpath,
+                "block" if detail_url_within_block else "page",
                 wait_xpath,
                 len(slow_fields),
             )
@@ -542,16 +582,35 @@ async def _scrape_request(
             if slow_enabled:
                 slow_detail_attempted += 1
                 try:
-                    detail_values = await _xpath_values(page, detail_url_xpath, root_handle=block)
+                    detail_lookup_xpath = _block_scoped_xpath(detail_url_xpath) if detail_url_within_block else detail_url_xpath
+                    detail_values = await _xpath_values(
+                        page,
+                        detail_lookup_xpath,
+                        root_handle=block if detail_url_within_block else None,
+                    )
                     detail_url = _absolute_url(page.url, detail_values[0] if detail_values else "")
+                    fallback_url_source = ""
+                    if not detail_url:
+                        detail_url, fallback_url_source = _fallback_detail_url_from_contact(contact, page.url)
+                        if detail_url:
+                            logger.info(
+                                "[source][slow] Request %s block=%d detail URL XPath returned none; using fast field fallback %s=%s",
+                                request.id,
+                                block_index,
+                                fallback_url_source,
+                                detail_url,
+                            )
                     if not detail_url:
                         slow_detail_url_missing += 1
                         logger.warning(
-                            "[source][slow] Request %s block=%d no detail URL. detail_url_xpath=%r extracted_values=%d fast_fields=%s",
+                            "[source][slow] Request %s block=%d no detail URL. detail_url_xpath=%r effective_xpath=%r scope=%s extracted_values=%d fast_keys=%s fast_fields=%s",
                             request.id,
                             block_index,
                             detail_url_xpath,
+                            detail_lookup_xpath,
+                            "block" if detail_url_within_block else "page",
                             len(detail_values),
+                            ", ".join(_contact_keys(contact)) or "none",
                             await _field_debug_summary(page, fast_fields, root_handle=block),
                         )
                     else:
@@ -674,6 +733,205 @@ async def _scrape_request(
             slow_detail_errors,
         )
         return total
+    finally:
+        await runtime.close()
+
+
+async def debug_source_template(
+    *,
+    source: dict,
+    query: str,
+    scrape_mode: str = "fast",
+    show_browser: bool = False,
+    proxy_url: str = "",
+    max_scrolls_override: Optional[int] = None,
+    max_blocks: int = 5,
+    max_detail_pages: int = 3,
+    log: Optional[Callable[[str], None]] = None,
+    stop_signal: Optional[Callable[[], bool]] = None,
+) -> Dict[str, Any]:
+    def emit(message: str) -> None:
+        if log:
+            log(message)
+        logger.info("[source-debug] %s", message)
+
+    def stopped() -> bool:
+        return bool(stop_signal and stop_signal())
+
+    def compact_values(values: List[str], limit: int = 3) -> List[str]:
+        out: List[str] = []
+        for value in values[:limit]:
+            text = _clean(value)
+            out.append(text[:300])
+        return out
+
+    config = source.get("config") if isinstance(source.get("config"), dict) else {}
+    start_template = str(config.get("start_url_template") or "").strip()
+    url = start_template.replace("{query}", urllib.parse.quote_plus(str(query or "").strip()))
+    fast = config.get("fast") if isinstance(config.get("fast"), dict) else {}
+    slow = config.get("slow") if isinstance(config.get("slow"), dict) else {}
+    nav = dict(config.get("navigation") if isinstance(config.get("navigation"), dict) else {})
+    if max_scrolls_override is not None:
+        nav["max_scrolls"] = max(1, int(max_scrolls_override))
+    debug_config = dict(config)
+    debug_config["navigation"] = nav
+
+    block_xpath = str(fast.get("block_xpath") or "").strip()
+    fast_fields = fast.get("fields") if isinstance(fast.get("fields"), list) else []
+    slow_enabled = bool(slow.get("enabled")) and str(scrape_mode or "fast").strip().lower() == "slow"
+    slow_fields = slow.get("fields") if isinstance(slow.get("fields"), list) else []
+    detail_url_xpath = str(slow.get("detail_url_xpath") or "").strip()
+    detail_url_within_block = bool(slow.get("detail_url_within_block", True))
+    wait_xpath = str(slow.get("wait_xpath") or "").strip()
+
+    result: Dict[str, Any] = {
+        "ok": False,
+        "source_name": source.get("name") or source.get("id") or "debug-source",
+        "query": query,
+        "scrape_mode": scrape_mode,
+        "opened_url": url,
+        "title": "",
+        "final_url": "",
+        "block_xpath": block_xpath,
+        "block_count": 0,
+        "fast_samples": [],
+        "detail_samples": [],
+        "errors": [],
+        "screenshot_base64": "",
+    }
+
+    runtime = AsyncBrowserRuntime(
+        headless=(not show_browser),
+        chromium_args=["--disable-blink-features=AutomationControlled", "--disable-extensions"],
+        camoufox_options={"block_images": False},
+        proxy_url=normalize_proxy_url(proxy_url),
+    )
+    browser = await runtime.launch()
+    try:
+        context = await browser.new_context()
+        page = await context.new_page()
+        emit(f"Opening {url}")
+        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        try:
+            await page.wait_for_function("() => document.body || document.documentElement", timeout=20000)
+        except Exception as exc:
+            result["errors"].append(f"Page DOM wait failed: {exc}")
+            emit(f"Page DOM wait failed: {exc}")
+        await page.wait_for_timeout(1200)
+        result["title"] = await page.title()
+        result["final_url"] = page.url
+        emit(f"Loaded title={result['title']!r} url={page.url}")
+
+        if block_xpath:
+            try:
+                await page.wait_for_selector(f"xpath={block_xpath}", timeout=30000)
+                emit("Initial block XPath matched.")
+            except Exception as exc:
+                warning = f"Initial block XPath did not match within 30s: {exc}"
+                result["errors"].append(warning)
+                emit(warning)
+
+        await _navigate_results(page, debug_config, stopped)
+        blocks = await _query_nodes(page, block_xpath)
+        result["block_count"] = len(blocks)
+        emit(f"Collected {len(blocks)} blocks with block XPath.")
+
+        try:
+            import base64
+            screenshot_bytes = await page.screenshot(type="jpeg", quality=70, full_page=False)
+            result["screenshot_base64"] = base64.b64encode(screenshot_bytes).decode("ascii")
+        except Exception as exc:
+            emit(f"Screenshot failed: {exc}")
+
+        for block_index, block in enumerate(blocks[:max(1, int(max_blocks or 1))], start=1):
+            if stopped():
+                break
+            sample: Dict[str, Any] = {"block_index": block_index, "fields": [], "contact_keys": []}
+            contact = await _extract_fields(page, fast_fields, block, page.url)
+            sample["contact_keys"] = _contact_keys(contact)
+            for field in fast_fields:
+                label = _field_label(field)
+                xpath = str(field.get("xpath") or "").strip()
+                use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
+                values = await (_xpath_content_values(page, xpath, root_handle=block) if use_content else _xpath_values(page, xpath, root_handle=block))
+                value = await _extract_field_value(page, field, root_handle=block)
+                sample["fields"].append({
+                    "label": label,
+                    "xpath": xpath,
+                    "matches": len(values),
+                    "value": value,
+                    "previews": compact_values(values),
+                    "run_regex_within_xpath_content": use_content,
+                })
+            result["fast_samples"].append(sample)
+
+            if slow_enabled and len(result["detail_samples"]) < max(0, int(max_detail_pages or 0)):
+                detail_lookup_xpath = _block_scoped_xpath(detail_url_xpath) if detail_url_within_block else detail_url_xpath
+                detail_values = await _xpath_values(page, detail_lookup_xpath, root_handle=block if detail_url_within_block else None)
+                detail_url = _absolute_url(page.url, detail_values[0] if detail_values else "")
+                fallback_source = ""
+                if not detail_url:
+                    detail_url, fallback_source = _fallback_detail_url_from_contact(contact, page.url)
+                detail_sample: Dict[str, Any] = {
+                    "block_index": block_index,
+                    "detail_url_xpath": detail_url_xpath,
+                    "effective_xpath": detail_lookup_xpath,
+                    "scope": "block" if detail_url_within_block else "page",
+                    "xpath_matches": len(detail_values),
+                    "fallback_source": fallback_source,
+                    "detail_url": detail_url,
+                    "wait_xpath": wait_xpath,
+                    "wait_xpath_matched": None,
+                    "fields": [],
+                    "error": "",
+                }
+                if not detail_url:
+                    detail_sample["error"] = "No detail URL from XPath or fast-field fallback."
+                    emit(f"Block {block_index}: no detail URL. effective_xpath={detail_lookup_xpath!r} scope={detail_sample['scope']}")
+                else:
+                    emit(f"Block {block_index}: opening detail URL {detail_url}")
+                    detail_page = await context.new_page()
+                    try:
+                        await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)
+                        try:
+                            await detail_page.wait_for_function("() => document.body || document.documentElement", timeout=15000)
+                        except Exception as exc:
+                            detail_sample["error"] = f"Detail DOM wait warning: {exc}"
+                        if wait_xpath:
+                            try:
+                                await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
+                                detail_sample["wait_xpath_matched"] = True
+                            except Exception as exc:
+                                detail_sample["wait_xpath_matched"] = False
+                                detail_sample["error"] = f"Wait XPath did not match: {exc}"
+                        for field in slow_fields:
+                            label = _field_label(field)
+                            xpath = str(field.get("xpath") or "").strip()
+                            use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
+                            values = await (_xpath_content_values(detail_page, xpath) if use_content else _xpath_values(detail_page, xpath))
+                            value = await _extract_field_value(detail_page, field)
+                            detail_sample["fields"].append({
+                                "label": label,
+                                "xpath": xpath,
+                                "matches": len(values),
+                                "value": value,
+                                "previews": compact_values(values),
+                                "run_regex_within_xpath_content": use_content,
+                            })
+                    except Exception as exc:
+                        detail_sample["error"] = str(exc)
+                        emit(f"Block {block_index}: detail error {exc}")
+                    finally:
+                        await detail_page.close()
+                result["detail_samples"].append(detail_sample)
+
+        result["ok"] = True
+        emit("Debug run completed.")
+        return result
+    except Exception as exc:
+        result["errors"].append(str(exc))
+        emit(f"Debug run failed: {exc}")
+        return result
     finally:
         await runtime.close()
 

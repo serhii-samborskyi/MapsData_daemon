@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import uuid
 import re
 import signal
 import shutil
@@ -116,6 +117,8 @@ class DaemonWebController:
                 pass
 
         self.log_lines = deque(maxlen=MAX_LOG_LINES)
+        self.debug_runs: Dict[str, Dict[str, Any]] = {}
+        self.debug_runs_order = deque(maxlen=50)
         self._append_log("ui", f"Web UI booted. config={self.config_path}")
 
     def _append_log(self, source: str, line: str) -> None:
@@ -582,6 +585,84 @@ class DaemonWebController:
         except Exception as exc:
             return {"ok": False, "error": "proxy_test_failed", "detail": str(exc), "target": target}
 
+    def start_source_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
+        query = str(payload.get("query") or "").strip()
+        if not source:
+            return {"ok": False, "error": "source_required"}
+        if not query:
+            return {"ok": False, "error": "query_required"}
+        run_id = uuid.uuid4().hex[:12]
+        maps_cfg = self.config.get("maps", {}) if isinstance(self.config.get("maps"), dict) else {}
+        debug_run: Dict[str, Any] = {
+            "id": run_id,
+            "ok": True,
+            "status": "running",
+            "created_at": time.time(),
+            "updated_at": time.time(),
+            "logs": [],
+            "result": None,
+            "error": "",
+        }
+        with self.lock:
+            self.debug_runs[run_id] = debug_run
+            self.debug_runs_order.append(run_id)
+            while len(self.debug_runs_order) > 40:
+                old_id = self.debug_runs_order.popleft()
+                self.debug_runs.pop(old_id, None)
+
+        def append_log(message: str) -> None:
+            line = f"[{time.strftime('%H:%M:%S')}] {message}"
+            with self.lock:
+                current = self.debug_runs.get(run_id)
+                if not current:
+                    return
+                current.setdefault("logs", []).append(line)
+                current["updated_at"] = time.time()
+
+        def worker() -> None:
+            try:
+                from source_runner import debug_source_template
+                import asyncio
+
+                result = asyncio.run(debug_source_template(
+                    source=source,
+                    query=query,
+                    scrape_mode=str(payload.get("scrape_mode") or "fast"),
+                    show_browser=_to_bool(payload.get("show_browser"), bool(maps_cfg.get("show_browser", False))),
+                    proxy_url=str(payload.get("proxy_url") if payload.get("proxy_url") is not None else maps_cfg.get("proxy_url", "")),
+                    max_scrolls_override=_to_int(payload.get("max_scrolls"), 0, 0, 500) or None,
+                    max_blocks=_to_int(payload.get("max_blocks"), 5, 1, 30),
+                    max_detail_pages=_to_int(payload.get("max_detail_pages"), 3, 0, 20),
+                    log=append_log,
+                ))
+                with self.lock:
+                    current = self.debug_runs.get(run_id)
+                    if current:
+                        current["status"] = "completed" if result.get("ok") else "failed"
+                        current["result"] = result
+                        current["updated_at"] = time.time()
+            except Exception as exc:
+                append_log(f"Debug worker failed: {exc}")
+                with self.lock:
+                    current = self.debug_runs.get(run_id)
+                    if current:
+                        current["status"] = "failed"
+                        current["error"] = str(exc)
+                        current["updated_at"] = time.time()
+
+        threading.Thread(target=worker, daemon=True).start()
+        return {"ok": True, "run_id": run_id, "status": "running"}
+
+    def get_source_debug(self, run_id: str) -> Dict[str, Any]:
+        with self.lock:
+            run = self.debug_runs.get(run_id)
+            if not run:
+                return {"ok": False, "error": "debug_run_not_found"}
+            payload = dict(run)
+            payload["logs"] = list(run.get("logs") or [])
+            return payload
+
     def get_state(self, log_limit: int = 300) -> Dict[str, Any]:
         with self.lock:
             maps_running = self.maps_proc is not None and self.maps_proc.poll() is None
@@ -622,6 +703,9 @@ class Handler(BaseHTTPRequestHandler):
         raw = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -630,6 +714,7 @@ class Handler(BaseHTTPRequestHandler):
         raw = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -647,6 +732,13 @@ class Handler(BaseHTTPRequestHandler):
             return {}
         return payload if isinstance(payload, dict) else {}
 
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.end_headers()
+
     def do_GET(self) -> None:
         global CONTROLLER
         if CONTROLLER is None:
@@ -661,6 +753,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_html(f"<h1>Failed to load UI</h1><pre>{exc}</pre>", 500)
                 return
             self._send_html(html)
+            return
+
+        if self.path.startswith("/api/source-debug/"):
+            run_id = self.path.rstrip("/").split("/")[-1]
+            self._send_json(CONTROLLER.get_source_debug(run_id))
             return
 
         if self.path.startswith("/api/state"):
@@ -720,6 +817,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/stop/both":
             self._send_json(CONTROLLER.stop_both())
+            return
+
+        if self.path == "/api/source-debug/run":
+            self._send_json(CONTROLLER.start_source_debug(payload))
             return
 
         if self.path == "/api/proxy/test":
