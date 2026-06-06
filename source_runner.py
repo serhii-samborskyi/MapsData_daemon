@@ -10,6 +10,7 @@ import urllib.parse
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from browser_backend import AsyncBrowserRuntime, backend_display_name, normalize_proxy_url
+from email_quality import extract_candidate_emails_from_text
 from maps_scraper import Campaign, HttpClient, LeadsApiClient, RequestItem
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,12 @@ def _apply_regex(value: str, pattern: str) -> str:
 
 def _field_label(field: dict) -> str:
     return str(field.get("label") or field.get("target_field") or field.get("xpath") or "field")
+
+
+def _is_email_field(field: dict) -> bool:
+    label = _field_label(field).lower()
+    target = str(field.get("target_field") or "").strip().lower()
+    return "email" in label or target == "email" or target.endswith("_email")
 
 
 def _contact_keys(contact: Dict[str, Any]) -> List[str]:
@@ -224,6 +231,54 @@ async def _extract_field_value(page, field: dict, root_handle=None) -> str:
     return _apply_regex(value, regex)
 
 
+async def _email_candidates_from_page(page) -> Dict[str, List[str]]:
+    out: Dict[str, List[str]] = {"html": [], "body_text": [], "mailto": []}
+    try:
+        html = await page.content()
+        out["html"] = sorted(extract_candidate_emails_from_text(html or ""))
+    except Exception:
+        pass
+    try:
+        text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+        out["body_text"] = sorted(extract_candidate_emails_from_text(str(text or "")))
+    except Exception:
+        pass
+    try:
+        mailtos = await page.eval_on_selector_all(
+            "a[href^='mailto:']",
+            "els => els.map(el => el.getAttribute('href')).filter(Boolean)",
+        )
+        candidates = set()
+        for item in mailtos or []:
+            candidates.update(extract_candidate_emails_from_text(str(item or "")))
+        out["mailto"] = sorted(candidates)
+    except Exception:
+        pass
+    return out
+
+
+async def _fallback_email_from_page(page) -> tuple[str, str, Dict[str, List[str]]]:
+    candidates = await _email_candidates_from_page(page)
+    for source in ("mailto", "body_text", "html"):
+        if candidates.get(source):
+            return candidates[source][0], source, candidates
+    return "", "", candidates
+
+
+async def _extract_field_value_with_meta(page, field: dict, root_handle=None) -> tuple[str, Dict[str, Any]]:
+    value = await _extract_field_value(page, field, root_handle=root_handle)
+    meta: Dict[str, Any] = {"fallback_source": "", "email_candidates": {}}
+    if value or root_handle is not None or not _is_email_field(field):
+        return value, meta
+    fallback_value, source, candidates = await _fallback_email_from_page(page)
+    if fallback_value:
+        meta["fallback_source"] = source
+        meta["email_candidates"] = candidates
+        return fallback_value, meta
+    meta["email_candidates"] = candidates
+    return value, meta
+
+
 async def _query_nodes(page, xpath: str):
     return await page.query_selector_all(f"xpath={xpath}")
 
@@ -389,7 +444,7 @@ async def _extract_fields(page, fields: List[dict], root_handle, page_url: str) 
     missing_required: List[str] = []
     for field in fields:
         xpath = str(field.get("xpath") or "").strip()
-        value = await _extract_field_value(page, field, root_handle=root_handle)
+        value, _meta = await _extract_field_value_with_meta(page, field, root_handle=root_handle)
         if not value:
             if bool(field.get("required")):
                 missing_required.append(str(field.get("label") or field.get("target_field") or xpath))
@@ -855,7 +910,7 @@ async def debug_source_template(
                 xpath = str(field.get("xpath") or "").strip()
                 use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
                 values = await (_xpath_content_values(page, xpath, root_handle=block) if use_content else _xpath_values(page, xpath, root_handle=block))
-                value = await _extract_field_value(page, field, root_handle=block)
+                value, field_meta = await _extract_field_value_with_meta(page, field, root_handle=block)
                 sample["fields"].append({
                     "label": label,
                     "xpath": xpath,
@@ -863,6 +918,8 @@ async def debug_source_template(
                     "value": value,
                     "previews": compact_values(values),
                     "run_regex_within_xpath_content": use_content,
+                    "fallback_source": field_meta.get("fallback_source", ""),
+                    "email_candidates": field_meta.get("email_candidates", {}),
                 })
             result["fast_samples"].append(sample)
 
@@ -925,7 +982,7 @@ async def debug_source_template(
                             xpath = str(field.get("xpath") or "").strip()
                             use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
                             values = await (_xpath_content_values(detail_page, xpath) if use_content else _xpath_values(detail_page, xpath))
-                            value = await _extract_field_value(detail_page, field)
+                            value, field_meta = await _extract_field_value_with_meta(detail_page, field)
                             detail_sample["fields"].append({
                                 "label": label,
                                 "xpath": xpath,
@@ -933,11 +990,15 @@ async def debug_source_template(
                                 "value": value,
                                 "previews": compact_values(values),
                                 "run_regex_within_xpath_content": use_content,
+                                "fallback_source": field_meta.get("fallback_source", ""),
+                                "email_candidates": field_meta.get("email_candidates", {}),
                             })
                             emit(
                                 f"Block {block_index}: field {label!r} matches={len(values)} "
-                                f"value={value[:160]!r}"
+                                f"value={value[:160]!r} fallback={field_meta.get('fallback_source', '') or '-'}"
                             )
+                            if field_meta.get("email_candidates"):
+                                emit(f"Block {block_index}: field {label!r} email_candidates={field_meta.get('email_candidates')}")
                     except Exception as exc:
                         detail_sample["error"] = str(exc)
                         emit(f"Block {block_index}: detail error {exc}")
