@@ -634,6 +634,7 @@ class DaemonWebController:
                     max_scrolls_override=_to_int(payload.get("max_scrolls"), 0, 0, 500) or None,
                     max_blocks=_to_int(payload.get("max_blocks"), 5, 1, 30),
                     max_detail_pages=_to_int(payload.get("max_detail_pages"), 3, 0, 20),
+                    detail_hold_seconds=_to_float(payload.get("detail_hold_seconds"), 0.0, 0.0, 120.0),
                     log=append_log,
                 ))
                 with self.lock:

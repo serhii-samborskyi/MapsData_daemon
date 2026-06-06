@@ -747,6 +747,7 @@ async def debug_source_template(
     max_scrolls_override: Optional[int] = None,
     max_blocks: int = 5,
     max_detail_pages: int = 3,
+    detail_hold_seconds: float = 0.0,
     log: Optional[Callable[[str], None]] = None,
     stop_signal: Optional[Callable[[], bool]] = None,
 ) -> Dict[str, Any]:
@@ -882,6 +883,9 @@ async def debug_source_template(
                     "detail_url": detail_url,
                     "wait_xpath": wait_xpath,
                     "wait_xpath_matched": None,
+                    "title": "",
+                    "final_url": "",
+                    "diagnostics": "",
                     "fields": [],
                     "error": "",
                 }
@@ -893,17 +897,29 @@ async def debug_source_template(
                     detail_page = await context.new_page()
                     try:
                         await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)
+                        detail_sample["title"] = await detail_page.title()
+                        detail_sample["final_url"] = detail_page.url
+                        emit(
+                            f"Block {block_index}: detail loaded title={detail_sample['title']!r} "
+                            f"url={detail_sample['final_url']}"
+                        )
                         try:
                             await detail_page.wait_for_function("() => document.body || document.documentElement", timeout=15000)
+                            detail_sample["diagnostics"] = await _page_diagnostics(detail_page)
+                            emit(f"Block {block_index}: detail DOM ready. {detail_sample['diagnostics']}")
                         except Exception as exc:
                             detail_sample["error"] = f"Detail DOM wait warning: {exc}"
+                            detail_sample["diagnostics"] = await _page_diagnostics(detail_page)
+                            emit(f"Block {block_index}: detail DOM wait warning: {exc}. {detail_sample['diagnostics']}")
                         if wait_xpath:
                             try:
                                 await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
                                 detail_sample["wait_xpath_matched"] = True
+                                emit(f"Block {block_index}: wait XPath matched: {wait_xpath}")
                             except Exception as exc:
                                 detail_sample["wait_xpath_matched"] = False
                                 detail_sample["error"] = f"Wait XPath did not match: {exc}"
+                                emit(f"Block {block_index}: wait XPath did not match: {wait_xpath}; {exc}")
                         for field in slow_fields:
                             label = _field_label(field)
                             xpath = str(field.get("xpath") or "").strip()
@@ -918,11 +934,20 @@ async def debug_source_template(
                                 "previews": compact_values(values),
                                 "run_regex_within_xpath_content": use_content,
                             })
+                            emit(
+                                f"Block {block_index}: field {label!r} matches={len(values)} "
+                                f"value={value[:160]!r}"
+                            )
                     except Exception as exc:
                         detail_sample["error"] = str(exc)
                         emit(f"Block {block_index}: detail error {exc}")
                     finally:
+                        hold_ms = max(0, int(float(detail_hold_seconds or 0) * 1000))
+                        if hold_ms:
+                            emit(f"Block {block_index}: holding detail page open for {hold_ms / 1000:.1f}s")
+                            await detail_page.wait_for_timeout(hold_ms)
                         await detail_page.close()
+                        emit(f"Block {block_index}: detail page closed.")
                 result["detail_samples"].append(detail_sample)
 
         result["ok"] = True
