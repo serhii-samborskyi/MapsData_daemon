@@ -166,11 +166,11 @@ async def _xpath_values(page, xpath: str, root_handle=None) -> List[str]:
     return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
 
 
-async def _xpath_content_values(page, xpath: str, root_handle=None) -> List[str]:
+async def _xpath_content_values(page, xpath: str, root_handle=None, strip_html: bool = False) -> List[str]:
     if not xpath:
         return []
     script = r"""
-    ({xpath, root}) => {
+    ({xpath, root, stripHtml}) => {
         const context = root || document;
         const result = document.evaluate(xpath, context, null, XPathResult.ANY_TYPE, null);
         const out = [];
@@ -178,7 +178,15 @@ async def _xpath_content_values(page, xpath: str, root_handle=None) -> List[str]
             if (!node) return;
             if (node.nodeType === Node.ATTRIBUTE_NODE) out.push(node.value || '');
             else if (node.nodeType === Node.TEXT_NODE) out.push(node.textContent || '');
-            else out.push((node.innerText || node.textContent || '').trim());
+            else if (stripHtml) {
+                const clone = node.cloneNode(true);
+                if (clone.querySelectorAll) {
+                    clone.querySelectorAll('script,style,noscript,template,svg').forEach(child => child.remove());
+                }
+                out.push((node.innerText || clone.textContent || '').trim());
+            } else {
+                out.push((node.innerText || node.textContent || '').trim());
+            }
         };
         switch (result.resultType) {
             case XPathResult.STRING_TYPE:
@@ -211,7 +219,7 @@ async def _xpath_content_values(page, xpath: str, root_handle=None) -> List[str]
         return out.map(v => String(v || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
     }
     """
-    values = await page.evaluate(script, {"xpath": xpath, "root": root_handle})
+    values = await page.evaluate(script, {"xpath": xpath, "root": root_handle, "stripHtml": bool(strip_html)})
     return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
 
 
@@ -219,8 +227,9 @@ async def _extract_field_value(page, field: dict, root_handle=None) -> str:
     xpath = str(field.get("xpath") or "").strip()
     regex = str(field.get("regex") or "").strip()
     run_within_content = bool(field.get("run_regex_within_xpath_content", False))
+    strip_html = bool(field.get("strip_html_before_regex", False))
     if run_within_content and regex:
-        content_values = await _xpath_content_values(page, xpath, root_handle=root_handle)
+        content_values = await _xpath_content_values(page, xpath, root_handle=root_handle, strip_html=strip_html)
         for raw_value in content_values:
             value = _apply_regex(_clean(raw_value), regex)
             if value:
@@ -477,11 +486,13 @@ async def _field_debug_summary(page, fields: List[dict], root_handle=None) -> st
             continue
         try:
             use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
-            values = await (_xpath_content_values(page, xpath, root_handle=root_handle) if use_content else _xpath_values(page, xpath, root_handle=root_handle))
+            strip_html = bool(field.get("strip_html_before_regex", False))
+            values = await (_xpath_content_values(page, xpath, root_handle=root_handle, strip_html=strip_html) if use_content else _xpath_values(page, xpath, root_handle=root_handle))
             raw = _clean(" ".join(values))
             value = await _extract_field_value(page, field, root_handle=root_handle)
             if value:
-                parts.append(f"{label}=ok{'(content_regex)' if use_content else ''}")
+                suffix = "(content_regex_strip_html)" if use_content and strip_html else "(content_regex)" if use_content else ""
+                parts.append(f"{label}=ok{suffix}")
             elif raw:
                 parts.append(f"{label}=regex_empty(raw_len={len(raw)})")
             else:
@@ -918,7 +929,8 @@ async def debug_source_template(
                 label = _field_label(field)
                 xpath = str(field.get("xpath") or "").strip()
                 use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
-                values = await (_xpath_content_values(page, xpath, root_handle=block) if use_content else _xpath_values(page, xpath, root_handle=block))
+                strip_html = bool(field.get("strip_html_before_regex", False))
+                values = await (_xpath_content_values(page, xpath, root_handle=block, strip_html=strip_html) if use_content else _xpath_values(page, xpath, root_handle=block))
                 value, field_meta = await _extract_field_value_with_meta(page, field, root_handle=block)
                 sample["fields"].append({
                     "label": label,
@@ -927,6 +939,7 @@ async def debug_source_template(
                     "value": value,
                     "previews": compact_values(values),
                     "run_regex_within_xpath_content": use_content,
+                    "strip_html_before_regex": strip_html,
                     "fallback_source": field_meta.get("fallback_source", ""),
                     "email_candidates": field_meta.get("email_candidates", {}),
                 })
@@ -996,7 +1009,8 @@ async def debug_source_template(
                             label = _field_label(field)
                             xpath = str(field.get("xpath") or "").strip()
                             use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
-                            values = await (_xpath_content_values(detail_page, xpath) if use_content else _xpath_values(detail_page, xpath))
+                            strip_html = bool(field.get("strip_html_before_regex", False))
+                            values = await (_xpath_content_values(detail_page, xpath, strip_html=strip_html) if use_content else _xpath_values(detail_page, xpath))
                             value, field_meta = await _extract_field_value_with_meta(detail_page, field)
                             detail_sample["fields"].append({
                                 "label": label,
@@ -1005,6 +1019,7 @@ async def debug_source_template(
                                 "value": value,
                                 "previews": compact_values(values),
                                 "run_regex_within_xpath_content": use_content,
+                                "strip_html_before_regex": strip_html,
                                 "fallback_source": field_meta.get("fallback_source", ""),
                                 "email_candidates": field_meta.get("email_candidates", {}),
                             })
