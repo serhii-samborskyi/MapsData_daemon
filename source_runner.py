@@ -223,21 +223,53 @@ async def _xpath_content_values(page, xpath: str, root_handle=None, strip_html: 
     return [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
 
 
-async def _extract_field_value(page, field: dict, root_handle=None) -> str:
+async def _field_xpath_values(page, field: dict, root_handle=None) -> tuple[List[str], bool, bool]:
     xpath = str(field.get("xpath") or "").strip()
     regex = str(field.get("regex") or "").strip()
-    run_within_content = bool(field.get("run_regex_within_xpath_content", False))
+    use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(regex)
     strip_html = bool(field.get("strip_html_before_regex", False))
-    if run_within_content and regex:
-        content_values = await _xpath_content_values(page, xpath, root_handle=root_handle, strip_html=strip_html)
-        for raw_value in content_values:
+    if use_content:
+        values = await _xpath_content_values(page, xpath, root_handle=root_handle, strip_html=strip_html)
+    else:
+        values = await _xpath_values(page, xpath, root_handle=root_handle)
+    return values, use_content, strip_html
+
+
+def _regex_attempts(values: List[str], pattern: str, limit: int = 12) -> List[Dict[str, Any]]:
+    attempts: List[Dict[str, Any]] = []
+    regex = str(pattern or "").strip()
+    if not regex:
+        return attempts
+    for index, raw_value in enumerate(values[:limit], start=1):
+        cleaned = _clean(raw_value)
+        matched_value = _apply_regex(cleaned, regex)
+        attempts.append({
+            "index": index,
+            "matched": bool(matched_value),
+            "value": matched_value,
+            "preview": cleaned[:300],
+        })
+    return attempts
+
+
+def _matched_attempt_index(attempts: List[Dict[str, Any]]) -> int:
+    for attempt in attempts:
+        if attempt.get("matched"):
+            return int(attempt.get("index") or 0)
+    return 0
+
+
+async def _extract_field_value(page, field: dict, root_handle=None) -> str:
+    regex = str(field.get("regex") or "").strip()
+    values, _use_content, _strip_html = await _field_xpath_values(page, field, root_handle=root_handle)
+    if regex:
+        for raw_value in values:
             value = _apply_regex(_clean(raw_value), regex)
             if value:
                 return value
-        return _apply_regex(_clean(" ".join(content_values)), regex)
-    values = await _xpath_values(page, xpath, root_handle=root_handle)
+        return _apply_regex(_clean(" ".join(values)), regex)
     value = _clean(" ".join(values))
-    return _apply_regex(value, regex)
+    return value
 
 
 async def _email_candidates_from_page(page) -> Dict[str, List[str]]:
@@ -485,9 +517,7 @@ async def _field_debug_summary(page, fields: List[dict], root_handle=None) -> st
             parts.append(f"{label}=empty_xpath")
             continue
         try:
-            use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
-            strip_html = bool(field.get("strip_html_before_regex", False))
-            values = await (_xpath_content_values(page, xpath, root_handle=root_handle, strip_html=strip_html) if use_content else _xpath_values(page, xpath, root_handle=root_handle))
+            values, use_content, strip_html = await _field_xpath_values(page, field, root_handle=root_handle)
             raw = _clean(" ".join(values))
             value = await _extract_field_value(page, field, root_handle=root_handle)
             if value:
@@ -941,16 +971,19 @@ async def debug_source_template(
                 for field in slow_fields:
                     label = _field_label(field)
                     xpath = str(field.get("xpath") or "").strip()
-                    use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
-                    strip_html = bool(field.get("strip_html_before_regex", False))
-                    values = await (_xpath_content_values(page, xpath, strip_html=strip_html) if use_content else _xpath_values(page, xpath))
+                    regex = str(field.get("regex") or "").strip()
+                    values, use_content, strip_html = await _field_xpath_values(page, field)
                     value, field_meta = await _extract_field_value_with_meta(page, field)
+                    attempts = _regex_attempts(values, regex)
                     detail_sample["fields"].append({
                         "label": label,
                         "xpath": xpath,
+                        "regex": regex,
                         "matches": len(values),
                         "value": value,
                         "previews": compact_values(values),
+                        "regex_attempts": attempts,
+                        "matched_attempt_index": _matched_attempt_index(attempts),
                         "run_regex_within_xpath_content": use_content,
                         "strip_html_before_regex": strip_html,
                         "fallback_source": field_meta.get("fallback_source", ""),
@@ -1030,16 +1063,19 @@ async def debug_source_template(
             for field in fast_fields:
                 label = _field_label(field)
                 xpath = str(field.get("xpath") or "").strip()
-                use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
-                strip_html = bool(field.get("strip_html_before_regex", False))
-                values = await (_xpath_content_values(page, xpath, root_handle=block, strip_html=strip_html) if use_content else _xpath_values(page, xpath, root_handle=block))
+                regex = str(field.get("regex") or "").strip()
+                values, use_content, strip_html = await _field_xpath_values(page, field, root_handle=block)
                 value, field_meta = await _extract_field_value_with_meta(page, field, root_handle=block)
+                attempts = _regex_attempts(values, regex)
                 sample["fields"].append({
                     "label": label,
                     "xpath": xpath,
+                    "regex": regex,
                     "matches": len(values),
                     "value": value,
                     "previews": compact_values(values),
+                    "regex_attempts": attempts,
+                    "matched_attempt_index": _matched_attempt_index(attempts),
                     "run_regex_within_xpath_content": use_content,
                     "strip_html_before_regex": strip_html,
                     "fallback_source": field_meta.get("fallback_source", ""),
@@ -1110,16 +1146,19 @@ async def debug_source_template(
                         for field in slow_fields:
                             label = _field_label(field)
                             xpath = str(field.get("xpath") or "").strip()
-                            use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
-                            strip_html = bool(field.get("strip_html_before_regex", False))
-                            values = await (_xpath_content_values(detail_page, xpath, strip_html=strip_html) if use_content else _xpath_values(detail_page, xpath))
+                            regex = str(field.get("regex") or "").strip()
+                            values, use_content, strip_html = await _field_xpath_values(detail_page, field)
                             value, field_meta = await _extract_field_value_with_meta(detail_page, field)
+                            attempts = _regex_attempts(values, regex)
                             detail_sample["fields"].append({
                                 "label": label,
                                 "xpath": xpath,
+                                "regex": regex,
                                 "matches": len(values),
                                 "value": value,
                                 "previews": compact_values(values),
+                                "regex_attempts": attempts,
+                                "matched_attempt_index": _matched_attempt_index(attempts),
                                 "run_regex_within_xpath_content": use_content,
                                 "strip_html_before_regex": strip_html,
                                 "fallback_source": field_meta.get("fallback_source", ""),
