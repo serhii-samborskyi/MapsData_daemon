@@ -588,10 +588,11 @@ class DaemonWebController:
     def start_source_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
         query = str(payload.get("query") or "").strip()
+        detail_url = str(payload.get("detail_url") or "").strip()
         if not source:
             return {"ok": False, "error": "source_required"}
-        if not query:
-            return {"ok": False, "error": "query_required"}
+        if not query and not detail_url:
+            return {"ok": False, "error": "query_or_detail_url_required"}
         run_id = uuid.uuid4().hex[:12]
         maps_cfg = self.config.get("maps", {}) if isinstance(self.config.get("maps"), dict) else {}
         debug_run: Dict[str, Any] = {
@@ -642,6 +643,7 @@ class DaemonWebController:
                 result = asyncio.run(debug_source_template(
                     source=source,
                     query=query,
+                    detail_url=detail_url,
                     scrape_mode=str(payload.get("scrape_mode") or "fast"),
                     show_browser=_to_bool(payload.get("show_browser"), bool(maps_cfg.get("show_browser", False))),
                     proxy_url=str(payload.get("proxy_url") if payload.get("proxy_url") is not None else maps_cfg.get("proxy_url", "")),

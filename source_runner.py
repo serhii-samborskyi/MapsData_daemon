@@ -807,6 +807,7 @@ async def debug_source_template(
     *,
     source: dict,
     query: str,
+    detail_url: str = "",
     scrape_mode: str = "fast",
     show_browser: bool = False,
     proxy_url: str = "",
@@ -842,7 +843,8 @@ async def debug_source_template(
 
     config = source.get("config") if isinstance(source.get("config"), dict) else {}
     start_template = str(config.get("start_url_template") or "").strip()
-    url = start_template.replace("{query}", urllib.parse.quote_plus(str(query or "").strip()))
+    manual_detail_url = _clean(detail_url)
+    url = manual_detail_url or start_template.replace("{query}", urllib.parse.quote_plus(str(query or "").strip()))
     fast = config.get("fast") if isinstance(config.get("fast"), dict) else {}
     slow = config.get("slow") if isinstance(config.get("slow"), dict) else {}
     nav = dict(config.get("navigation") if isinstance(config.get("navigation"), dict) else {})
@@ -863,6 +865,7 @@ async def debug_source_template(
         "ok": False,
         "source_name": source.get("name") or source.get("id") or "debug-source",
         "query": query,
+        "detail_url_only": bool(manual_detail_url),
         "scrape_mode": scrape_mode,
         "opened_url": url,
         "title": "",
@@ -885,6 +888,105 @@ async def debug_source_template(
     try:
         context = await browser.new_context()
         page = await context.new_page()
+
+        if manual_detail_url:
+            emit(f"Opening detail URL {manual_detail_url}")
+            detail_sample: Dict[str, Any] = {
+                "block_index": 1,
+                "detail_url_xpath": "",
+                "effective_xpath": "",
+                "scope": "manual",
+                "xpath_matches": 0,
+                "fallback_source": "manual_detail_url",
+                "detail_url": manual_detail_url,
+                "wait_xpath": wait_xpath,
+                "wait_xpath_matched": None,
+                "title": "",
+                "final_url": "",
+                "diagnostics": "",
+                "fields": [],
+                "error": "",
+            }
+            emit_progress({"type": "detail_start", "block_index": 1, "detail": dict(detail_sample)})
+            try:
+                await page.goto(manual_detail_url, wait_until="domcontentloaded", timeout=60000)
+                result["title"] = await page.title()
+                result["final_url"] = page.url
+                detail_sample["title"] = result["title"]
+                detail_sample["final_url"] = result["final_url"]
+                emit(f"Detail loaded title={result['title']!r} url={page.url}")
+                emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
+
+                try:
+                    await page.wait_for_function("() => document.body || document.documentElement", timeout=20000)
+                    detail_sample["diagnostics"] = await _page_diagnostics(page)
+                    emit(f"Detail DOM ready. {detail_sample['diagnostics']}")
+                except Exception as exc:
+                    detail_sample["error"] = f"Detail DOM wait warning: {exc}"
+                    detail_sample["diagnostics"] = await _page_diagnostics(page)
+                    emit(f"Detail DOM wait warning: {exc}. {detail_sample['diagnostics']}")
+                emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
+
+                if wait_xpath:
+                    try:
+                        await page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
+                        detail_sample["wait_xpath_matched"] = True
+                        emit(f"Wait XPath matched: {wait_xpath}")
+                    except Exception as exc:
+                        detail_sample["wait_xpath_matched"] = False
+                        detail_sample["error"] = f"Wait XPath did not match: {exc}"
+                        emit(f"Wait XPath did not match: {wait_xpath}; {exc}")
+                    emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
+
+                for field in slow_fields:
+                    label = _field_label(field)
+                    xpath = str(field.get("xpath") or "").strip()
+                    use_content = bool(field.get("run_regex_within_xpath_content", False)) and bool(str(field.get("regex") or "").strip())
+                    strip_html = bool(field.get("strip_html_before_regex", False))
+                    values = await (_xpath_content_values(page, xpath, strip_html=strip_html) if use_content else _xpath_values(page, xpath))
+                    value, field_meta = await _extract_field_value_with_meta(page, field)
+                    detail_sample["fields"].append({
+                        "label": label,
+                        "xpath": xpath,
+                        "matches": len(values),
+                        "value": value,
+                        "previews": compact_values(values),
+                        "run_regex_within_xpath_content": use_content,
+                        "strip_html_before_regex": strip_html,
+                        "fallback_source": field_meta.get("fallback_source", ""),
+                        "email_candidates": field_meta.get("email_candidates", {}),
+                    })
+                    emit(
+                        f"Detail field {label!r} matches={len(values)} "
+                        f"value={value[:160]!r} fallback={field_meta.get('fallback_source', '') or '-'}"
+                    )
+                    if field_meta.get("email_candidates"):
+                        emit(f"Detail field {label!r} email_candidates={field_meta.get('email_candidates')}")
+                    emit_progress({"type": "detail_field", "block_index": 1, "detail": dict(detail_sample)})
+
+                try:
+                    import base64
+                    screenshot_bytes = await page.screenshot(type="jpeg", quality=70, full_page=False)
+                    result["screenshot_base64"] = base64.b64encode(screenshot_bytes).decode("ascii")
+                except Exception as exc:
+                    emit(f"Screenshot failed: {exc}")
+
+                hold_ms = max(0, int(float(detail_hold_seconds or 0) * 1000))
+                if hold_ms:
+                    emit(f"Holding detail page open for {hold_ms / 1000:.1f}s")
+                    await page.wait_for_timeout(hold_ms)
+            except Exception as exc:
+                detail_sample["error"] = str(exc)
+                result["errors"].append(str(exc))
+                emit(f"Manual detail debug failed: {exc}")
+                emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
+
+            result["detail_samples"].append(detail_sample)
+            emit_progress({"type": "detail_complete", "block_index": 1, "detail": detail_sample})
+            result["ok"] = True
+            emit("Manual detail debug run completed.")
+            return result
+
         emit(f"Opening {url}")
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         try:
