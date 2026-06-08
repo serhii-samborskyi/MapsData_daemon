@@ -568,6 +568,57 @@ async def _page_diagnostics(page) -> str:
     )
 
 
+async def _wait_for_detail_page_settle(page, max_wait_ms: int = 9000) -> Dict[str, Any]:
+    deadline = time.monotonic() + max(0.5, max_wait_ms / 1000.0)
+    last_signature = None
+    stable_cycles = 0
+    latest: Dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        try:
+            latest = await page.evaluate(
+                r"""() => {
+                    const bodyText = document.body && document.body.innerText || '';
+                    const html = document.documentElement && document.documentElement.outerHTML || '';
+                    return {
+                        readyState: document.readyState || '',
+                        listitems: document.querySelectorAll('[role="listitem"]').length,
+                        links: document.querySelectorAll('a[href]').length,
+                        bodyTextLength: bodyText.length,
+                        htmlLength: html.length,
+                    };
+                }"""
+            )
+        except Exception as exc:
+            latest = {"error": str(exc)}
+        signature = (
+            latest.get("readyState"),
+            latest.get("listitems"),
+            latest.get("links"),
+            latest.get("bodyTextLength"),
+        )
+        if signature == last_signature and int(latest.get("listitems") or 0) > 0:
+            stable_cycles += 1
+            if stable_cycles >= 2:
+                break
+        else:
+            stable_cycles = 0
+            last_signature = signature
+        await page.wait_for_timeout(700)
+    return latest
+
+
+def _settle_summary(metrics: Dict[str, Any]) -> str:
+    if not metrics:
+        return "settle_metrics=empty"
+    if metrics.get("error"):
+        return f"settle_error={metrics.get('error')}"
+    return (
+        f"readyState={metrics.get('readyState')!r} "
+        f"listitems={metrics.get('listitems')} links={metrics.get('links')} "
+        f"bodyTextLength={metrics.get('bodyTextLength')} htmlLength={metrics.get('htmlLength')}"
+    )
+
+
 async def _scroll_detail_page(page, scrolls: int, pause_min_ms: int = 500, pause_max_ms: int = 1200) -> None:
     count = max(0, min(int(scrolls or 0), 50))
     if count <= 0:
@@ -790,6 +841,13 @@ async def _scrape_request(
                                         await _page_diagnostics(detail_page),
                                         str(exc)[:180],
                                     )
+                            settle_metrics = await _wait_for_detail_page_settle(detail_page)
+                            logger.info(
+                                "[source][slow] Request %s block=%d detail page settled before extraction. %s",
+                                request.id,
+                                block_index,
+                                _settle_summary(settle_metrics),
+                            )
                             detail_contact = await _extract_fields(detail_page, slow_fields, None, detail_page.url)
                             detail_contact.pop("__missing_required", None)
                             detail_keys = _contact_keys(detail_contact)
@@ -1015,6 +1073,11 @@ async def debug_source_template(
                         emit(f"Wait XPath did not match: {wait_xpath}; {exc}")
                     emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
 
+                settle_metrics = await _wait_for_detail_page_settle(page)
+                emit(f"Detail page settled before extraction. {_settle_summary(settle_metrics)}")
+                detail_sample["diagnostics"] = await _page_diagnostics(page)
+                emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
+
                 for field in slow_fields:
                     label = _field_label(field)
                     xpath = str(field.get("xpath") or "").strip()
@@ -1196,6 +1259,11 @@ async def debug_source_template(
                                 detail_sample["error"] = f"Wait XPath did not match: {exc}"
                                 emit(f"Block {block_index}: wait XPath did not match: {wait_xpath}; {exc}")
                             emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
+                        settle_metrics = await _wait_for_detail_page_settle(detail_page)
+                        emit(f"Block {block_index}: detail page settled before extraction. {_settle_summary(settle_metrics)}")
+                        detail_sample["diagnostics"] = await _page_diagnostics(detail_page)
+                        emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
+
                         for field in slow_fields:
                             label = _field_label(field)
                             xpath = str(field.get("xpath") or "").strip()
