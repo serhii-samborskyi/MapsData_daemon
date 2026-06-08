@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import uuid
@@ -119,6 +120,8 @@ class DaemonWebController:
         self.log_lines = deque(maxlen=MAX_LOG_LINES)
         self.debug_runs: Dict[str, Dict[str, Any]] = {}
         self.debug_runs_order = deque(maxlen=50)
+        self.live_debug_sessions: Dict[str, Dict[str, Any]] = {}
+        self.live_debug_sessions_order = deque(maxlen=20)
         self._append_log("ui", f"Web UI booted. config={self.config_path}")
 
     def _append_log(self, source: str, line: str) -> None:
@@ -682,6 +685,300 @@ class DaemonWebController:
             payload["events"] = list(run.get("events") or [])
             return payload
 
+    def start_live_detail_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        detail_url = str(payload.get("detail_url") or "").strip()
+        if not detail_url:
+            return {"ok": False, "error": "detail_url_required"}
+        run_id = uuid.uuid4().hex[:12]
+        maps_cfg = self.config.get("maps", {}) if isinstance(self.config.get("maps"), dict) else {}
+        session: Dict[str, Any] = {
+            "id": run_id,
+            "ok": True,
+            "status": "starting",
+            "detail_url": detail_url,
+            "final_url": "",
+            "title": "",
+            "created_at": time.time(),
+            "updated_at": time.time(),
+            "logs": [],
+            "error": "",
+            "last_result": None,
+            "stop_requested": False,
+            "loop": None,
+            "runtime": None,
+            "page": None,
+        }
+        with self.lock:
+            self.live_debug_sessions[run_id] = session
+            self.live_debug_sessions_order.append(run_id)
+            while len(self.live_debug_sessions_order) > 15:
+                old_id = self.live_debug_sessions_order.popleft()
+                self._stop_live_detail_debug_locked(old_id)
+
+        def append_log(message: str) -> None:
+            line = f"[{time.strftime('%H:%M:%S')}] {message}"
+            with self.lock:
+                current = self.live_debug_sessions.get(run_id)
+                if not current:
+                    return
+                current.setdefault("logs", []).append(line)
+                current["updated_at"] = time.time()
+
+        def worker() -> None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            runtime = None
+            try:
+                from browser_backend import AsyncBrowserRuntime, normalize_proxy_url
+
+                async def boot() -> None:
+                    nonlocal runtime
+                    runtime = AsyncBrowserRuntime(
+                        headless=(not _to_bool(payload.get("show_browser"), True)),
+                        chromium_args=["--disable-blink-features=AutomationControlled", "--disable-extensions"],
+                        camoufox_options={"block_images": False},
+                        proxy_url=normalize_proxy_url(str(payload.get("proxy_url") if payload.get("proxy_url") is not None else maps_cfg.get("proxy_url", ""))),
+                    )
+                    browser = await runtime.launch()
+                    context = await browser.new_context()
+                    page = await context.new_page()
+                    append_log(f"Opening live detail page {detail_url}")
+                    await page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)
+                    try:
+                        await page.wait_for_function("() => document.body || document.documentElement", timeout=20000)
+                    except Exception as exc:
+                        append_log(f"DOM wait warning: {exc}")
+                    title = await page.title()
+                    with self.lock:
+                        current = self.live_debug_sessions.get(run_id)
+                        if current and current.get("stop_requested"):
+                            append_log("Live detail page opened, but stop was requested before ready.")
+                            return
+                        if current:
+                            current["status"] = "ready"
+                            current["loop"] = loop
+                            current["runtime"] = runtime
+                            current["page"] = page
+                            current["title"] = title
+                            current["final_url"] = page.url
+                            current["updated_at"] = time.time()
+                    append_log(f"Live detail page ready title={title!r} url={page.url}")
+
+                loop.run_until_complete(boot())
+                with self.lock:
+                    should_run = bool(self.live_debug_sessions.get(run_id, {}).get("status") == "ready")
+                if should_run:
+                    loop.run_forever()
+            except Exception as exc:
+                append_log(f"Live detail debug failed: {exc}")
+                with self.lock:
+                    current = self.live_debug_sessions.get(run_id)
+                    if current:
+                        current["status"] = "failed"
+                        current["error"] = str(exc)
+                        current["updated_at"] = time.time()
+            finally:
+                if runtime is not None:
+                    try:
+                        loop.run_until_complete(runtime.close())
+                    except Exception:
+                        pass
+                with self.lock:
+                    current = self.live_debug_sessions.get(run_id)
+                    if current and current.get("status") not in {"failed", "stopped"}:
+                        current["status"] = "stopped"
+                    if current:
+                        current["loop"] = None
+                        current["runtime"] = None
+                        current["page"] = None
+                        current["updated_at"] = time.time()
+                try:
+                    loop.close()
+                except Exception:
+                    pass
+
+        threading.Thread(target=worker, daemon=True).start()
+        return {"ok": True, "session_id": run_id, "status": "starting"}
+
+    async def _evaluate_live_detail_page(self, page, payload: Dict[str, Any]) -> Dict[str, Any]:
+        xpath = str(payload.get("xpath") or "").strip()
+        regex = str(payload.get("regex") or "").strip()
+        strip_html = _to_bool(payload.get("strip_html"), False)
+        scrolls = _to_int(payload.get("scrolls"), 0, 0, 50)
+        if not xpath:
+            return {"ok": False, "error": "xpath_required"}
+        return await page.evaluate(
+            r"""
+            async ({xpath, regex, stripHtml, scrolls}) => {
+                const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+                for (let i = 0; i < scrolls; i++) {
+                    const root = document.scrollingElement || document.documentElement || document.body;
+                    if (root) window.scrollBy(0, Math.max(500, Math.floor((window.innerHeight || 900) * 0.85)));
+                    await sleep(650);
+                }
+                const cleanText = value => String(value || '').replace(/\s+/g, ' ').trim();
+                const nodeText = node => {
+                    if (!node) return '';
+                    if (node.nodeType === Node.ATTRIBUTE_NODE) return node.value || '';
+                    if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+                    if (stripHtml) {
+                        const clone = node.cloneNode(true);
+                        if (clone.querySelectorAll) clone.querySelectorAll('script,style,noscript,template,svg').forEach(child => child.remove());
+                        return node.innerText || clone.textContent || '';
+                    }
+                    return node.innerText || node.textContent || node.getAttribute?.('href') || '';
+                };
+                const nodeHtml = node => {
+                    if (!node || node.nodeType !== Node.ELEMENT_NODE) return '';
+                    return cleanText(node.outerHTML || '').slice(0, 600);
+                };
+                const values = [];
+                const result = document.evaluate(xpath, document, null, XPathResult.ANY_TYPE, null);
+                const push = node => values.push({text: cleanText(nodeText(node)), html: nodeHtml(node)});
+                switch (result.resultType) {
+                    case XPathResult.STRING_TYPE:
+                        values.push({text: cleanText(result.stringValue || ''), html: ''});
+                        break;
+                    case XPathResult.NUMBER_TYPE:
+                        values.push({text: String(result.numberValue), html: ''});
+                        break;
+                    case XPathResult.BOOLEAN_TYPE:
+                        values.push({text: String(result.booleanValue), html: ''});
+                        break;
+                    case XPathResult.UNORDERED_NODE_ITERATOR_TYPE:
+                    case XPathResult.ORDERED_NODE_ITERATOR_TYPE: {
+                        let node = result.iterateNext();
+                        while (node) {
+                            push(node);
+                            node = result.iterateNext();
+                        }
+                        break;
+                    }
+                    case XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE:
+                    case XPathResult.ORDERED_NODE_SNAPSHOT_TYPE:
+                        for (let i = 0; i < result.snapshotLength; i++) push(result.snapshotItem(i));
+                        break;
+                    case XPathResult.ANY_UNORDERED_NODE_TYPE:
+                    case XPathResult.FIRST_ORDERED_NODE_TYPE:
+                        push(result.singleNodeValue);
+                        break;
+                }
+                const filtered = values.filter(item => item.text);
+                let rx = null;
+                let regexError = '';
+                if (regex) {
+                    try { rx = new RegExp(regex, 'i'); }
+                    catch (err) { regexError = String(err && err.message || err); }
+                }
+                const attempts = filtered.slice(0, 100).map((item, idx) => {
+                    let matched = false;
+                    let value = '';
+                    if (rx) {
+                        const match = item.text.match(rx);
+                        if (match) {
+                            matched = true;
+                            value = cleanText(match[1] || match[0] || '');
+                        }
+                    }
+                    return {
+                        index: idx + 1,
+                        matched,
+                        value,
+                        preview: item.text.slice(0, 500),
+                        html_preview: item.html,
+                    };
+                });
+                const firstMatch = attempts.find(item => item.matched);
+                return {
+                    ok: !regexError,
+                    error: regexError,
+                    url: location.href,
+                    title: document.title || '',
+                    readyState: document.readyState || '',
+                    xpath,
+                    regex,
+                    strip_html: !!stripHtml,
+                    scrolls,
+                    total_matches: filtered.length,
+                    first_value: firstMatch ? firstMatch.value : (filtered[0] ? filtered[0].text : ''),
+                    matched_attempt_index: firstMatch ? firstMatch.index : 0,
+                    attempts,
+                };
+            }
+            """,
+            {"xpath": xpath, "regex": regex, "stripHtml": strip_html, "scrolls": scrolls},
+        )
+
+    def evaluate_live_detail_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        session_id = str(payload.get("session_id") or "").strip()
+        with self.lock:
+            session = self.live_debug_sessions.get(session_id)
+            if not session:
+                return {"ok": False, "error": "live_session_not_found"}
+            if session.get("status") != "ready":
+                return {"ok": False, "error": "live_session_not_ready", "status": session.get("status")}
+            loop = session.get("loop")
+            page = session.get("page")
+        if loop is None or page is None:
+            return {"ok": False, "error": "live_session_not_ready"}
+        try:
+            future = asyncio.run_coroutine_threadsafe(self._evaluate_live_detail_page(page, payload), loop)
+            result = future.result(timeout=90)
+            with self.lock:
+                current = self.live_debug_sessions.get(session_id)
+                if current:
+                    current["last_result"] = result
+                    current["updated_at"] = time.time()
+            return {"ok": True, "session_id": session_id, "result": result}
+        except Exception as exc:
+            return {"ok": False, "error": "live_eval_failed", "detail": str(exc)}
+
+    def _stop_live_detail_debug_locked(self, session_id: str) -> Dict[str, Any]:
+        session = self.live_debug_sessions.get(session_id)
+        if not session:
+            return {"ok": False, "error": "live_session_not_found"}
+        loop = session.get("loop")
+        runtime = session.get("runtime")
+        session["stop_requested"] = True
+        session["status"] = "stopped"
+        session["updated_at"] = time.time()
+        if loop is not None:
+            async def close_and_stop() -> None:
+                try:
+                    if runtime is not None:
+                        await runtime.close()
+                finally:
+                    loop.stop()
+            try:
+                asyncio.run_coroutine_threadsafe(close_and_stop(), loop)
+            except Exception:
+                pass
+        return {"ok": True, "session_id": session_id, "status": "stopped"}
+
+    def stop_live_detail_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        session_id = str(payload.get("session_id") or "").strip()
+        with self.lock:
+            return self._stop_live_detail_debug_locked(session_id)
+
+    def get_live_detail_debug(self, session_id: str) -> Dict[str, Any]:
+        with self.lock:
+            session = self.live_debug_sessions.get(session_id)
+            if not session:
+                return {"ok": False, "error": "live_session_not_found"}
+            return {
+                "ok": True,
+                "id": session.get("id"),
+                "status": session.get("status"),
+                "detail_url": session.get("detail_url"),
+                "final_url": session.get("final_url"),
+                "title": session.get("title"),
+                "created_at": session.get("created_at"),
+                "updated_at": session.get("updated_at"),
+                "logs": list(session.get("logs") or []),
+                "error": session.get("error"),
+                "last_result": session.get("last_result"),
+            }
+
     def get_state(self, log_limit: int = 300) -> Dict[str, Any]:
         with self.lock:
             maps_running = self.maps_proc is not None and self.maps_proc.poll() is None
@@ -706,6 +1003,10 @@ class DaemonWebController:
             }
 
     def shutdown(self) -> None:
+        with self.lock:
+            session_ids = list(self.live_debug_sessions.keys())
+            for session_id in session_ids:
+                self._stop_live_detail_debug_locked(session_id)
         self.stop_both()
 
 
@@ -774,6 +1075,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_html(html)
             return
 
+        if self.path.startswith("/api/source-debug/live/"):
+            session_id = self.path.rstrip("/").split("/")[-1]
+            self._send_json(CONTROLLER.get_live_detail_debug(session_id))
+            return
+
         if self.path.startswith("/api/source-debug/"):
             run_id = self.path.rstrip("/").split("/")[-1]
             self._send_json(CONTROLLER.get_source_debug(run_id))
@@ -840,6 +1146,18 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/source-debug/run":
             self._send_json(CONTROLLER.start_source_debug(payload))
+            return
+
+        if self.path == "/api/source-debug/live-start":
+            self._send_json(CONTROLLER.start_live_detail_debug(payload))
+            return
+
+        if self.path == "/api/source-debug/live-eval":
+            self._send_json(CONTROLLER.evaluate_live_detail_debug(payload))
+            return
+
+        if self.path == "/api/source-debug/live-stop":
+            self._send_json(CONTROLLER.stop_live_detail_debug(payload))
             return
 
         if self.path == "/api/proxy/test":
