@@ -351,6 +351,7 @@ def _run_maps_stage(
                 base_url=ctx.maps_base_url,
                 batch_size=_coerce_int(ctx.maps_cfg.get("batch_size", 20), 20),
                 request_workers=_coerce_int(ctx.maps_cfg.get("max_concurrent", 1), 1),
+                detail_workers=_coerce_int(ctx.maps_cfg.get("detail_workers", 1), 1),
                 show_browser=maps_scraper.DEFAULT_SHOW_BROWSER,
                 proxy_url=maps_scraper.DEFAULT_PROXY_URL,
                 scrape_mode=maps_scraper.DEFAULT_SCRAPE_MODE,

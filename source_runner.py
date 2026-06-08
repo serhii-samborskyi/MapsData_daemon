@@ -693,6 +693,7 @@ async def _scrape_request(
     show_browser: bool,
     proxy_url: str,
     stop_signal: Callable[[], bool],
+    detail_workers: int = 1,
     detail_url_seen: Optional[Set[str]] = None,
     detail_url_seen_lock: Optional[threading.Lock] = None,
 ) -> int:
@@ -704,6 +705,7 @@ async def _scrape_request(
     block_xpath = str(fast.get("block_xpath") or "").strip()
     fast_fields = fast.get("fields") if isinstance(fast.get("fields"), list) else []
     slow_enabled = bool(slow.get("enabled")) and str(scrape_mode or "fast").strip().lower() == "slow"
+    detail_worker_count = max(1, int(detail_workers or 1))
 
     runtime = AsyncBrowserRuntime(
         headless=(not show_browser),
@@ -754,8 +756,10 @@ async def _scrape_request(
                 f"check block XPath or page access. block_xpath={block_xpath!r} {await _page_diagnostics(page)}"
             )
 
-        seen: Set[str] = set()
+        contact_seen: Set[str] = set()
+        local_detail_url_seen: Set[str] = set()
         batch: List[Dict[str, Any]] = []
+        detail_jobs: List[Dict[str, Any]] = []
         total = 0
         skipped_duplicates = 0
         skipped_missing_required = 0
@@ -773,18 +777,127 @@ async def _scrape_request(
         slow_fields = slow.get("fields") if isinstance(slow.get("fields"), list) else []
         if slow_enabled:
             logger.info(
-                "[source][slow] Enabled for request %s: detail_url_xpath=%r detail_url_scope=%s wait_xpath=%r detail_scrolls=%d fields=%d",
+                "[source][slow] Enabled for request %s: detail_url_xpath=%r detail_url_scope=%s wait_xpath=%r detail_scrolls=%d fields=%d detail_workers=%d",
                 request.id,
                 detail_url_xpath,
                 "block" if detail_url_within_block else "page",
                 wait_xpath,
                 detail_scrolls,
                 len(slow_fields),
+                detail_worker_count,
             )
             if not detail_url_xpath:
                 logger.warning("[source][slow] Request %s has slow mode enabled but detail_url_xpath is empty.", request.id)
             if not slow_fields:
                 logger.warning("[source][slow] Request %s has slow mode enabled but no detail fields configured.", request.id)
+
+        async def add_contact(contact: Dict[str, Any]) -> None:
+            nonlocal total, skipped_duplicates, batch
+            normalized = _normalize_contact(contact, campaign_id, request.id)
+            dedupe_key = "|".join(str(normalized.get(k, "")).lower() for k in ("business_name", "domain", "phone", "address"))
+            if dedupe_key in contact_seen:
+                skipped_duplicates += 1
+                return
+            contact_seen.add(dedupe_key)
+            batch.append(normalized)
+            total += 1
+            if len(batch) >= batch_size:
+                if not api.send_contacts(batch):
+                    raise RuntimeError(f"Failed sending generic source batch for request {request.id}")
+                batch = []
+
+        async def scrape_detail_job(job: Dict[str, Any]) -> Dict[str, Any]:
+            nonlocal slow_detail_opened, slow_detail_wait_timeout, slow_detail_field_empty, slow_detail_errors
+            block_index = int(job.get("block_index") or 0)
+            detail_url = str(job.get("detail_url") or "")
+            contact = dict(job.get("contact") or {})
+            detail_page = await context.new_page()
+            try:
+                logger.info("[source][slow] Request %s block=%d opening detail URL: %s", request.id, block_index, detail_url)
+                await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)
+                slow_detail_opened += 1
+                try:
+                    await detail_page.wait_for_load_state("domcontentloaded", timeout=15000)
+                except Exception as exc:
+                    logger.warning(
+                        "[source][slow] Request %s block=%d load-state wait warning: %s",
+                        request.id,
+                        block_index,
+                        str(exc)[:180],
+                    )
+                try:
+                    await detail_page.wait_for_function(
+                        "() => document.body || document.documentElement",
+                        timeout=15000,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "[source][slow] Request %s block=%d DOM wait timeout. %s error=%s",
+                        request.id,
+                        block_index,
+                        await _page_diagnostics(detail_page),
+                        str(exc)[:180],
+                    )
+                if detail_scrolls:
+                    logger.info("[source][slow] Request %s block=%d scrolling detail page %d time(s).", request.id, block_index, detail_scrolls)
+                    await _scroll_detail_page(detail_page, detail_scrolls)
+                if wait_xpath:
+                    try:
+                        await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
+                        logger.info("[source][slow] Request %s block=%d wait XPath matched.", request.id, block_index)
+                    except Exception as exc:
+                        slow_detail_wait_timeout += 1
+                        logger.warning(
+                            "[source][slow] Request %s block=%d wait XPath did not match within timeout. wait_xpath=%r %s error=%s",
+                            request.id,
+                            block_index,
+                            wait_xpath,
+                            await _page_diagnostics(detail_page),
+                            str(exc)[:180],
+                        )
+                settle_metrics = await _wait_for_detail_page_settle(detail_page)
+                logger.info(
+                    "[source][slow] Request %s block=%d detail page settled before extraction. %s",
+                    request.id,
+                    block_index,
+                    _settle_summary(settle_metrics),
+                )
+                detail_contact = await _extract_fields(detail_page, slow_fields, None, detail_page.url)
+                detail_contact.pop("__missing_required", None)
+                detail_keys = _contact_keys(detail_contact)
+                if detail_keys:
+                    logger.info(
+                        "[source][slow] Request %s block=%d extracted detail fields: %s",
+                        request.id,
+                        block_index,
+                        ", ".join(detail_keys),
+                    )
+                else:
+                    slow_detail_field_empty += 1
+                    logger.warning(
+                        "[source][slow] Request %s block=%d detail fields empty. %s fields=%s",
+                        request.id,
+                        block_index,
+                        await _page_diagnostics(detail_page),
+                        await _field_debug_summary(detail_page, slow_fields),
+                    )
+                if detail_contact.get("source_data") and contact.get("source_data"):
+                    merged = dict(contact.get("source_data") or {})
+                    merged.update(detail_contact.get("source_data") or {})
+                    detail_contact["source_data"] = merged
+                contact.update(detail_contact)
+            except Exception as exc:
+                slow_detail_errors += 1
+                logger.exception(
+                    "[source][slow] Request %s block=%d detail scrape error for url=%s: %s",
+                    request.id,
+                    block_index,
+                    detail_url,
+                    exc,
+                )
+            finally:
+                await detail_page.close()
+            return contact
 
         for block_index, block in enumerate(blocks, start=1):
             if stop_signal():
@@ -833,140 +946,71 @@ async def _scrape_request(
                             ", ".join(_contact_keys(contact)) or "none",
                             await _field_debug_summary(page, fast_fields, root_handle=block),
                         )
-                    else:
-                        detail_dedupe_key = _detail_url_dedupe_key(detail_url)
-                        if detail_dedupe_key:
-                            should_skip_detail = False
-                            if detail_url_seen is not None and detail_url_seen_lock is not None:
-                                with detail_url_seen_lock:
-                                    if detail_dedupe_key in detail_url_seen:
-                                        should_skip_detail = True
-                                    else:
-                                        detail_url_seen.add(detail_dedupe_key)
-                            elif detail_dedupe_key in seen:
-                                should_skip_detail = True
-                            else:
-                                seen.add(detail_dedupe_key)
-                            if should_skip_detail:
-                                slow_detail_duplicates += 1
-                                skipped_duplicates += 1
-                                logger.info(
-                                    "[source][slow] Request %s block=%d skipping duplicate detail URL: %s",
-                                    request.id,
-                                    block_index,
-                                    detail_url,
-                                )
-                                continue
-                        detail_page = await context.new_page()
-                        try:
-                            logger.info("[source][slow] Request %s block=%d opening detail URL: %s", request.id, block_index, detail_url)
-                            await detail_page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)
-                            slow_detail_opened += 1
-                            try:
-                                await detail_page.wait_for_load_state("domcontentloaded", timeout=15000)
-                            except Exception as exc:
-                                logger.warning(
-                                    "[source][slow] Request %s block=%d load-state wait warning: %s",
-                                    request.id,
-                                    block_index,
-                                    str(exc)[:180],
-                                )
-                            try:
-                                await detail_page.wait_for_function(
-                                    "() => document.body || document.documentElement",
-                                    timeout=15000,
-                                )
-                            except Exception as exc:
-                                logger.warning(
-                                    "[source][slow] Request %s block=%d DOM wait timeout. %s error=%s",
-                                    request.id,
-                                    block_index,
-                                    await _page_diagnostics(detail_page),
-                                    str(exc)[:180],
-                                )
-                            if detail_scrolls:
-                                logger.info("[source][slow] Request %s block=%d scrolling detail page %d time(s).", request.id, block_index, detail_scrolls)
-                                await _scroll_detail_page(detail_page, detail_scrolls)
-                            if wait_xpath:
-                                try:
-                                    await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
-                                    logger.info("[source][slow] Request %s block=%d wait XPath matched.", request.id, block_index)
-                                except Exception as exc:
-                                    slow_detail_wait_timeout += 1
-                                    logger.warning(
-                                        "[source][slow] Request %s block=%d wait XPath did not match within timeout. wait_xpath=%r %s error=%s",
-                                        request.id,
-                                        block_index,
-                                        wait_xpath,
-                                        await _page_diagnostics(detail_page),
-                                        str(exc)[:180],
-                                    )
-                            settle_metrics = await _wait_for_detail_page_settle(detail_page)
+                        await add_contact(contact)
+                        continue
+                    detail_dedupe_key = _detail_url_dedupe_key(detail_url)
+                    if detail_dedupe_key:
+                        should_skip_detail = False
+                        if detail_url_seen is not None and detail_url_seen_lock is not None:
+                            with detail_url_seen_lock:
+                                if detail_dedupe_key in detail_url_seen:
+                                    should_skip_detail = True
+                                else:
+                                    detail_url_seen.add(detail_dedupe_key)
+                        elif detail_dedupe_key in local_detail_url_seen:
+                            should_skip_detail = True
+                        else:
+                            local_detail_url_seen.add(detail_dedupe_key)
+                        if should_skip_detail:
+                            slow_detail_duplicates += 1
+                            skipped_duplicates += 1
                             logger.info(
-                                "[source][slow] Request %s block=%d detail page settled before extraction. %s",
-                                request.id,
-                                block_index,
-                                _settle_summary(settle_metrics),
-                            )
-                            detail_contact = await _extract_fields(detail_page, slow_fields, None, detail_page.url)
-                            detail_contact.pop("__missing_required", None)
-                            detail_keys = _contact_keys(detail_contact)
-                            if detail_keys:
-                                logger.info(
-                                    "[source][slow] Request %s block=%d extracted detail fields: %s",
-                                    request.id,
-                                    block_index,
-                                    ", ".join(detail_keys),
-                                )
-                            else:
-                                slow_detail_field_empty += 1
-                                logger.warning(
-                                    "[source][slow] Request %s block=%d detail fields empty. %s fields=%s",
-                                    request.id,
-                                    block_index,
-                                    await _page_diagnostics(detail_page),
-                                    await _field_debug_summary(detail_page, slow_fields),
-                                )
-                            if detail_contact.get("source_data") and contact.get("source_data"):
-                                merged = dict(contact.get("source_data") or {})
-                                merged.update(detail_contact.get("source_data") or {})
-                                detail_contact["source_data"] = merged
-                            contact.update(detail_contact)
-                        except Exception as exc:
-                            slow_detail_errors += 1
-                            logger.exception(
-                                "[source][slow] Request %s block=%d detail scrape error for url=%s: %s",
+                                "[source][slow] Request %s block=%d skipping duplicate detail URL: %s",
                                 request.id,
                                 block_index,
                                 detail_url,
-                                exc,
                             )
-                        finally:
-                            await detail_page.close()
+                            continue
+                    detail_jobs.append({"block_index": block_index, "detail_url": detail_url, "contact": contact})
+                    continue
                 except Exception as exc:
                     slow_detail_errors += 1
                     logger.exception(
-                        "[source][slow] Request %s block=%d detail URL/extraction error: %s",
+                        "[source][slow] Request %s block=%d detail URL extraction error: %s",
                         request.id,
                         block_index,
                         exc,
                     )
-            normalized = _normalize_contact(contact, campaign_id, request.id)
-            dedupe_key = "|".join(str(normalized.get(k, "")).lower() for k in ("business_name", "domain", "phone", "address"))
-            if dedupe_key in seen:
-                skipped_duplicates += 1
-                continue
-            seen.add(dedupe_key)
-            batch.append(normalized)
-            total += 1
-            if len(batch) >= batch_size:
-                if not api.send_contacts(batch):
-                    raise RuntimeError(f"Failed sending generic source batch for request {request.id}")
-                batch = []
+            await add_contact(contact)
+
+        if detail_jobs:
+            logger.info(
+                "[source][slow] Request %s scraping %d unique detail page(s) with detail_workers=%d",
+                request.id,
+                len(detail_jobs),
+                detail_worker_count,
+            )
+            semaphore = asyncio.Semaphore(detail_worker_count)
+
+            async def run_detail_job(job: Dict[str, Any]) -> Dict[str, Any]:
+                async with semaphore:
+                    if stop_signal():
+                        return dict(job.get("contact") or {})
+                    return await scrape_detail_job(job)
+
+            tasks = [asyncio.create_task(run_detail_job(job)) for job in detail_jobs]
+            for task in asyncio.as_completed(tasks):
+                await add_contact(await task)
         if batch:
             if not api.send_contacts(batch):
                 raise RuntimeError(f"Failed sending generic source final batch for request {request.id}")
         if total <= 0:
+            if skipped_duplicates > 0 and slow_detail_errors <= 0:
+                logger.info(
+                    "[source] Request %s produced no new contacts because all candidates were duplicates.",
+                    request.id,
+                )
+                return 0
             raise RuntimeError(
                 f"Generic source produced 0 contacts for request {request.id}; "
                 "check required fields and field XPath mappings."
@@ -1386,6 +1430,7 @@ def run_generic_source_campaign(
     base_url: str,
     batch_size: int,
     request_workers: int,
+    detail_workers: int,
     show_browser: bool,
     proxy_url: str,
     scrape_mode: str,
@@ -1393,11 +1438,13 @@ def run_generic_source_campaign(
 ) -> None:
     api = LeadsApiClient(base_url, HttpClient())
     worker_count = max(1, int(request_workers or 1))
+    detail_worker_count = max(1, int(detail_workers or 1))
     logger.info(
-        "Generic source campaign start: campaign=%s source=%s workers=%s browser=%s proxy=%s",
+        "Generic source campaign start: campaign=%s source=%s request_workers=%s detail_workers=%s browser=%s proxy=%s",
         campaign_id,
         (source or {}).get("name") or (source or {}).get("id") or "generic",
         worker_count,
+        detail_worker_count,
         backend_display_name(None),
         "on" if normalize_proxy_url(proxy_url) else "off",
     )
@@ -1430,11 +1477,10 @@ def run_generic_source_campaign(
                     show_browser,
                     proxy_url,
                     should_stop,
+                    detail_workers=detail_worker_count,
                     detail_url_seen=detail_url_seen,
                     detail_url_seen_lock=detail_url_seen_lock,
                 ))
-                if total <= 0:
-                    raise RuntimeError(f"Generic source produced 0 contacts for request {item.id}")
                 if not should_stop():
                     api.set_request_status(item.id, "completed")
                 logger.info("[source] Completed request %s with %d contacts", item.id, total)
