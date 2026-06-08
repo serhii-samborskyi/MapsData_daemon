@@ -1451,6 +1451,7 @@ def run_generic_source_campaign(
 
     detail_url_seen: Set[str] = set()
     detail_url_seen_lock = threading.Lock()
+    empty_request_checks = 0
 
     while not should_stop():
         requests = api.get_requests_for_campaign_name(campaign_name, include_inuse=True)
@@ -1458,8 +1459,33 @@ def run_generic_source_campaign(
         pending = [item for item in available if str(getattr(item, "status", "") or "pending").lower() == "pending"]
         inuse = [item for item in available if str(getattr(item, "status", "") or "").lower() == "inuse"]
         if not available:
-            logger.info("[source] No more requests for campaign %s", campaign_id)
-            return
+            progress = api.get_campaign_request_progress(campaign_id)
+            unfinished = int(progress.get("unfinished_requests") or 0) if progress else None
+            completed = int(progress.get("completed_requests") or 0) if progress else None
+            total = int(progress.get("total_requests") or 0) if progress else None
+            if progress and unfinished == 0:
+                logger.info("[source] No more requests for campaign %s (completed=%s total=%s)", campaign_id, completed, total)
+                return
+            empty_request_checks += 1
+            logger.warning(
+                "[source] Request list empty but completion is not verified for campaign %s "
+                "(empty_check=%d unfinished=%s completed=%s total=%s). Retrying before stage completion.",
+                campaign_id,
+                empty_request_checks,
+                unfinished if unfinished is not None else "unknown",
+                completed if completed is not None else "unknown",
+                total if total is not None else "unknown",
+            )
+            if empty_request_checks >= 3:
+                raise RuntimeError(
+                    f"Generic source request list empty but campaign {campaign_id} still appears unfinished "
+                    f"(unfinished={unfinished if unfinished is not None else 'unknown'}, "
+                    f"completed={completed if completed is not None else 'unknown'}, "
+                    f"total={total if total is not None else 'unknown'})"
+                )
+            time.sleep(5)
+            continue
+        empty_request_checks = 0
 
         selected_pool = pending if pending else inuse
         selected_status = "pending" if pending else "inuse_recovery"

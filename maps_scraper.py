@@ -793,6 +793,15 @@ class LeadsApiClient:
                 out.append(RequestItem(id=rid, req_text=txt, status=status))
         return out
 
+    def get_campaign_request_progress(self, campaign_id: str) -> Dict[str, Any]:
+        enc = urllib.parse.quote(str(campaign_id))
+        url = f"{self.base_url}/dashboard/runtime-status?campaign_ids={enc}"
+        data = self.http.get_json(url)
+        campaigns = data.get("campaigns") if isinstance(data, dict) else {}
+        item = campaigns.get(str(campaign_id)) if isinstance(campaigns, dict) else {}
+        progress = item.get("requests") if isinstance(item, dict) else {}
+        return progress if isinstance(progress, dict) else {}
+
     def set_request_status(self, request_id: str, state: str) -> None:
         url = f"{self.base_url}/request/{request_id}/status/{state}"
         _ = self.http.get_text(url)
