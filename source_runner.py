@@ -74,6 +74,25 @@ def _absolute_url(base_url: str, value: str) -> str:
     return _strip_detail_url_trailing_slash(urllib.parse.urljoin(base_url, raw))
 
 
+def _normalize_website_url(base_url: str, value: Any) -> str:
+    raw = _clean(value)
+    if not raw:
+        return ""
+    if raw.startswith("//"):
+        return _strip_detail_url_trailing_slash(f"https:{raw}")
+    if raw.startswith(("http://", "https://")):
+        parsed = urllib.parse.urlsplit(raw)
+        if parsed.netloc.endswith("l.facebook.com") and parsed.path.startswith("/l.php"):
+            query = urllib.parse.parse_qs(parsed.query)
+            target = (query.get("u") or [""])[0]
+            if target:
+                return _normalize_website_url(base_url, target)
+        return _strip_detail_url_trailing_slash(raw)
+    if re.match(r"^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(/.*)?$", raw, flags=re.I):
+        return _strip_detail_url_trailing_slash(f"https://{raw}")
+    return _absolute_url(base_url, raw)
+
+
 def _strip_detail_url_trailing_slash(value: str) -> str:
     raw = _clean(value)
     if not raw:
@@ -516,9 +535,9 @@ async def _extract_fields(page, fields: List[dict], root_handle, page_url: str) 
     if missing_required:
         contact["__missing_required"] = missing_required
     if "domain" in contact:
-        contact["domain"] = _absolute_url(page_url, contact["domain"])
+        contact["domain"] = _normalize_website_url(page_url, contact["domain"])
     if "www" in contact:
-        contact["www"] = _absolute_url(page_url, contact["www"])
+        contact["www"] = _normalize_website_url(page_url, contact["www"])
     return contact
 
 
