@@ -1454,11 +1454,29 @@ def run_generic_source_campaign(
 
     while not should_stop():
         requests = api.get_requests_for_campaign_name(campaign_name, include_inuse=True)
-        pending = [item for item in requests if _clean(item.req_text)]
-        if not pending:
+        available = [item for item in requests if _clean(item.req_text)]
+        pending = [item for item in available if str(getattr(item, "status", "") or "pending").lower() == "pending"]
+        inuse = [item for item in available if str(getattr(item, "status", "") or "").lower() == "inuse"]
+        if not available:
             logger.info("[source] No more requests for campaign %s", campaign_id)
             return
-        selected = pending[:min(worker_count, len(pending))]
+
+        selected_pool = pending if pending else inuse
+        selected_status = "pending" if pending else "inuse_recovery"
+        if not selected_pool:
+            logger.info("[source] No claimable requests for campaign %s (available=%d)", campaign_id, len(available))
+            return
+
+        selected = selected_pool[:min(worker_count, len(selected_pool))]
+        logger.info(
+            "[source] Request selection campaign=%s available=%d pending=%d inuse=%d selected=%d selected_status=%s",
+            campaign_id,
+            len(available),
+            len(pending),
+            len(inuse),
+            len(selected),
+            selected_status,
+        )
         for item in selected:
             api.set_request_status(item.id, "inuse")
 

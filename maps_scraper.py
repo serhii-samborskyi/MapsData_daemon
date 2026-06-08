@@ -760,6 +760,7 @@ class Campaign:
 class RequestItem:
     id: str
     req_text: str
+    status: str = ""
 
 
 class LeadsApiClient:
@@ -787,8 +788,9 @@ class LeadsApiClient:
         for r in (data.get("requests") or []):
             rid = str(r.get("id","")).strip()
             txt = str(r.get("req_text","")).strip()
+            status = str(r.get("status","")).strip().lower()
             if rid:
-                out.append(RequestItem(id=rid, req_text=txt))
+                out.append(RequestItem(id=rid, req_text=txt, status=status))
         return out
 
     def set_request_status(self, request_id: str, state: str) -> None:
