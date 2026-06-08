@@ -96,6 +96,20 @@ def _normalize_proxy_url(value: Any) -> str:
     return f"http://{host}:{port}"
 
 
+def _strip_detail_url_trailing_slash(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = urlparse(raw)
+    except Exception:
+        return raw.rstrip("/")
+    if parsed.scheme and parsed.netloc:
+        path = parsed.path.rstrip("/")
+        return parsed._replace(path=path).geturl()
+    return raw.rstrip("/")
+
+
 class DaemonWebController:
     def __init__(self, config_path: str) -> None:
         self.base_dir = ROOT_DIR
@@ -591,7 +605,7 @@ class DaemonWebController:
     def start_source_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
         query = str(payload.get("query") or "").strip()
-        detail_url = str(payload.get("detail_url") or "").strip()
+        detail_url = _strip_detail_url_trailing_slash(payload.get("detail_url"))
         if not source:
             return {"ok": False, "error": "source_required"}
         if not query and not detail_url:
@@ -686,7 +700,7 @@ class DaemonWebController:
             return payload
 
     def start_live_detail_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        detail_url = str(payload.get("detail_url") or "").strip()
+        detail_url = _strip_detail_url_trailing_slash(payload.get("detail_url"))
         if not detail_url:
             return {"ok": False, "error": "detail_url_required"}
         run_id = uuid.uuid4().hex[:12]

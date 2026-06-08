@@ -71,7 +71,21 @@ def _absolute_url(base_url: str, value: str) -> str:
     raw = _clean(value)
     if not raw:
         return ""
-    return urllib.parse.urljoin(base_url, raw)
+    return _strip_detail_url_trailing_slash(urllib.parse.urljoin(base_url, raw))
+
+
+def _strip_detail_url_trailing_slash(value: str) -> str:
+    raw = _clean(value)
+    if not raw:
+        return ""
+    try:
+        parts = urllib.parse.urlsplit(raw)
+    except Exception:
+        return raw.rstrip("/")
+    if parts.scheme and parts.netloc:
+        path = parts.path.rstrip("/")
+        return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
+    return raw.rstrip("/")
 
 
 def _looks_like_url(value: Any) -> bool:
@@ -898,7 +912,7 @@ async def debug_source_template(
 
     config = source.get("config") if isinstance(source.get("config"), dict) else {}
     start_template = str(config.get("start_url_template") or "").strip()
-    manual_detail_url = _clean(detail_url)
+    manual_detail_url = _strip_detail_url_trailing_slash(str(detail_url or ""))
     url = manual_detail_url or start_template.replace("{query}", urllib.parse.quote_plus(str(query or "").strip()))
     fast = config.get("fast") if isinstance(config.get("fast"), dict) else {}
     slow = config.get("slow") if isinstance(config.get("slow"), dict) else {}
