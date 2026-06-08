@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import warnings
 from urllib.parse import quote, urlparse
 from typing import Any, Dict, Optional, Sequence
 
@@ -150,8 +151,13 @@ class AsyncBrowserRuntime:
                     if needs_geoip_fallback:
                         _warn("Camoufox geoip extra missing; retrying with geoip disabled.")
                         options["geoip"] = False
-                        self._camoufox_cm = AsyncCamoufox(**options)
-                        self.browser = await self._camoufox_cm.__aenter__()
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings(
+                                "ignore",
+                                message=r"When using a proxy, it is heavily recommended that you pass `geoip=True`\.",
+                            )
+                            self._camoufox_cm = AsyncCamoufox(**options)
+                            self.browser = await self._camoufox_cm.__aenter__()
                         return self.browser
                     raise
 
@@ -248,8 +254,13 @@ class SyncBrowserRuntime:
                     if needs_geoip_fallback:
                         _warn("Camoufox geoip extra missing; retrying with geoip disabled.")
                         options["geoip"] = False
-                        self._camoufox_cm = Camoufox(**options)
-                        self.browser = self._camoufox_cm.__enter__()
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings(
+                                "ignore",
+                                message=r"When using a proxy, it is heavily recommended that you pass `geoip=True`\.",
+                            )
+                            self._camoufox_cm = Camoufox(**options)
+                            self.browser = self._camoufox_cm.__enter__()
                         return self.browser
                     raise
 

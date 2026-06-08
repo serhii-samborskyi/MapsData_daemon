@@ -751,10 +751,19 @@ async def _scrape_request(
         blocks = await _query_nodes(page, block_xpath)
         logger.info("[source] Request %s collected %d blocks", request.id, len(blocks))
         if not blocks:
-            raise RuntimeError(
-                f"Generic source found 0 result blocks for request {request.id}; "
-                f"check block XPath or page access. block_xpath={block_xpath!r} {await _page_diagnostics(page)}"
+            await page.wait_for_timeout(5000)
+            if not stop_signal():
+                await _navigate_results(page, config, stop_signal)
+            blocks = await _query_nodes(page, block_xpath)
+            logger.info("[source] Request %s collected %d blocks after empty retry", request.id, len(blocks))
+        if not blocks:
+            logger.warning(
+                "[source] Request %s produced 0 result blocks; completing as empty. block_xpath=%r %s",
+                request.id,
+                block_xpath,
+                await _page_diagnostics(page),
             )
+            return 0
 
         contact_seen: Set[str] = set()
         local_detail_url_seen: Set[str] = set()
