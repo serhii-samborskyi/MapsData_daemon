@@ -554,6 +554,26 @@ async def _page_diagnostics(page) -> str:
     )
 
 
+async def _scroll_detail_page(page, scrolls: int, pause_min_ms: int = 500, pause_max_ms: int = 1200) -> None:
+    count = max(0, min(int(scrolls or 0), 50))
+    if count <= 0:
+        return
+    min_pause = max(50, int(pause_min_ms or 500))
+    max_pause = max(min_pause, int(pause_max_ms or min_pause))
+    for _ in range(count):
+        await page.evaluate(
+            r"""() => {
+                const root = document.scrollingElement || document.documentElement || document.body;
+                if (!root) return false;
+                const distance = Math.max(500, Math.floor((window.innerHeight || root.clientHeight || 900) * 0.85));
+                window.scrollBy(0, distance);
+                root.scrollTop = Math.max(root.scrollTop || 0, (window.scrollY || 0));
+                return true;
+            }"""
+        )
+        await page.wait_for_timeout(random.randint(min_pause, max_pause))
+
+
 def _normalize_contact(contact: Dict[str, Any], campaign_id: str, request_id: str) -> Dict[str, Any]:
     out = dict(contact)
     out["campaign_id"] = campaign_id
@@ -647,14 +667,16 @@ async def _scrape_request(
         detail_url_xpath = str(slow.get("detail_url_xpath") or "").strip()
         detail_url_within_block = bool(slow.get("detail_url_within_block", True))
         wait_xpath = str(slow.get("wait_xpath") or "").strip()
+        detail_scrolls = max(0, min(int(slow.get("detail_scrolls") or 0), 50))
         slow_fields = slow.get("fields") if isinstance(slow.get("fields"), list) else []
         if slow_enabled:
             logger.info(
-                "[source][slow] Enabled for request %s: detail_url_xpath=%r detail_url_scope=%s wait_xpath=%r fields=%d",
+                "[source][slow] Enabled for request %s: detail_url_xpath=%r detail_url_scope=%s wait_xpath=%r detail_scrolls=%d fields=%d",
                 request.id,
                 detail_url_xpath,
                 "block" if detail_url_within_block else "page",
                 wait_xpath,
+                detail_scrolls,
                 len(slow_fields),
             )
             if not detail_url_xpath:
@@ -737,6 +759,9 @@ async def _scrape_request(
                                     await _page_diagnostics(detail_page),
                                     str(exc)[:180],
                                 )
+                            if detail_scrolls:
+                                logger.info("[source][slow] Request %s block=%d scrolling detail page %d time(s).", request.id, block_index, detail_scrolls)
+                                await _scroll_detail_page(detail_page, detail_scrolls)
                             if wait_xpath:
                                 try:
                                     await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
@@ -890,6 +915,7 @@ async def debug_source_template(
     detail_url_xpath = str(slow.get("detail_url_xpath") or "").strip()
     detail_url_within_block = bool(slow.get("detail_url_within_block", True))
     wait_xpath = str(slow.get("wait_xpath") or "").strip()
+    detail_scrolls = max(0, min(int(slow.get("detail_scrolls") or 0), 50))
 
     result: Dict[str, Any] = {
         "ok": False,
@@ -956,6 +982,13 @@ async def debug_source_template(
                     detail_sample["diagnostics"] = await _page_diagnostics(page)
                     emit(f"Detail DOM wait warning: {exc}. {detail_sample['diagnostics']}")
                 emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
+
+                if detail_scrolls:
+                    emit(f"Scrolling detail page {detail_scrolls} time(s) before extraction.")
+                    await _scroll_detail_page(page, detail_scrolls)
+                    detail_sample["diagnostics"] = await _page_diagnostics(page)
+                    emit(f"Detail page after scroll. {detail_sample['diagnostics']}")
+                    emit_progress({"type": "detail_update", "block_index": 1, "detail": dict(detail_sample)})
 
                 if wait_xpath:
                     try:
@@ -1133,6 +1166,12 @@ async def debug_source_template(
                             detail_sample["diagnostics"] = await _page_diagnostics(detail_page)
                             emit(f"Block {block_index}: detail DOM wait warning: {exc}. {detail_sample['diagnostics']}")
                         emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
+                        if detail_scrolls:
+                            emit(f"Block {block_index}: scrolling detail page {detail_scrolls} time(s) before extraction.")
+                            await _scroll_detail_page(detail_page, detail_scrolls)
+                            detail_sample["diagnostics"] = await _page_diagnostics(detail_page)
+                            emit(f"Block {block_index}: detail page after scroll. {detail_sample['diagnostics']}")
+                            emit_progress({"type": "detail_update", "block_index": block_index, "detail": dict(detail_sample)})
                         if wait_xpath:
                             try:
                                 await detail_page.wait_for_selector(f"xpath={wait_xpath}", timeout=15000)
