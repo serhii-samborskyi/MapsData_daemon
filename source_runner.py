@@ -107,6 +107,21 @@ def _strip_detail_url_trailing_slash(value: str) -> str:
     return raw.rstrip("/")
 
 
+def _detail_url_dedupe_key(value: Any) -> str:
+    raw = _strip_detail_url_trailing_slash(str(value or ""))
+    if not raw:
+        return ""
+    try:
+        parts = urllib.parse.urlsplit(raw)
+    except Exception:
+        return raw.lower()
+    scheme = (parts.scheme or "https").lower()
+    netloc = parts.netloc.lower()
+    path = parts.path.rstrip("/")
+    query = parts.query
+    return urllib.parse.urlunsplit((scheme, netloc, path, query, ""))
+
+
 def _looks_like_url(value: Any) -> bool:
     raw = _clean(value)
     if not raw:
@@ -678,6 +693,8 @@ async def _scrape_request(
     show_browser: bool,
     proxy_url: str,
     stop_signal: Callable[[], bool],
+    detail_url_seen: Optional[Set[str]] = None,
+    detail_url_seen_lock: Optional[threading.Lock] = None,
 ) -> int:
     config = source.get("config") if isinstance(source.get("config"), dict) else {}
     start_template = str(config.get("start_url_template") or "").strip()
@@ -745,6 +762,7 @@ async def _scrape_request(
         slow_detail_attempted = 0
         slow_detail_opened = 0
         slow_detail_url_missing = 0
+        slow_detail_duplicates = 0
         slow_detail_wait_timeout = 0
         slow_detail_field_empty = 0
         slow_detail_errors = 0
@@ -816,6 +834,29 @@ async def _scrape_request(
                             await _field_debug_summary(page, fast_fields, root_handle=block),
                         )
                     else:
+                        detail_dedupe_key = _detail_url_dedupe_key(detail_url)
+                        if detail_dedupe_key:
+                            should_skip_detail = False
+                            if detail_url_seen is not None and detail_url_seen_lock is not None:
+                                with detail_url_seen_lock:
+                                    if detail_dedupe_key in detail_url_seen:
+                                        should_skip_detail = True
+                                    else:
+                                        detail_url_seen.add(detail_dedupe_key)
+                            elif detail_dedupe_key in seen:
+                                should_skip_detail = True
+                            else:
+                                seen.add(detail_dedupe_key)
+                            if should_skip_detail:
+                                slow_detail_duplicates += 1
+                                skipped_duplicates += 1
+                                logger.info(
+                                    "[source][slow] Request %s block=%d skipping duplicate detail URL: %s",
+                                    request.id,
+                                    block_index,
+                                    detail_url,
+                                )
+                                continue
                         detail_page = await context.new_page()
                         try:
                             logger.info("[source][slow] Request %s block=%d opening detail URL: %s", request.id, block_index, detail_url)
@@ -931,7 +972,7 @@ async def _scrape_request(
                 "check required fields and field XPath mappings."
             )
         logger.info(
-            "[source] Request %s summary: blocks=%d sent=%d skipped_duplicates=%d skipped_missing_required=%d slow_attempted=%d slow_opened=%d slow_missing_url=%d slow_wait_timeout=%d slow_empty_fields=%d slow_errors=%d",
+            "[source] Request %s summary: blocks=%d sent=%d skipped_duplicates=%d skipped_missing_required=%d slow_attempted=%d slow_opened=%d slow_missing_url=%d slow_detail_duplicates=%d slow_wait_timeout=%d slow_empty_fields=%d slow_errors=%d",
             request.id,
             len(blocks),
             total,
@@ -940,6 +981,7 @@ async def _scrape_request(
             slow_detail_attempted,
             slow_detail_opened,
             slow_detail_url_missing,
+            slow_detail_duplicates,
             slow_detail_wait_timeout,
             slow_detail_field_empty,
             slow_detail_errors,
@@ -1360,6 +1402,9 @@ def run_generic_source_campaign(
         "on" if normalize_proxy_url(proxy_url) else "off",
     )
 
+    detail_url_seen: Set[str] = set()
+    detail_url_seen_lock = threading.Lock()
+
     while not should_stop():
         requests = api.get_requests_for_campaign_name(campaign_name, include_inuse=True)
         pending = [item for item in requests if _clean(item.req_text)]
@@ -1375,7 +1420,19 @@ def run_generic_source_campaign(
 
         def run_one(item: RequestItem) -> None:
             try:
-                total = asyncio.run(_scrape_request(source, item, campaign_id, batch_size, api, scrape_mode, show_browser, proxy_url, should_stop))
+                total = asyncio.run(_scrape_request(
+                    source,
+                    item,
+                    campaign_id,
+                    batch_size,
+                    api,
+                    scrape_mode,
+                    show_browser,
+                    proxy_url,
+                    should_stop,
+                    detail_url_seen=detail_url_seen,
+                    detail_url_seen_lock=detail_url_seen_lock,
+                ))
                 if total <= 0:
                     raise RuntimeError(f"Generic source produced 0 contacts for request {item.id}")
                 if not should_stop():
