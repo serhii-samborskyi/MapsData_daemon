@@ -23,13 +23,13 @@
   "maps": {
     "batch_size": 10,
     "csv_dir": "",
-    "detail_workers": 1,
-    "max_concurrent": 1,
+    "detail_workers": 5,
+    "max_concurrent": 5,
     "scrape_mode": "slow",
     "scroll_pause_max_s": 0.8,
     "scroll_pause_min_s": 0.8,
-    "proxy_url": "",
-    "show_browser": true,
+    "proxy_url": "lxlytomnxi-country-US:bvfqf9qnbd@lite.flashproxy.io:6969",
+    "show_browser": false,
     "slow_place_pause_max_s": 3.0,
     "slow_place_pause_min_s": 0.8
   },
