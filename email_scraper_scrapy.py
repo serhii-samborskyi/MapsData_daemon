@@ -31,7 +31,12 @@ except Exception:
 import ssl
 from urllib.request import Request, urlopen
 
-from browser_backend import SyncBrowserRuntime, backend_display_name, normalize_proxy_url
+from browser_backend import (
+    SyncBrowserRuntime,
+    backend_display_name,
+    install_sync_blocked_resource_routes,
+    normalize_proxy_url,
+)
 from email_quality import (
     extract_candidate_emails_from_text,
     normalize_domain,
@@ -591,6 +596,7 @@ class EmailSpider(scrapy.Spider):
                 context = None
                 try:
                     context = browser.new_context(java_script_enabled=True, user_agent=user_agent)
+                    install_sync_blocked_resource_routes(context)
                     page = context.new_page()
                     page.goto(target, wait_until="domcontentloaded", timeout=page_timeout_ms)
                     page.wait_for_timeout(1200)

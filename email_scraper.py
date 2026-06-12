@@ -32,7 +32,13 @@ if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
     sys.path.insert(0, LOCAL_DEPS)
 
 from bs4 import BeautifulSoup
-from browser_backend import AsyncBrowserRuntime, backend_display_name, normalize_proxy_url
+from browser_backend import (
+    AsyncBrowserRuntime,
+    backend_display_name,
+    install_async_blocked_resource_routes,
+    normalize_proxy_url,
+    should_block_resource_url,
+)
 from email_quality import (
     filter_valid_emails,
     is_allowed_domain as quality_is_allowed_domain,
@@ -411,6 +417,7 @@ async def extract_emails_from_facebook(
         user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"),
     )
+    await install_async_blocked_resource_routes(context)
 
     # Allow third-party requests for Facebook
     context.set_default_timeout(int(timeout * 1000))
@@ -603,6 +610,8 @@ async def extract_emails(
     )
 
     async def route_handler(route):
+        if should_block_resource_url(route.request.url):
+            return await route.abort()
         if not block_assets and allow_third_party:
             return await route.continue_()
         try:
@@ -1156,6 +1165,7 @@ async def scrape_and_update_immediate(
                                             user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                                                         "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"),
                                         )
+                                        await install_async_blocked_resource_routes(context)
                                         context.set_default_timeout(int(timeout * 1000))
                                         context.set_default_navigation_timeout(int(timeout * 1000))
                                         page = await context.new_page()

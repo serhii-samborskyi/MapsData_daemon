@@ -16,7 +16,13 @@ except Exception:
     print("PySide6 is required. Install with: pip install PySide6")
     raise
 
-from daemon_config import DEFAULT_CONFIG, load_config, save_config
+from daemon_config import (
+    DEFAULT_CONFIG,
+    blocked_resource_extensions_to_env,
+    load_config,
+    normalize_blocked_resource_extensions,
+    save_config,
+)
 
 
 class DaemonUI(QtWidgets.QMainWindow):
@@ -106,11 +112,17 @@ class DaemonUI(QtWidgets.QMainWindow):
         self.maps_poll_interval.setRange(5, 3600)
         self.email_poll_interval = QtWidgets.QSpinBox()
         self.email_poll_interval.setRange(5, 3600)
+        self.browser_block_extensions_enabled = QtWidgets.QCheckBox("Enabled")
+        self.browser_blocked_extensions = QtWidgets.QPlainTextEdit()
+        self.browser_blocked_extensions.setFixedHeight(80)
+        self.browser_blocked_extensions.setPlaceholderText(".png, .jpg, .mp4, .woff2")
         general_form.addRow("Maps base URL", self.maps_base_url)
         general_form.addRow("Email base URL", self.email_base_url)
         general_form.addRow("Queue dir", self.queue_dir)
         general_form.addRow("Maps poll interval (s)", self.maps_poll_interval)
         general_form.addRow("Email poll interval (s)", self.email_poll_interval)
+        general_form.addRow("", self.browser_block_extensions_enabled)
+        general_form.addRow("Blocked browser formats", self.browser_blocked_extensions)
 
         pipeline_content = QtWidgets.QWidget()
         pipeline_form = QtWidgets.QFormLayout(pipeline_content)
@@ -572,12 +584,19 @@ class DaemonUI(QtWidgets.QMainWindow):
         maps_cfg = cfg.get("maps", {})
         email_cfg = cfg.get("email", {})
         pipeline_cfg = cfg.get("pipeline", {})
+        browser_cfg = cfg.get("browser", {}) if isinstance(cfg.get("browser"), dict) else {}
 
         self.maps_base_url.setText(cfg.get("maps_base_url", DEFAULT_CONFIG["maps_base_url"]))
         self.email_base_url.setText(cfg.get("email_base_url", DEFAULT_CONFIG["email_base_url"]))
         self.queue_dir.setText(cfg.get("queue_dir", DEFAULT_CONFIG["queue_dir"]))
         self.maps_poll_interval.setValue(int(cfg.get("maps_poll_interval_s", 30)))
         self.email_poll_interval.setValue(int(cfg.get("email_poll_interval_s", 15)))
+        self.browser_blocked_extensions.setPlainText(
+            blocked_resource_extensions_to_env(browser_cfg.get("blocked_resource_extensions", []))
+        )
+        self.browser_block_extensions_enabled.setChecked(
+            bool(browser_cfg.get("block_resource_extensions_enabled", True))
+        )
         self.pipeline_enabled.setChecked(bool(pipeline_cfg.get("enabled", True)))
         self.pipeline_base_url.setText(str(pipeline_cfg.get("base_url", "")))
         self.pipeline_actor.setText(str(pipeline_cfg.get("actor", "daemon")))
@@ -664,6 +683,14 @@ class DaemonUI(QtWidgets.QMainWindow):
         cfg["queue_dir"] = self.queue_dir.text().strip()
         cfg["maps_poll_interval_s"] = int(self.maps_poll_interval.value())
         cfg["email_poll_interval_s"] = int(self.email_poll_interval.value())
+        browser_cfg = cfg.get("browser", {})
+        if not isinstance(browser_cfg, dict):
+            browser_cfg = {}
+        cfg["browser"] = browser_cfg
+        browser_cfg["block_resource_extensions_enabled"] = bool(self.browser_block_extensions_enabled.isChecked())
+        browser_cfg["blocked_resource_extensions"] = normalize_blocked_resource_extensions(
+            self.browser_blocked_extensions.toPlainText()
+        )
         pipeline_cfg = cfg.get("pipeline", {})
         if not isinstance(pipeline_cfg, dict):
             pipeline_cfg = {}

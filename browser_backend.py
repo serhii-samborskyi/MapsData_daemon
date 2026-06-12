@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import sys
 import warnings
-from urllib.parse import quote, urlparse
-from typing import Any, Dict, Optional, Sequence
+from urllib.parse import quote, unquote, urlparse
+from typing import Any, Dict, List, Optional, Sequence
 
 
 LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
@@ -38,6 +38,11 @@ except Exception:
 
 
 DEFAULT_BACKEND = os.environ.get("DAEMON_BROWSER_BACKEND", "camoufox")
+DEFAULT_BLOCKED_RESOURCE_EXTENSIONS = [
+    ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".avif", ".apng",
+    ".mp4", ".webm", ".mov", ".m4v", ".avi", ".m3u8", ".ts", ".mp3", ".wav", ".ogg",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+]
 
 
 def _warn(msg: str) -> None:
@@ -97,6 +102,73 @@ def to_playwright_proxy(proxy_url: Optional[str]) -> Optional[Dict[str, str]]:
     if parsed.password:
         proxy["password"] = parsed.password
     return proxy
+
+
+def normalize_blocked_resource_extensions(value: Any = None) -> List[str]:
+    if value is None:
+        if os.environ.get("DAEMON_BLOCK_RESOURCE_EXTENSIONS_ENABLED", "1").strip().lower() in {"0", "false", "no", "off"}:
+            return []
+        value = os.environ.get("DAEMON_BLOCKED_RESOURCE_EXTENSIONS", ",".join(DEFAULT_BLOCKED_RESOURCE_EXTENSIONS))
+    if isinstance(value, str):
+        raw_items = value.replace("\n", ",").replace(";", ",").split(",")
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = list(value)
+    else:
+        raw_items = []
+
+    normalized: List[str] = []
+    seen = set()
+    for item in raw_items:
+        ext = str(item or "").strip().lower()
+        if not ext:
+            continue
+        if ext.startswith("*"):
+            ext = ext.lstrip("*")
+        if not ext.startswith("."):
+            ext = f".{ext}"
+        if "/" in ext or "\\" in ext or "?" in ext or "#" in ext:
+            continue
+        if ext not in seen:
+            seen.add(ext)
+            normalized.append(ext)
+    return normalized
+
+
+def should_block_resource_url(url: str, blocked_extensions: Any = None) -> bool:
+    extensions = normalize_blocked_resource_extensions(blocked_extensions)
+    if not extensions:
+        return False
+    try:
+        path = unquote(urlparse(str(url or "")).path).lower()
+    except Exception:
+        path = str(url or "").split("?", 1)[0].split("#", 1)[0].lower()
+    return any(path.endswith(ext) for ext in extensions)
+
+
+async def install_async_blocked_resource_routes(target: Any, blocked_extensions: Any = None) -> None:
+    extensions = normalize_blocked_resource_extensions(blocked_extensions)
+    if not extensions or not hasattr(target, "route"):
+        return
+
+    async def route_handler(route):
+        if should_block_resource_url(route.request.url, extensions):
+            return await route.abort()
+        return await route.continue_()
+
+    await target.route("**/*", route_handler)
+
+
+def install_sync_blocked_resource_routes(target: Any, blocked_extensions: Any = None) -> None:
+    extensions = normalize_blocked_resource_extensions(blocked_extensions)
+    if not extensions or not hasattr(target, "route"):
+        return
+
+    def route_handler(route):
+        if should_block_resource_url(route.request.url, extensions):
+            return route.abort()
+        return route.continue_()
+
+    target.route("**/*", route_handler)
 
 
 class AsyncBrowserRuntime:

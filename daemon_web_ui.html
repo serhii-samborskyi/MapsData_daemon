@@ -157,7 +157,7 @@
     }
     .fields { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
     .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-    input, select {
+    input, select, textarea {
       width: 100%;
       border: 1px solid var(--line);
       border-radius: 10px;
@@ -166,8 +166,17 @@
       padding: 8px 10px;
       font-size: 13px;
     }
+    textarea {
+      resize: vertical;
+      min-height: 72px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
     .check { display: flex; align-items: center; gap: 8px; }
     .check input { width: auto; }
+    .field.full { grid-column: 1 / -1; }
+    .field-line { display: flex; align-items: flex-start; gap: 12px; }
+    .field-line .check { flex: 0 0 auto; min-height: 39px; }
+    .field-line textarea { flex: 1 1 auto; }
     .inline-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .inline-row .muted { font-size: 12px; }
 
@@ -253,6 +262,13 @@
                 <div class="field"><label>Queue dir</label><input id="queue_dir"></div>
                 <div class="field"><label>Maps poll interval (s)</label><input id="maps_poll_interval_s" type="number" min="5" max="3600"></div>
                 <div class="field"><label>Email poll interval (s)</label><input id="email_poll_interval_s" type="number" min="5" max="3600"></div>
+                <div class="field full">
+                  <label>Blocked browser formats</label>
+                  <div class="field-line">
+                    <div class="check"><input id="browser_block_resource_extensions_enabled" type="checkbox"><label for="browser_block_resource_extensions_enabled">Enabled</label></div>
+                    <textarea id="browser_blocked_resource_extensions" rows="3" placeholder=".png, .jpg, .mp4, .woff2"></textarea>
+                  </div>
+                </div>
               </div>
             </div>
           </details>
@@ -385,6 +401,8 @@
       queue_dir: 'queue_dir',
       maps_poll_interval_s: 'maps_poll_interval_s',
       email_poll_interval_s: 'email_poll_interval_s',
+      browser_block_resource_extensions_enabled: 'browser_block_resource_extensions_enabled',
+      browser_blocked_resource_extensions: 'browser_blocked_resource_extensions',
       pipeline_enabled: 'pipeline_enabled',
       pipeline_base_url: 'pipeline_base_url',
       pipeline_actor: 'pipeline_actor',
@@ -472,6 +490,12 @@
       setInput(ids.queue_dir, cfg.queue_dir);
       setInput(ids.maps_poll_interval_s, cfg.maps_poll_interval_s);
       setInput(ids.email_poll_interval_s, cfg.email_poll_interval_s);
+      const browser = cfg.browser || {};
+      setInput(ids.browser_block_resource_extensions_enabled, browser.block_resource_extensions_enabled !== false);
+      const blockedExtensions = Array.isArray(browser.blocked_resource_extensions)
+        ? browser.blocked_resource_extensions.join(', ')
+        : (browser.blocked_resource_extensions || '');
+      setInput(ids.browser_blocked_resource_extensions, blockedExtensions);
 
       const p = cfg.pipeline || {};
       setInput(ids.pipeline_enabled, p.enabled);
@@ -531,6 +555,10 @@
         queue_dir: getInput(ids.queue_dir),
         maps_poll_interval_s: getInput(ids.maps_poll_interval_s),
         email_poll_interval_s: getInput(ids.email_poll_interval_s),
+        browser: {
+          block_resource_extensions_enabled: getInput(ids.browser_block_resource_extensions_enabled),
+          blocked_resource_extensions: getInput(ids.browser_blocked_resource_extensions),
+        },
         pipeline: {
           enabled: getInput(ids.pipeline_enabled),
           base_url: getInput(ids.pipeline_base_url),

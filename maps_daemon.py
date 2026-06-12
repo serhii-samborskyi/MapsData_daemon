@@ -16,7 +16,7 @@ if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
     sys.path.insert(0, LOCAL_DEPS)
 
 import maps_scraper
-from daemon_config import load_config
+from daemon_config import apply_browser_blocking_env, load_config
 from maps_scraper import Campaign, CampaignProcessor, HttpClient, LeadsApiClient
 from pipeline_runtime import PipelineContext, default_worker_id, run_pipeline_worker
 
@@ -247,6 +247,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    apply_browser_blocking_env(cfg)
     pipeline_cfg = cfg.get("pipeline", {})
     maps_cfg = cfg.get("maps", {})
     base_url = args.maps_base_url or cfg.get("maps_base_url")

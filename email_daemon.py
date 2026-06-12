@@ -17,7 +17,7 @@ LOCAL_DEPS = os.path.join(os.path.dirname(__file__), ".deps")
 if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
     sys.path.insert(0, LOCAL_DEPS)
 
-from daemon_config import load_config
+from daemon_config import apply_browser_blocking_env, load_config
 from pipeline_runtime import PipelineContext, default_worker_id, run_pipeline_worker
 
 
@@ -434,6 +434,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    apply_browser_blocking_env(cfg)
     pipeline_cfg = cfg.get("pipeline", {})
     email_cfg = cfg.get("email", {})
     base_url = args.email_base_url or cfg.get("email_base_url")

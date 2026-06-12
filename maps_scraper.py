@@ -18,7 +18,12 @@ if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
 
 from bs4 import BeautifulSoup
 from lxml import html
-from browser_backend import AsyncBrowserRuntime, backend_display_name, normalize_proxy_url
+from browser_backend import (
+    AsyncBrowserRuntime,
+    backend_display_name,
+    install_async_blocked_resource_routes,
+    normalize_proxy_url,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -90,6 +95,7 @@ async def extractEmail(url: str, name: str, browser, recursive: bool = True, max
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
         )
+        await install_async_blocked_resource_routes(context)
         page = await context.new_page()
         try:
             response = await asyncio.wait_for(page.goto(url, wait_until="domcontentloaded"), timeout=5000)
@@ -463,6 +469,7 @@ async def scroll_google_maps(search_query: str, max_concurrent: int = 3):
         logger.info("Maps browser backend: %s", backend_display_name(None))
         try:
             page = await browser.new_page(viewport={'width': 1280, 'height': 720})
+            await install_async_blocked_resource_routes(page)
 
             search_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}"
             logger.info(f"Navigating to {search_url}")
@@ -1508,6 +1515,7 @@ def run_campaign_slow_dedup_and_yield_batches(
                     "Chrome/114.0.0.0 Safari/537.36"
                 )
             )
+            await install_async_blocked_resource_routes(context)
             page = await context.new_page()
 
             sent_any = False
@@ -1694,6 +1702,7 @@ def run_scrape_and_yield_batches(
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/114.0.0.0 Safari/537.36"
             ))
+            await install_async_blocked_resource_routes(context)
             page = await context.new_page()
             try:
                 url = f"https://www.google.com/maps/search/{urllib.parse.quote_plus(query)}"

@@ -3,7 +3,14 @@ from __future__ import annotations
 import json
 import os
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+
+DEFAULT_BLOCKED_RESOURCE_EXTENSIONS = [
+    ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".avif", ".apng",
+    ".mp4", ".webm", ".mov", ".m4v", ".avi", ".m3u8", ".ts", ".mp3", ".wav", ".ogg",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+]
 
 
 DEFAULT_CONFIG: Dict[str, Any] = {
@@ -12,6 +19,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "maps_poll_interval_s": 30,
     "email_poll_interval_s": 15,
     "queue_dir": "queue",
+    "browser": {
+        "block_resource_extensions_enabled": True,
+        "blocked_resource_extensions": DEFAULT_BLOCKED_RESOURCE_EXTENSIONS,
+    },
     "maps": {
         "batch_size": 20,
         "max_concurrent": 5,
@@ -70,6 +81,45 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "email_log": "logs/email_daemon.log",
     },
 }
+
+
+def normalize_blocked_resource_extensions(value: Any) -> List[str]:
+    if isinstance(value, str):
+        raw_items = value.replace("\n", ",").replace(";", ",").split(",")
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = list(value)
+    else:
+        raw_items = []
+
+    normalized: List[str] = []
+    seen = set()
+    for item in raw_items:
+        ext = str(item or "").strip().lower()
+        if not ext:
+            continue
+        if ext.startswith("*"):
+            ext = ext.lstrip("*")
+        if not ext.startswith("."):
+            ext = f".{ext}"
+        if "/" in ext or "\\" in ext or "?" in ext or "#" in ext:
+            continue
+        if ext not in seen:
+            seen.add(ext)
+            normalized.append(ext)
+    return normalized
+
+
+def blocked_resource_extensions_to_env(value: Any) -> str:
+    return ",".join(normalize_blocked_resource_extensions(value))
+
+
+def apply_browser_blocking_env(config: Dict[str, Any]) -> None:
+    browser_cfg = config.get("browser", {}) if isinstance(config.get("browser"), dict) else {}
+    enabled = bool(browser_cfg.get("block_resource_extensions_enabled", True))
+    os.environ["DAEMON_BLOCK_RESOURCE_EXTENSIONS_ENABLED"] = "1" if enabled else "0"
+    os.environ["DAEMON_BLOCKED_RESOURCE_EXTENSIONS"] = blocked_resource_extensions_to_env(
+        browser_cfg.get("blocked_resource_extensions", [])
+    )
 
 
 def _merge(dst: Dict[str, Any], src: Dict[str, Any]) -> Dict[str, Any]:

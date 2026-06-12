@@ -29,7 +29,7 @@ try:
 except Exception:
     psutil = None  # type: ignore
 
-from daemon_config import load_config, save_config
+from daemon_config import apply_browser_blocking_env, load_config, normalize_blocked_resource_extensions, save_config
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -249,6 +249,7 @@ class DaemonWebController:
                 return {"ok": True, "status": "already_running"}
 
             self.config = load_config(self.config_path)
+            apply_browser_blocking_env(self.config)
             mode_flag = self._daemon_mode_flag()
             args = [sys.executable, script_name, "--config", self.config_path, mode_flag]
             maps_cfg = self.config.get("maps", {}) if isinstance(self.config.get("maps"), dict) else {}
@@ -334,6 +335,20 @@ class DaemonWebController:
         current["queue_dir"] = str(payload.get("queue_dir", current.get("queue_dir", "queue"))).strip() or "queue"
         current["maps_poll_interval_s"] = _to_int(payload.get("maps_poll_interval_s"), int(current.get("maps_poll_interval_s", 30)), 5, 3600)
         current["email_poll_interval_s"] = _to_int(payload.get("email_poll_interval_s"), int(current.get("email_poll_interval_s", 15)), 5, 3600)
+
+        browser_cfg = dict(current.get("browser") or {})
+        browser_input = payload.get("browser") if isinstance(payload.get("browser"), dict) else {}
+        browser_cfg["block_resource_extensions_enabled"] = _to_bool(
+            browser_input.get(
+                "block_resource_extensions_enabled",
+                browser_cfg.get("block_resource_extensions_enabled", True),
+            ),
+            True,
+        )
+        browser_cfg["blocked_resource_extensions"] = normalize_blocked_resource_extensions(
+            browser_input.get("blocked_resource_extensions", browser_cfg.get("blocked_resource_extensions", []))
+        )
+        current["browser"] = browser_cfg
 
         maps_cfg = dict(current.get("maps") or {})
         maps_input = payload.get("maps") if isinstance(payload.get("maps"), dict) else {}
@@ -743,7 +758,10 @@ class DaemonWebController:
             asyncio.set_event_loop(loop)
             runtime = None
             try:
-                from browser_backend import AsyncBrowserRuntime, normalize_proxy_url
+                from browser_backend import AsyncBrowserRuntime, install_async_blocked_resource_routes, normalize_proxy_url
+                from daemon_config import apply_browser_blocking_env
+                with self.lock:
+                    apply_browser_blocking_env(self.config)
 
                 async def boot() -> None:
                     nonlocal runtime
@@ -755,6 +773,7 @@ class DaemonWebController:
                     )
                     browser = await runtime.launch()
                     context = await browser.new_context()
+                    await install_async_blocked_resource_routes(context)
                     page = await context.new_page()
                     append_log(f"Opening live detail page {detail_url}")
                     await page.goto(detail_url, wait_until="domcontentloaded", timeout=60000)

@@ -9,7 +9,12 @@ import time
 import urllib.parse
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from browser_backend import AsyncBrowserRuntime, backend_display_name, normalize_proxy_url
+from browser_backend import (
+    AsyncBrowserRuntime,
+    backend_display_name,
+    install_async_blocked_resource_routes,
+    normalize_proxy_url,
+)
 from email_quality import extract_candidate_emails_from_text
 from maps_scraper import Campaign, HttpClient, LeadsApiClient, RequestItem
 
@@ -722,6 +727,7 @@ async def _scrape_request(
     browser = await runtime.launch()
     try:
         context = await browser.new_context()
+        await install_async_blocked_resource_routes(context)
         page = await context.new_page()
         logger.info("[source] Opening %s", url)
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
@@ -1129,6 +1135,7 @@ async def debug_source_template(
     browser = await runtime.launch()
     try:
         context = await browser.new_context()
+        await install_async_blocked_resource_routes(context)
         page = await context.new_page()
 
         if manual_detail_url:
