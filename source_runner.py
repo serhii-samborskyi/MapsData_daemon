@@ -19,6 +19,7 @@ from email_quality import extract_candidate_emails_from_text
 from maps_scraper import Campaign, HttpClient, LeadsApiClient, RequestItem
 
 logger = logging.getLogger(__name__)
+SOURCE_DETAIL_JOB_TIMEOUT_SECONDS = 180
 
 CORE_ALIAS = {
     "business_name": "business_name",
@@ -785,10 +786,15 @@ async def _scrape_request(
         slow_detail_wait_timeout = 0
         slow_detail_field_empty = 0
         slow_detail_errors = 0
+        slow_detail_timeout = 0
         detail_url_xpath = str(slow.get("detail_url_xpath") or "").strip()
         detail_url_within_block = bool(slow.get("detail_url_within_block", True))
         wait_xpath = str(slow.get("wait_xpath") or "").strip()
         detail_scrolls = max(0, min(int(slow.get("detail_scrolls") or 0), 50))
+        detail_job_timeout_seconds = max(
+            30,
+            min(int(slow.get("detail_timeout_seconds") or SOURCE_DETAIL_JOB_TIMEOUT_SECONDS), 900),
+        )
         slow_fields = slow.get("fields") if isinstance(slow.get("fields"), list) else []
         if slow_enabled:
             logger.info(
@@ -1008,14 +1014,35 @@ async def _scrape_request(
             semaphore = asyncio.Semaphore(detail_worker_count)
 
             async def run_detail_job(job: Dict[str, Any]) -> Dict[str, Any]:
+                nonlocal slow_detail_timeout, slow_detail_errors
                 async with semaphore:
                     if stop_signal():
                         return dict(job.get("contact") or {})
-                    return await scrape_detail_job(job)
+                    try:
+                        return await asyncio.wait_for(
+                            scrape_detail_job(job),
+                            timeout=detail_job_timeout_seconds,
+                        )
+                    except asyncio.TimeoutError:
+                        slow_detail_timeout += 1
+                        slow_detail_errors += 1
+                        logger.warning(
+                            "[source][slow] Request %s block=%d detail scrape timed out after %ss; keeping fast fields only. url=%s",
+                            request.id,
+                            int(job.get("block_index") or 0),
+                            detail_job_timeout_seconds,
+                            str(job.get("detail_url") or ""),
+                        )
+                        return dict(job.get("contact") or {})
 
             tasks = [asyncio.create_task(run_detail_job(job)) for job in detail_jobs]
-            for task in asyncio.as_completed(tasks):
-                await add_contact(await task)
+            try:
+                for task in asyncio.as_completed(tasks):
+                    await add_contact(await task)
+            finally:
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
         if batch:
             if not api.send_contacts(batch):
                 raise RuntimeError(f"Failed sending generic source final batch for request {request.id}")
@@ -1031,7 +1058,7 @@ async def _scrape_request(
                 "check required fields and field XPath mappings."
             )
         logger.info(
-            "[source] Request %s summary: blocks=%d sent=%d skipped_duplicates=%d skipped_missing_required=%d slow_attempted=%d slow_opened=%d slow_missing_url=%d slow_detail_duplicates=%d slow_wait_timeout=%d slow_empty_fields=%d slow_errors=%d",
+            "[source] Request %s summary: blocks=%d sent=%d skipped_duplicates=%d skipped_missing_required=%d slow_attempted=%d slow_opened=%d slow_missing_url=%d slow_detail_duplicates=%d slow_wait_timeout=%d slow_timeouts=%d slow_empty_fields=%d slow_errors=%d",
             request.id,
             len(blocks),
             total,
@@ -1042,6 +1069,7 @@ async def _scrape_request(
             slow_detail_url_missing,
             slow_detail_duplicates,
             slow_detail_wait_timeout,
+            slow_detail_timeout,
             slow_detail_field_empty,
             slow_detail_errors,
         )

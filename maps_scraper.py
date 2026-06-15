@@ -1115,10 +1115,11 @@ class CampaignProcessor:
                 )
                 return
             if stage_failed:
-                logger.warning(
-                    "[fast] Request %s stays in current state after scrape failure (API does not accept 'pending').",
-                    request.id,
-                )
+                try:
+                    self.api.set_request_status(request.id, "failed")
+                    logger.warning("[fast] Marked request %s as failed after scrape error.", request.id)
+                except Exception as status_exc:
+                    logger.warning("[fast] Could not mark request %s failed: %s", request.id, status_exc)
             else:
                 self.api.set_request_status(request.id, "completed")
                 logger.info(f"[fast] Completed request {request.id} (total leads seen: {total_seen})")
@@ -1166,10 +1167,11 @@ class CampaignProcessor:
                 )
                 return
             if stage_failed:
-                logger.warning(
-                    "[slow] Request %s stays in current state after scrape failure (API does not accept 'pending').",
-                    request.id,
-                )
+                try:
+                    self.api.set_request_status(request.id, "failed")
+                    logger.warning("[slow] Marked request %s as failed after scrape error.", request.id)
+                except Exception as status_exc:
+                    logger.warning("[slow] Could not mark request %s failed: %s", request.id, status_exc)
                 time.sleep(1.0)
                 return
             current_total = totals_by_request.get(request.id, 0)
