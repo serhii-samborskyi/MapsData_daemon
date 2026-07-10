@@ -758,7 +758,7 @@ class DaemonWebController:
             asyncio.set_event_loop(loop)
             runtime = None
             try:
-                from browser_backend import AsyncBrowserRuntime, install_async_blocked_resource_routes, normalize_proxy_url
+                from browser_backend import AsyncBrowserRuntime, async_new_browser_context, install_async_blocked_resource_routes, normalize_proxy_url
                 from daemon_config import apply_browser_blocking_env
                 with self.lock:
                     apply_browser_blocking_env(self.config)
@@ -772,7 +772,7 @@ class DaemonWebController:
                         proxy_url=normalize_proxy_url(str(payload.get("proxy_url") if payload.get("proxy_url") is not None else maps_cfg.get("proxy_url", ""))),
                     )
                     browser = await runtime.launch()
-                    context = await browser.new_context()
+                    context = await async_new_browser_context(browser)
                     await install_async_blocked_resource_routes(context)
                     page = await context.new_page()
                     append_log(f"Opening live detail page {detail_url}")

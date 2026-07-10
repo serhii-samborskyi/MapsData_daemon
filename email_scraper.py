@@ -34,6 +34,7 @@ if os.path.isdir(LOCAL_DEPS) and LOCAL_DEPS not in sys.path:
 from bs4 import BeautifulSoup
 from browser_backend import (
     AsyncBrowserRuntime,
+    async_new_browser_context,
     backend_display_name,
     install_async_blocked_resource_routes,
     normalize_proxy_url,
@@ -412,7 +413,8 @@ async def extract_emails_from_facebook(
     """Extract emails from a Facebook page (relaxed validation)"""
     logger.info(f"📘 FACEBOOK: Starting extraction from {facebook_url}")
 
-    context = await browser.new_context(
+    context = await async_new_browser_context(
+        browser,
         java_script_enabled=True,  # Facebook needs JS
         user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"),
@@ -603,7 +605,8 @@ async def extract_emails(
     if base_host:
         allowed_hosts.add(base_host)
 
-    context = await browser.new_context(
+    context = await async_new_browser_context(
+        browser,
         java_script_enabled=js_enabled,
         user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"),
@@ -1160,7 +1163,8 @@ async def scrape_and_update_immediate(
                                         )
 
                                         target = domain if True else "http://" + strip_url_prefix(domain)
-                                        context = await browser.new_context(
+                                        context = await async_new_browser_context(
+                                            browser,
                                             java_script_enabled=False,
                                             user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                                                         "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"),

@@ -36,6 +36,7 @@ from browser_backend import (
     backend_display_name,
     install_sync_blocked_resource_routes,
     normalize_proxy_url,
+    sync_new_browser_context,
 )
 from email_quality import (
     extract_candidate_emails_from_text,
@@ -595,7 +596,7 @@ class EmailSpider(scrapy.Spider):
             for target in targets:
                 context = None
                 try:
-                    context = browser.new_context(java_script_enabled=True, user_agent=user_agent)
+                    context = sync_new_browser_context(browser, java_script_enabled=True, user_agent=user_agent)
                     install_sync_blocked_resource_routes(context)
                     page = context.new_page()
                     page.goto(target, wait_until="domcontentloaded", timeout=page_timeout_ms)

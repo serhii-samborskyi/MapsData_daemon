@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from browser_backend import (
     AsyncBrowserRuntime,
+    async_new_browser_context,
     backend_display_name,
     install_async_blocked_resource_routes,
     normalize_proxy_url,
@@ -727,7 +728,7 @@ async def _scrape_request(
     )
     browser = await runtime.launch()
     try:
-        context = await browser.new_context()
+        context = await async_new_browser_context(browser)
         await install_async_blocked_resource_routes(context)
         page = await context.new_page()
         logger.info("[source] Opening %s", url)
@@ -1162,7 +1163,7 @@ async def debug_source_template(
     )
     browser = await runtime.launch()
     try:
-        context = await browser.new_context()
+        context = await async_new_browser_context(browser)
         await install_async_blocked_resource_routes(context)
         page = await context.new_page()
 

@@ -52,6 +52,56 @@ def _warn(msg: str) -> None:
         pass
 
 
+def _is_viewport_schema_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        "browser.setdefaultviewport" in message
+        and "viewport.ismobile" in message
+        and "not described in this scheme" in message
+    )
+
+
+def _context_kwargs_without_default_viewport(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    next_kwargs = dict(kwargs)
+    next_kwargs.pop("viewport", None)
+    next_kwargs["no_viewport"] = True
+    return next_kwargs
+
+
+async def async_new_browser_context(browser: Any, **kwargs: Any) -> Any:
+    """Create a browser context with a Camoufox viewport compatibility fallback."""
+    try:
+        return await browser.new_context(**kwargs)
+    except Exception as exc:
+        if not _is_viewport_schema_error(exc):
+            raise
+        _warn("Browser rejected default viewport payload; retrying context with no_viewport=True.")
+        return await browser.new_context(**_context_kwargs_without_default_viewport(kwargs))
+
+
+async def async_new_browser_page(browser: Any, **kwargs: Any) -> Any:
+    """Create a browser page with a Camoufox viewport compatibility fallback."""
+    try:
+        return await browser.new_page(**kwargs)
+    except Exception as exc:
+        if not _is_viewport_schema_error(exc):
+            raise
+        _warn("Browser rejected page viewport payload; retrying page in no_viewport context.")
+        context = await async_new_browser_context(browser, no_viewport=True)
+        return await context.new_page()
+
+
+def sync_new_browser_context(browser: Any, **kwargs: Any) -> Any:
+    """Create a sync browser context with a Camoufox viewport compatibility fallback."""
+    try:
+        return browser.new_context(**kwargs)
+    except Exception as exc:
+        if not _is_viewport_schema_error(exc):
+            raise
+        _warn("Browser rejected default viewport payload; retrying context with no_viewport=True.")
+        return browser.new_context(**_context_kwargs_without_default_viewport(kwargs))
+
+
 def normalize_browser_backend(value: Optional[str]) -> str:
     raw = str(value or DEFAULT_BACKEND).strip().lower()
     if raw in {"camoufox", "camou"}:

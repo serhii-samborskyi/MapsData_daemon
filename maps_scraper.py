@@ -20,6 +20,8 @@ from bs4 import BeautifulSoup
 from lxml import html
 from browser_backend import (
     AsyncBrowserRuntime,
+    async_new_browser_context,
+    async_new_browser_page,
     backend_display_name,
     install_async_blocked_resource_routes,
     normalize_proxy_url,
@@ -92,7 +94,8 @@ async def extractEmail(url: str, name: str, browser, recursive: bool = True, max
         if not url:
             return {"email": set()}
 
-        context = await browser.new_context(
+        context = await async_new_browser_context(
+            browser,
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
         )
         await install_async_blocked_resource_routes(context)
@@ -468,7 +471,7 @@ async def scroll_google_maps(search_query: str, max_concurrent: int = 3):
         browser = await runtime.launch()
         logger.info("Maps browser backend: %s", backend_display_name(None))
         try:
-            page = await browser.new_page(viewport={'width': 1280, 'height': 720})
+            page = await async_new_browser_page(browser, viewport={'width': 1280, 'height': 720})
             await install_async_blocked_resource_routes(page)
 
             search_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}"
@@ -1510,7 +1513,8 @@ def run_campaign_slow_dedup_and_yield_batches(
         browser = await runtime.launch()
         logger.info("Maps browser backend: %s", backend_display_name(None))
         try:
-            context = await browser.new_context(
+            context = await async_new_browser_context(
+                browser,
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -1699,7 +1703,7 @@ def run_scrape_and_yield_batches(
         browser = await runtime.launch()
         logger.info("Maps browser backend: %s", backend_display_name(None))
         try:
-            context = await browser.new_context(user_agent=(
+            context = await async_new_browser_context(browser, user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/114.0.0.0 Safari/537.36"
