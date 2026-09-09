@@ -4,6 +4,7 @@ import json
 import logging
 import math
 import os
+import signal
 import socket
 import ssl
 import subprocess
@@ -12,7 +13,7 @@ import time
 import traceback
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Dict, Optional
 
 class PipelineApiClient:
@@ -58,6 +59,8 @@ class PipelineApiClient:
                 body = exc.read().decode("utf-8", "ignore")
             except Exception:
                 body = ""
+            finally:
+                exc.close()
             detail = body.strip() or str(exc)
             self.logger.warning("Pipeline API %s %s failed: HTTP %s %s", method.upper(), path, exc.code, detail[:400])
             return {"_ok": False, "_status": int(exc.code), "_error": detail}
@@ -257,21 +260,46 @@ def _run_subprocess_with_stop(
     cwd: str,
     logger: logging.Logger,
     should_stop: Callable[[], bool],
+    process_group: bool = False,
 ) -> int:
-    proc = subprocess.Popen(args, cwd=cwd)
+    grouped = process_group and os.name == "posix"
+    proc = subprocess.Popen(args, cwd=cwd, start_new_session=grouped)
+
+    def terminate() -> None:
+        if grouped:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        elif proc.poll() is None:
+            proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            if grouped:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                proc.kill()
+            proc.wait()
+
     try:
         while proc.poll() is None:
             if should_stop():
-                proc.terminate()
-                try:
-                    proc.wait(timeout=10)
-                except Exception:
-                    proc.kill()
+                terminate()
                 return -15
             time.sleep(1.0)
     finally:
         if proc.poll() is None:
-            proc.terminate()
+            terminate()
+        if grouped:
+            # Browser descendants may outlive the scraper process after a crash.
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
     return int(proc.returncode or 0)
 
 
@@ -476,6 +504,7 @@ def _run_email_stage(
     api: PipelineApiClient,
     logger: logging.Logger,
     should_stop: Callable[[], bool],
+    scoped: bool = False,
 ) -> None:
     email_cfg = ctx.email_cfg
     pipeline_cfg = ctx.pipeline_cfg
@@ -543,7 +572,9 @@ def _run_email_stage(
         email_policy,
     )
 
-    code = _run_subprocess_with_stop(args, cwd=ctx.base_dir, logger=logger, should_stop=should_stop)
+    code = _run_subprocess_with_stop(
+        args, cwd=ctx.base_dir, logger=logger, should_stop=should_stop, process_group=scoped,
+    )
     if code != 0:
         raise RuntimeError(f"Email scraper failed for stage {stage} with code={code}")
 
@@ -557,7 +588,7 @@ def _run_finalize_stage(campaign_id: str, ctx: PipelineContext, api: PipelineApi
     logger.info("Finalize stage stats for campaign %s: %s", campaign_id, stats)
 
 
-def run_pipeline_worker(
+def _run_pipeline_worker(
     logger: logging.Logger,
     ctx: PipelineContext,
     worker_id: str,
@@ -698,6 +729,7 @@ def run_pipeline_worker(
             or _clean_scalar(run_obj.get("maps_scrape_mode", ""))
             or "slow"
         )
+        streaming = str(claim.get("execution_mode") or run_obj.get("execution_mode") or "").strip().lower() == "streaming"
 
         if not run_id or not campaign_id or not stage:
             logger.error("Invalid claim payload: %s", claim)
@@ -742,7 +774,12 @@ def run_pipeline_worker(
         try:
             _heartbeat_once()
 
-            if stage == "maps_scrape":
+            if streaming and stage in {"cleanup_contacts", "email_fast", "email_fallback"}:
+                logger.info("Skipping legacy %s for streaming campaign %s.", stage, campaign_id)
+            elif streaming and stage == "maps_scrape":
+                streaming_ctx = replace(ctx, maps_cfg={**ctx.maps_cfg, "batch_size": 1})
+                _run_maps_stage(campaign_id, campaign_name, maps_scrape_mode, streaming_ctx, api, logger, stop_signal)
+            elif stage == "maps_scrape":
                 _run_maps_stage(campaign_id, campaign_name, maps_scrape_mode, ctx, api, logger, stop_signal)
             elif stage == "cleanup_contacts":
                 _run_cleanup_stage(campaign_id, api, logger)
@@ -757,6 +794,8 @@ def run_pipeline_worker(
 
             if lease_lost.is_set():
                 raise RuntimeError(f"Pipeline lease lost before stage completion for run={run_id} stage={stage}")
+            if streaming and should_stop():
+                raise RuntimeError("Stopping before streaming stage completion")
 
             resp = api.stage_complete(run_id=run_id, worker_id=worker_id, machine_id=machine_id, stage=stage)
             if not bool(resp.get("_ok", True)):
@@ -780,6 +819,37 @@ def run_pipeline_worker(
             beat.stop()
 
     logger.info("Pipeline worker stopping")
+
+
+def run_pipeline_worker(
+    logger: logging.Logger,
+    ctx: PipelineContext,
+    worker_id: str,
+    actor: str,
+    claim_interval_s: float,
+    lease_seconds: int,
+    heartbeat_interval_s: float,
+    should_stop: Callable[[], bool],
+) -> None:
+    if __package__:
+        from .streaming_runtime import SourceEmailWorker
+    else:
+        from streaming_runtime import SourceEmailWorker
+
+    done = threading.Event()
+    stop = lambda: should_stop() or done.is_set()
+    cfg = ctx.pipeline_cfg if isinstance(ctx.pipeline_cfg, dict) else {}
+    api = PipelineApiClient(cfg.get("base_url") or ctx.email_base_url, logger)
+    source_worker = SourceEmailWorker(api, ctx, logger, worker_id, stop)
+    thread = threading.Thread(target=source_worker.run, name="streaming-source-email", daemon=True)
+    thread.start()
+    try:
+        _run_pipeline_worker(
+            logger, ctx, worker_id, actor, claim_interval_s, lease_seconds, heartbeat_interval_s, stop,
+        )
+    finally:
+        done.set()
+        thread.join()
 
 
 def default_machine_id() -> str:
