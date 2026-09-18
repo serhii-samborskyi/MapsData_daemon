@@ -16,6 +16,66 @@ import urllib.request
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Dict, Optional
 
+
+class DaemonMetricSampler:
+    """Collect lightweight host/process metrics without an extra dependency."""
+
+    def __init__(self, role: str) -> None:
+        self.role = str(role or "worker").strip() or "worker"
+        self._host_sample = None
+        self._process_sample = None
+
+    @staticmethod
+    def _host_cpu_sample():
+        try:
+            with open("/proc/stat", "r", encoding="utf-8") as handle:
+                parts = handle.readline().split()
+            if not parts or parts[0] != "cpu":
+                return None
+            values = [int(value) for value in parts[1:]]
+            total = sum(values)
+            idle = values[3] + (values[4] if len(values) > 4 else 0)
+            return total, idle
+        except (OSError, ValueError, IndexError):
+            return None
+
+    def snapshot(self) -> Dict[str, Any]:
+        host_cpu_percent = None
+        host_sample = self._host_cpu_sample()
+        if host_sample and self._host_sample:
+            total_delta = host_sample[0] - self._host_sample[0]
+            idle_delta = host_sample[1] - self._host_sample[1]
+            if total_delta > 0:
+                host_cpu_percent = round(max(0.0, min(100.0, (1.0 - idle_delta / total_delta) * 100.0)), 1)
+        if host_sample:
+            self._host_sample = host_sample
+
+        process_cpu_percent = None
+        process_sample = (time.process_time(), time.monotonic())
+        if self._process_sample:
+            cpu_delta = process_sample[0] - self._process_sample[0]
+            wall_delta = process_sample[1] - self._process_sample[1]
+            if wall_delta > 0:
+                process_cpu_percent = round(max(0.0, (cpu_delta / wall_delta) * 100.0), 1)
+        self._process_sample = process_sample
+
+        try:
+            load_1 = round(float(os.getloadavg()[0]), 2)
+        except (AttributeError, OSError):
+            load_1 = None
+        return {
+            "daemon": {
+                "role": self.role,
+                "hostname": socket.gethostname().split(".")[0],
+                "pid": os.getpid(),
+                "host_cpu_percent": host_cpu_percent,
+                "process_cpu_percent": process_cpu_percent,
+                "load_1": load_1,
+                "cpu_count": os.cpu_count(),
+            }
+        }
+
+
 class PipelineApiClient:
     def __init__(self, base_url: str, logger: logging.Logger, timeout_s: float = 20.0) -> None:
         base = (base_url or "").strip().rstrip("/")
@@ -74,13 +134,22 @@ class PipelineApiClient:
             self.logger.warning("Pipeline API %s %s failed: %s", method.upper(), path, exc)
             return {"_ok": False, "_status": 0, "_error": str(exc)}
 
-    def claim(self, worker_id: str, machine_id: str, actor: str, lease_seconds: int) -> Dict[str, Any]:
+    def claim(
+        self,
+        worker_id: str,
+        machine_id: str,
+        actor: str,
+        lease_seconds: int,
+        worker_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         payload = {
             "worker_id": worker_id,
             "machine_id": machine_id,
             "actor": actor,
             "lease_seconds": int(lease_seconds),
         }
+        if worker_metadata:
+            payload["worker_metadata"] = worker_metadata
         return self._request_json("POST", "/api/pipeline/claim", payload)
 
     def list_active_campaigns(self) -> list[Dict[str, Any]]:
@@ -97,14 +166,31 @@ class PipelineApiClient:
         }
         return self._request_json("POST", f"/api/campaign/{campaign_id}/pipeline/start", payload)
 
-    def heartbeat(self, run_id: str, worker_id: str, machine_id: str, stage: str, lease_seconds: int) -> Dict[str, Any]:
+    def heartbeat(
+        self,
+        run_id: str,
+        worker_id: str,
+        machine_id: str,
+        stage: str,
+        lease_seconds: int,
+        worker_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         payload = {
             "worker_id": worker_id,
             "machine_id": machine_id,
             "stage": stage,
             "lease_seconds": int(lease_seconds),
         }
+        if worker_metadata:
+            payload["worker_metadata"] = worker_metadata
         return self._request_json("POST", f"/api/pipeline/{run_id}/heartbeat", payload)
+
+    def release(self, run_id: str, worker_id: str, machine_id: str, stage: str) -> Dict[str, Any]:
+        return self._request_json(
+            "POST",
+            f"/api/pipeline/{run_id}/release",
+            {"worker_id": worker_id, "machine_id": machine_id, "stage": stage},
+        )
 
     def stage_complete(self, run_id: str, worker_id: str, machine_id: str, stage: str) -> Dict[str, Any]:
         payload = {
@@ -597,10 +683,12 @@ def _run_pipeline_worker(
     lease_seconds: int,
     heartbeat_interval_s: float,
     should_stop: Callable[[], bool],
+    worker_kind: str = "worker",
 ) -> None:
     pipeline_cfg = ctx.pipeline_cfg if isinstance(ctx.pipeline_cfg, dict) else {}
     api = PipelineApiClient(pipeline_cfg.get("base_url") or ctx.email_base_url, logger)
     machine_id = str(pipeline_cfg.get("machine_id") or "").strip() or default_machine_id()
+    metrics = DaemonMetricSampler(worker_kind)
     no_claim_counter = 0
     auto_start_enabled = bool(pipeline_cfg.get("auto_start_on_run_not_started", True))
     auto_start_cooldown_s = max(5.0, _coerce_float(pipeline_cfg.get("auto_start_cooldown_s", 30), 30.0))
@@ -651,7 +739,13 @@ def _run_pipeline_worker(
             )
 
     while not should_stop():
-        claim = api.claim(worker_id=worker_id, machine_id=machine_id, actor=actor, lease_seconds=lease_seconds)
+        claim = api.claim(
+            worker_id=worker_id,
+            machine_id=machine_id,
+            actor=actor,
+            lease_seconds=lease_seconds,
+            worker_metadata=metrics.snapshot(),
+        )
         run_obj = claim.get("run", {}) if isinstance(claim.get("run"), dict) else {}
         claim_run_id = (
             _clean_scalar(claim.get("run_id", ""))
@@ -747,6 +841,7 @@ def _run_pipeline_worker(
         )
 
         lease_lost = threading.Event()
+        daemon_stop = threading.Event()
 
         def _heartbeat_once() -> Dict[str, Any]:
             response = api.heartbeat(
@@ -755,17 +850,20 @@ def _run_pipeline_worker(
                 machine_id=machine_id,
                 stage=stage,
                 lease_seconds=lease_seconds,
+                worker_metadata=metrics.snapshot(),
             )
             status_code = int(response.get("_status", 200) or 200) if isinstance(response, dict) else 0
             if status_code == 409:
                 lease_lost.set()
                 raise RuntimeError(f"Pipeline lease lost for run={run_id} stage={stage}")
+            if str(response.get("daemon_state") or "").strip().lower() == "stopped":
+                daemon_stop.set()
             return response if isinstance(response, dict) else {}
 
-        stop_signal = lambda: should_stop() or lease_lost.is_set()
+        stop_signal = lambda: should_stop() or lease_lost.is_set() or daemon_stop.is_set()
 
         beat = Heartbeater(
-            interval_s=heartbeat_interval_s,
+            interval_s=min(10.0, heartbeat_interval_s),
             beat_fn=_heartbeat_once,
             logger=logger,
         )
@@ -794,6 +892,10 @@ def _run_pipeline_worker(
 
             if lease_lost.is_set():
                 raise RuntimeError(f"Pipeline lease lost before stage completion for run={run_id} stage={stage}")
+            if daemon_stop.is_set():
+                release_response = api.release(run_id, worker_id, machine_id, stage)
+                logger.info("Daemon stop acknowledged; released run=%s stage=%s response=%s", run_id, stage, release_response)
+                continue
             if streaming and should_stop():
                 raise RuntimeError("Stopping before streaming stage completion")
 
@@ -804,6 +906,10 @@ def _run_pipeline_worker(
                 raise RuntimeError(f"Stage completion rejected due lease conflict for run={run_id} stage={stage}")
             logger.info("Stage complete acknowledged: run=%s stage=%s resp=%s", run_id, stage, resp)
         except Exception as exc:
+            if daemon_stop.is_set():
+                release_response = api.release(run_id, worker_id, machine_id, stage)
+                logger.info("Daemon stop acknowledged after interruption; released run=%s stage=%s response=%s", run_id, stage, release_response)
+                continue
             tb = traceback.format_exc(limit=3)
             logger.exception("Stage failed: run=%s campaign=%s stage=%s", run_id, campaign_id, stage)
             fail_resp = api.fail(
@@ -830,6 +936,7 @@ def run_pipeline_worker(
     lease_seconds: int,
     heartbeat_interval_s: float,
     should_stop: Callable[[], bool],
+    worker_kind: str = "worker",
 ) -> None:
     if __package__:
         from .streaming_runtime import SourceEmailWorker
@@ -840,12 +947,13 @@ def run_pipeline_worker(
     stop = lambda: should_stop() or done.is_set()
     cfg = ctx.pipeline_cfg if isinstance(ctx.pipeline_cfg, dict) else {}
     api = PipelineApiClient(cfg.get("base_url") or ctx.email_base_url, logger)
-    source_worker = SourceEmailWorker(api, ctx, logger, worker_id, stop)
+    machine_id = str(cfg.get("machine_id") or "").strip() or default_machine_id()
+    source_worker = SourceEmailWorker(api, ctx, logger, worker_id, stop, machine_id=machine_id, worker_kind=worker_kind)
     thread = threading.Thread(target=source_worker.run, name="streaming-source-email", daemon=True)
     thread.start()
     try:
         _run_pipeline_worker(
-            logger, ctx, worker_id, actor, claim_interval_s, lease_seconds, heartbeat_interval_s, stop,
+            logger, ctx, worker_id, actor, claim_interval_s, lease_seconds, heartbeat_interval_s, stop, worker_kind,
         )
     finally:
         done.set()

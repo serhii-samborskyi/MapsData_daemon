@@ -215,6 +215,7 @@ def run_pipeline_daemon(
         lease_seconds=lease_seconds,
         heartbeat_interval_s=heartbeat_interval_s,
         should_stop=lambda: STOP,
+        worker_kind="maps",
     )
 
 

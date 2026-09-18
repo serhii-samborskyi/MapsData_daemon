@@ -34,13 +34,13 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 if __package__:
-    from .pipeline_runtime import PipelineApiClient, _coerce_int, _run_email_stage
+    from .pipeline_runtime import DaemonMetricSampler, PipelineApiClient, _coerce_int, _run_email_stage
 else:
-    from pipeline_runtime import PipelineApiClient, _coerce_int, _run_email_stage
+    from pipeline_runtime import DaemonMetricSampler, PipelineApiClient, _coerce_int, _run_email_stage
 
 
 LEASE_SECONDS = 180
-HEARTBEAT_SECONDS = 30
+HEARTBEAT_SECONDS = 10
 POLL_SECONDS = 1.0
 SOURCE_TASKS_PATH = "/api/streaming/source-tasks"
 
@@ -170,10 +170,12 @@ def process_contact(task, ctx, logger, should_stop):
 
 
 class TaskLease:
-    def __init__(self, api, task, should_stop, logger):
+    def __init__(self, api, task, should_stop, logger, identity=None):
         self.api, self.task = api, task
         self.should_stop, self.logger = should_stop, logger
+        self.identity = dict(identity or {})
         self.lost = threading.Event()
+        self.controlled_stop = False
         self._done = threading.Event()
         self.deadline = time.monotonic() + LEASE_SECONDS
         self._thread = threading.Thread(target=self._heartbeat, name="source-task-heartbeat", daemon=True)
@@ -186,8 +188,11 @@ class TaskLease:
     def action(self, action, **payload):
         response = self.api._request_json(
             "POST", f"{SOURCE_TASKS_PATH}/{self.task['id']}/{action}",
-            {"lease_token": self.task["lease_token"], **payload}, timeout_s=10.0,
+            {**self.identity, "lease_token": self.task["lease_token"], **payload}, timeout_s=10.0,
         )
+        if str(response.get("daemon_state") or "").strip().lower() == "stopped":
+            self.controlled_stop = True
+            self.lost.set()
         if response.get("active") is False or int(response.get("_status", 200)) in {403, 404, 409, 410}:
             self.lost.set()
         return response
@@ -221,14 +226,30 @@ class TaskLease:
 
 
 class SourceEmailWorker:
-    def __init__(self, api, ctx, logger, worker_id, should_stop):
+    def __init__(self, api, ctx, logger, worker_id, should_stop, machine_id=None, worker_kind="worker"):
         self.api, self.ctx, self.logger = api, ctx, logger
-        self.identity = {"worker_id": worker_id}
+        self.managed = machine_id is not None
+        self.worker_id = f"{worker_id}-source-email" if self.managed else worker_id
+        self.machine_id = str(machine_id or worker_id).strip()
+        self.worker_kind = worker_kind
+        self.metrics = DaemonMetricSampler("source_email")
         self.should_stop = should_stop
         self.concurrency = min(8, max(1, _coerce_int(ctx.pipeline_cfg.get("streaming_concurrency", 2), 2)))
 
+    def _identity(self):
+        if not self.managed:
+            return {"worker_id": self.worker_id}
+        return {
+            "worker_id": self.worker_id,
+            "machine_id": self.machine_id,
+            "worker_metadata": self.metrics.snapshot(),
+        }
+
+    def _lease_identity(self):
+        return self._identity() if self.managed else {}
+
     def _process_task(self, task, should_stop):
-        lease = TaskLease(self.api, task, should_stop, self.logger)
+        lease = TaskLease(self.api, task, should_stop, self.logger, self._lease_identity())
         completing = False
         try:
             lease.start()
@@ -255,6 +276,12 @@ class SourceEmailWorker:
             if not completing and not lease.stopped():
                 lease.action("complete", status="failed", error=str(exc)[:2000])
         finally:
+            if lease.controlled_stop:
+                try:
+                    response = lease.action("release")
+                    self.logger.info("Daemon stop released source task=%s response=%s", task["id"], response)
+                except Exception:
+                    self.logger.exception("Could not release stopped source task=%s", task["id"])
             lease.close()
 
     @staticmethod
@@ -299,7 +326,7 @@ class SourceEmailWorker:
                                 self.logger.exception("Source task failed; its lease remains recoverable.")
                             next_poll = 0.0
                     if len(futures) < self.concurrency and time.monotonic() >= next_poll:
-                        payload = {**self.identity, "limit": 1}
+                        payload = {**self._identity(), "limit": 1}
                         if campaign_id is not None:
                             payload["campaign_id"] = str(campaign_id)
                         try:
