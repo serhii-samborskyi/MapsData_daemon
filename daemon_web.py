@@ -398,6 +398,7 @@ class DaemonWebController:
         pipeline_cfg["base_url"] = str(pipeline_input.get("base_url", pipeline_cfg.get("base_url", ""))).strip()
         pipeline_cfg["actor"] = str(pipeline_input.get("actor", pipeline_cfg.get("actor", "daemon"))).strip() or "daemon"
         pipeline_cfg["worker_id"] = str(pipeline_input.get("worker_id", pipeline_cfg.get("worker_id", ""))).strip()
+        pipeline_cfg["worker_pool_size"] = _to_int(pipeline_input.get("worker_pool_size"), int(pipeline_cfg.get("worker_pool_size", 10)), 1, 10)
         pipeline_cfg["claim_interval_s"] = _to_int(pipeline_input.get("claim_interval_s"), int(pipeline_cfg.get("claim_interval_s", 10)), 1, 3600)
         pipeline_cfg["lease_seconds"] = _to_int(pipeline_input.get("lease_seconds"), int(pipeline_cfg.get("lease_seconds", 120)), 10, 7200)
         pipeline_cfg["heartbeat_interval_s"] = _to_int(pipeline_input.get("heartbeat_interval_s"), int(pipeline_cfg.get("heartbeat_interval_s", 30)), 1, 3600)

@@ -225,6 +225,7 @@ def main() -> None:
     parser.add_argument("--pipeline-mode", dest="pipeline_mode", action="store_const", const=True, default=None, help="Run pipeline worker mode (claim stages from API)")
     parser.add_argument("--legacy-mode", dest="pipeline_mode", action="store_const", const=False, help="Run legacy active-campaign polling mode")
     parser.add_argument("--worker-id", default=None, help="Pipeline worker id (defaults to host+pid)")
+    parser.add_argument("--pipeline-workers", type=int, default=None, help="Idle pipeline worker pool size (1-10)")
     parser.add_argument("--actor", default=None, help="Pipeline actor name")
     parser.add_argument("--claim-interval", type=float, default=None, help="Pipeline claim polling interval in seconds")
     parser.add_argument("--lease-seconds", type=int, default=None, help="Pipeline lease length in seconds")
@@ -250,6 +251,8 @@ def main() -> None:
     cfg = load_config(args.config)
     apply_browser_blocking_env(cfg)
     pipeline_cfg = cfg.get("pipeline", {})
+    if args.pipeline_workers is not None and isinstance(pipeline_cfg, dict):
+        pipeline_cfg["worker_pool_size"] = max(1, min(10, args.pipeline_workers))
     maps_cfg = cfg.get("maps", {})
     base_url = args.maps_base_url or cfg.get("maps_base_url")
     poll_interval_s = args.poll_interval if args.poll_interval is not None else cfg.get("maps_poll_interval_s", 30)

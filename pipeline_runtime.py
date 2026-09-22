@@ -949,15 +949,34 @@ def run_pipeline_worker(
     api = PipelineApiClient(cfg.get("base_url") or ctx.email_base_url, logger)
     machine_id = str(cfg.get("machine_id") or "").strip() or default_machine_id()
     source_worker = SourceEmailWorker(api, ctx, logger, worker_id, stop, machine_id=machine_id, worker_kind=worker_kind)
-    thread = threading.Thread(target=source_worker.run, name="streaming-source-email", daemon=True)
-    thread.start()
+    source_thread = threading.Thread(target=source_worker.run, name="streaming-source-email", daemon=True)
+    source_thread.start()
+    worker_count = min(10, max(1, _coerce_int(cfg.get("worker_pool_size", 10), 10)))
+    logger.info("Pipeline worker pool starting: kind=%s workers=%s", worker_kind, worker_count)
+    workers = []
     try:
-        _run_pipeline_worker(
-            logger, ctx, worker_id, actor, claim_interval_s, lease_seconds, heartbeat_interval_s, stop, worker_kind,
-        )
+        for slot in range(worker_count):
+            slot_worker_id = worker_id if worker_count == 1 else f"{worker_id}-{slot + 1}"
+            slot_ctx = ctx if slot == 0 else replace(
+                ctx,
+                pipeline_cfg={**cfg, "auto_start_on_run_not_started": False},
+            )
+            thread = threading.Thread(
+                target=_run_pipeline_worker,
+                args=(
+                    logger, slot_ctx, slot_worker_id, actor, claim_interval_s,
+                    lease_seconds, heartbeat_interval_s, stop, worker_kind,
+                ),
+                name=f"pipeline-{worker_kind}-{slot + 1}",
+                daemon=True,
+            )
+            thread.start()
+            workers.append(thread)
+        for thread in workers:
+            thread.join()
     finally:
         done.set()
-        thread.join()
+        source_thread.join()
 
 
 def default_machine_id() -> str:

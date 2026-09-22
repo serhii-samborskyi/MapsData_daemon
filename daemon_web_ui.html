@@ -281,6 +281,7 @@
                 <div class="field"><label>Pipeline base URL</label><input id="pipeline_base_url"></div>
                 <div class="field"><label>Actor</label><input id="pipeline_actor"></div>
                 <div class="field"><label>Worker ID override</label><input id="pipeline_worker_id"></div>
+                <div class="field"><label>Pipeline worker pool</label><input id="pipeline_worker_pool_size" type="number" min="1" max="10"></div>
                 <div class="field"><label>Claim interval (s)</label><input id="pipeline_claim_interval_s" type="number" min="1" max="3600"></div>
                 <div class="field"><label>Lease seconds</label><input id="pipeline_lease_seconds" type="number" min="10" max="7200"></div>
                 <div class="field"><label>Heartbeat interval (s)</label><input id="pipeline_heartbeat_interval_s" type="number" min="1" max="3600"></div>
@@ -407,6 +408,7 @@
       pipeline_base_url: 'pipeline_base_url',
       pipeline_actor: 'pipeline_actor',
       pipeline_worker_id: 'pipeline_worker_id',
+      pipeline_worker_pool_size: 'pipeline_worker_pool_size',
       pipeline_claim_interval_s: 'pipeline_claim_interval_s',
       pipeline_lease_seconds: 'pipeline_lease_seconds',
       pipeline_heartbeat_interval_s: 'pipeline_heartbeat_interval_s',
@@ -502,6 +504,7 @@
       setInput(ids.pipeline_base_url, p.base_url);
       setInput(ids.pipeline_actor, p.actor);
       setInput(ids.pipeline_worker_id, p.worker_id);
+      setInput(ids.pipeline_worker_pool_size, p.worker_pool_size);
       setInput(ids.pipeline_claim_interval_s, p.claim_interval_s);
       setInput(ids.pipeline_lease_seconds, p.lease_seconds);
       setInput(ids.pipeline_heartbeat_interval_s, p.heartbeat_interval_s);
@@ -564,6 +567,7 @@
           base_url: getInput(ids.pipeline_base_url),
           actor: getInput(ids.pipeline_actor),
           worker_id: getInput(ids.pipeline_worker_id),
+          worker_pool_size: getInput(ids.pipeline_worker_pool_size),
           claim_interval_s: getInput(ids.pipeline_claim_interval_s),
           lease_seconds: getInput(ids.pipeline_lease_seconds),
           heartbeat_interval_s: getInput(ids.pipeline_heartbeat_interval_s),
